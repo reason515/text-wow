@@ -19,7 +19,8 @@ CREATE TABLE IF NOT EXISTS users (
     username VARCHAR(32) UNIQUE NOT NULL,
     password_hash VARCHAR(256) NOT NULL,
     email VARCHAR(128) UNIQUE,
-    max_team_size INTEGER DEFAULT 5,          -- 最大队伍人数
+    max_team_size INTEGER DEFAULT 5,          -- 最大队伍人数上限
+    unlocked_slots INTEGER DEFAULT 1,         -- 已解锁槽位数(初始1个)
     gold INTEGER DEFAULT 0,                   -- 金币(小队共享)
     current_zone_id VARCHAR(32) DEFAULT 'elwynn', -- 当前区域(小队共享)
     total_kills INTEGER DEFAULT 0,            -- 总击杀(小队统计)
@@ -42,6 +43,8 @@ CREATE TABLE IF NOT EXISTS characters (
     faction VARCHAR(16) NOT NULL,
     team_slot INTEGER NOT NULL,       -- 队伍位置: 1-5 (1=队长)
     is_active INTEGER DEFAULT 1,      -- 是否出战: 1是 0否
+    is_dead INTEGER DEFAULT 0,        -- 是否死亡: 1是 0否
+    revive_at DATETIME,               -- 复活时间(NULL表示存活)
     level INTEGER DEFAULT 1,
     exp INTEGER DEFAULT 0,
     exp_to_next INTEGER DEFAULT 100,
@@ -109,27 +112,54 @@ CREATE TABLE IF NOT EXISTS classes (
     base_spirit INTEGER DEFAULT 10
 );
 
--- 技能配置表
+-- 技能配置表 (扩展版)
 CREATE TABLE IF NOT EXISTS skills (
     id VARCHAR(32) PRIMARY KEY,
     name VARCHAR(32) NOT NULL,
     description TEXT,
+    icon VARCHAR(64),                 -- 图标标识(预留)
     class_id VARCHAR(32),
-    type VARCHAR(16) NOT NULL,
-    target VARCHAR(16) NOT NULL,
-    damage_type VARCHAR(16),
-    base_damage INTEGER DEFAULT 0,
-    damage_scaling REAL DEFAULT 1.0,
+    type VARCHAR(16) NOT NULL,        -- attack/heal/buff/debuff/dot/hot/shield/control等
+    target_type VARCHAR(16) NOT NULL, -- self/ally/enemy/ally_all/enemy_all等
+    damage_type VARCHAR(16),          -- physical/magic/fire/frost/shadow/holy/nature
+    base_value INTEGER DEFAULT 0,     -- 基础数值
+    scaling_stat VARCHAR(16),         -- 成长属性: strength/agility/intellect/spirit
+    scaling_ratio REAL DEFAULT 1.0,   -- 属性加成系数
     mp_cost INTEGER DEFAULT 0,
     cooldown INTEGER DEFAULT 0,
     level_required INTEGER DEFAULT 1,
-    effect_type VARCHAR(32),
-    effect_value REAL,
-    effect_duration INTEGER,
-    FOREIGN KEY (class_id) REFERENCES classes(id)
+    effect_id VARCHAR(32),            -- 附加效果ID
+    effect_chance REAL DEFAULT 1.0,   -- 效果触发概率
+    tags TEXT,                        -- 标签(JSON数组)
+    FOREIGN KEY (class_id) REFERENCES classes(id),
+    FOREIGN KEY (effect_id) REFERENCES effects(id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_skills_class_id ON skills(class_id);
+CREATE INDEX IF NOT EXISTS idx_skills_type ON skills(type);
+
+-- 效果配置表 (Buff/Debuff)
+-- 每场战斗开始时清空所有效果
+CREATE TABLE IF NOT EXISTS effects (
+    id VARCHAR(32) PRIMARY KEY,
+    name VARCHAR(32) NOT NULL,
+    description TEXT,
+    icon VARCHAR(64),
+    type VARCHAR(16) NOT NULL,        -- stat_mod/dot/hot/shield/stun/silence等
+    is_buff INTEGER NOT NULL,         -- 1=增益 0=减益
+    is_stackable INTEGER DEFAULT 0,   -- 是否可叠加
+    max_stacks INTEGER DEFAULT 1,     -- 最大叠加层数
+    duration INTEGER NOT NULL,        -- 持续回合数
+    tick_interval INTEGER DEFAULT 1,  -- 触发间隔
+    value_type VARCHAR(16),           -- flat=固定值 percent=百分比
+    value REAL,                       -- 效果数值
+    stat_affected VARCHAR(32),        -- 影响的属性
+    damage_type VARCHAR(16),          -- DOT伤害类型
+    can_dispel INTEGER DEFAULT 1,     -- 是否可驱散
+    tags TEXT                         -- 标签(JSON数组)
+);
+
+CREATE INDEX IF NOT EXISTS idx_effects_type ON effects(type);
 
 -- 物品配置表
 CREATE TABLE IF NOT EXISTS items (

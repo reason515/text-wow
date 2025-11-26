@@ -28,11 +28,35 @@
 ```
 
 **小队规则：**
-- 每个用户最多创建5个角色
+- 初始只有1个角色槽位，需解锁更多
+- 最多可解锁5个角色槽位
 - 角色通过 `team_slot` (1-5) 确定位置
 - `is_active` 控制是否参与战斗
-- 所有角色共享金币（存在用户级别）
-- 经验值各自独立获取
+- 金币小队共享，经验平均分配
+
+**槽位解锁条件（建议）：**
+| 槽位 | 解锁条件 |
+|-----|---------|
+| 1 | 初始拥有 |
+| 2 | 队伍中任意角色达到 10 级 |
+| 3 | 队伍中任意角色达到 20 级 |
+| 4 | 队伍中任意角色达到 35 级 |
+| 5 | 队伍中任意角色达到 50 级 |
+
+**死亡与复活机制：**
+- 角色死亡后需要等待复活
+- 复活时间 = 基础时间 × 当前死亡角色数量
+- 玩家需通过策略配置尽量避免角色死亡
+
+| 死亡人数 | 复活等待时间(建议) |
+|---------|------------------|
+| 1人死亡 | 30秒 |
+| 2人死亡 | 60秒 (每人) |
+| 3人死亡 | 90秒 (每人) |
+| 4人死亡 | 120秒 (每人) |
+| 5人全灭 | 180秒 (每人) |
+
+> 💡 这个机制鼓励玩家合理配置策略（如低血量时使用治疗技能），而不是无脑挂机
 
 ### 📐 数据库架构
 
@@ -76,7 +100,8 @@
 | username | VARCHAR(32) | UNIQUE NOT NULL | 用户名 |
 | password_hash | VARCHAR(256) | NOT NULL | 密码哈希 |
 | email | VARCHAR(128) | UNIQUE | 邮箱（可选） |
-| max_team_size | INTEGER | DEFAULT 5 | 最大队伍人数 |
+| max_team_size | INTEGER | DEFAULT 5 | 最大队伍人数上限 |
+| unlocked_slots | INTEGER | DEFAULT 1 | 已解锁槽位数(初始1个) |
 | gold | INTEGER | DEFAULT 0 | 金币(小队共享) |
 | current_zone_id | VARCHAR(32) | DEFAULT 'elwynn' | 当前区域(小队共享) |
 | created_at | DATETIME | DEFAULT CURRENT_TIMESTAMP | 注册时间 |
@@ -90,6 +115,7 @@ CREATE TABLE users (
     password_hash VARCHAR(256) NOT NULL,
     email VARCHAR(128) UNIQUE,
     max_team_size INTEGER DEFAULT 5,
+    unlocked_slots INTEGER DEFAULT 1,  -- 已解锁槽位数(初始1个)
     gold INTEGER DEFAULT 0,
     current_zone_id VARCHAR(32) DEFAULT 'elwynn',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -116,6 +142,8 @@ CREATE INDEX idx_users_username ON users(username);
 | faction | VARCHAR(16) | NOT NULL | 阵营: alliance/horde |
 | team_slot | INTEGER | NOT NULL | 队伍位置: 1-5 (1=队长) |
 | is_active | INTEGER | DEFAULT 1 | 是否出战: 1是 0否 |
+| is_dead | INTEGER | DEFAULT 0 | 是否死亡: 1是 0否 |
+| revive_at | DATETIME | NULL | 复活时间(NULL表示存活) |
 | level | INTEGER | DEFAULT 1 | 等级 |
 | exp | INTEGER | DEFAULT 0 | 当前经验 |
 | exp_to_next | INTEGER | DEFAULT 100 | 升级所需经验 |
@@ -263,23 +291,112 @@ CREATE TABLE classes (
 
 ### 5. skills - 技能配置表
 
+> 📌 **Buff/Debuff机制**: 所有增益/减益效果仅在战斗中生效，每场战斗开始前自动清空。
+
 | 字段 | 类型 | 约束 | 说明 |
 |-----|------|-----|------|
 | id | VARCHAR(32) | PRIMARY KEY | 技能ID |
 | name | VARCHAR(32) | NOT NULL | 技能名称 |
 | description | TEXT | | 描述 |
+| icon | VARCHAR(64) | | 图标标识(预留) |
 | class_id | VARCHAR(32) | | 所属职业(null为通用) |
-| type | VARCHAR(16) | NOT NULL | 类型: attack/heal/buff/debuff |
-| target | VARCHAR(16) | NOT NULL | 目标: self/enemy/ally |
-| damage_type | VARCHAR(16) | | 伤害类型: physical/magic/true |
-| base_damage | INTEGER | DEFAULT 0 | 基础伤害/治疗量 |
-| damage_scaling | REAL | DEFAULT 1.0 | 攻击力加成系数 |
+| type | VARCHAR(16) | NOT NULL | 类型(见下表) |
+| target_type | VARCHAR(16) | NOT NULL | 目标类型(见下表) |
+| damage_type | VARCHAR(16) | | 伤害类型: physical/magic/true/nature/fire/frost/shadow/holy |
+| base_value | INTEGER | DEFAULT 0 | 基础数值(伤害/治疗/效果强度) |
+| scaling_stat | VARCHAR(16) | | 成长属性: strength/agility/intellect/spirit |
+| scaling_ratio | REAL | DEFAULT 1.0 | 属性加成系数 |
 | mp_cost | INTEGER | DEFAULT 0 | 法力消耗 |
 | cooldown | INTEGER | DEFAULT 0 | 冷却时间(回合) |
 | level_required | INTEGER | DEFAULT 1 | 需求等级 |
-| effect_type | VARCHAR(32) | | 特效类型 |
-| effect_value | REAL | | 特效数值 |
-| effect_duration | INTEGER | | 特效持续回合 |
+| effect_id | VARCHAR(32) | | 附加效果ID(关联effects表) |
+| effect_chance | REAL | DEFAULT 1.0 | 效果触发概率(0-1) |
+| tags | TEXT | | 标签(JSON数组，用于分类筛选) |
+
+**技能类型 (type):**
+| 类型 | 说明 |
+|-----|------|
+| `attack` | 造成伤害 |
+| `heal` | 恢复生命 |
+| `buff` | 增益效果 |
+| `debuff` | 减益效果 |
+| `dot` | 持续伤害(Damage over Time) |
+| `hot` | 持续治疗(Heal over Time) |
+| `shield` | 伤害吸收护盾 |
+| `summon` | 召唤(预留) |
+| `dispel` | 驱散效果 |
+| `interrupt` | 打断施法 |
+| `control` | 控制(眩晕/沉默等) |
+
+**目标类型 (target_type):**
+| 类型 | 说明 |
+|-----|------|
+| `self` | 自身 |
+| `ally` | 友方单体 |
+| `ally_all` | 友方全体 |
+| `ally_lowest_hp` | 血量最低的友方 |
+| `enemy` | 敌方单体 |
+| `enemy_all` | 敌方全体 |
+| `enemy_random` | 随机敌人 |
+| `enemy_lowest_hp` | 血量最低的敌人 |
+
+---
+
+### 5.1 effects - 效果配置表(Buff/Debuff)
+
+> 📌 **扩展性设计**: 通过独立的效果表，支持技能附带各种复杂效果
+
+| 字段 | 类型 | 约束 | 说明 |
+|-----|------|-----|------|
+| id | VARCHAR(32) | PRIMARY KEY | 效果ID |
+| name | VARCHAR(32) | NOT NULL | 效果名称 |
+| description | TEXT | | 描述 |
+| icon | VARCHAR(64) | | 图标标识(预留) |
+| type | VARCHAR(16) | NOT NULL | 效果类型(见下表) |
+| is_buff | INTEGER | NOT NULL | 1=增益 0=减益 |
+| is_stackable | INTEGER | DEFAULT 0 | 是否可叠加 |
+| max_stacks | INTEGER | DEFAULT 1 | 最大叠加层数 |
+| duration | INTEGER | NOT NULL | 持续回合数 |
+| tick_interval | INTEGER | DEFAULT 1 | 触发间隔(回合) |
+| value_type | VARCHAR(16) | | 数值类型: flat/percent |
+| value | REAL | | 效果数值 |
+| stat_affected | VARCHAR(32) | | 影响的属性 |
+| damage_type | VARCHAR(16) | | DOT伤害类型 |
+| can_dispel | INTEGER | DEFAULT 1 | 是否可驱散 |
+| tags | TEXT | | 标签(JSON数组) |
+
+**效果类型 (type):**
+| 类型 | 说明 | 示例 |
+|-----|------|-----|
+| `stat_mod` | 属性修改 | 攻击力+10% |
+| `dot` | 持续伤害 | 中毒、燃烧 |
+| `hot` | 持续治疗 | 回春术 |
+| `shield` | 伤害吸收 | 真言术:盾 |
+| `stun` | 眩晕 | 无法行动 |
+| `silence` | 沉默 | 无法施法 |
+| `slow` | 减速 | 攻击速度降低(预留) |
+| `root` | 定身 | 无法移动(预留) |
+| `taunt` | 嘲讽 | 强制攻击自己 |
+| `immunity` | 免疫 | 免疫某类伤害 |
+| `reflect` | 反射 | 反弹伤害 |
+| `lifesteal` | 吸血 | 造成伤害时回血 |
+| `thorns` | 荆棘 | 被攻击时反伤 |
+| `stealth` | 潜行 | 隐身状态 |
+| `invulnerable` | 无敌 | 免疫所有伤害 |
+
+**可影响的属性 (stat_affected):**
+- `attack` - 攻击力
+- `defense` - 防御力
+- `max_hp` - 最大生命值
+- `max_mp` - 最大法力值
+- `crit_rate` - 暴击率
+- `crit_damage` - 暴击伤害
+- `hit_rate` - 命中率(预留)
+- `dodge_rate` - 闪避率(预留)
+- `damage_taken` - 受到的伤害
+- `damage_dealt` - 造成的伤害
+- `healing_taken` - 受到的治疗
+- `healing_done` - 造成的治疗
 
 ```sql
 CREATE TABLE skills (

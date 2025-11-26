@@ -72,3 +72,4 @@ type BattleResult struct {
 	Status    BattleStatus `json:"status"`
 }
 
+
