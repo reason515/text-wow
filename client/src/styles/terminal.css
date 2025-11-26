@@ -1,0 +1,556 @@
+/* ═══════════════════════════════════════════════════════════
+   TEXT WoW - DOS终端复古风格
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  /* 配色方案 */
+  --bg-color: #0a0a0a;
+  --text-primary: #00ff00;
+  --text-secondary: #00cc00;
+  --text-dim: #006600;
+  --text-white: #ffffff;
+  --text-yellow: #ffff00;
+  --text-gold: #ffd700;
+  --text-red: #ff4444;
+  --text-damage: #ff6b6b;
+  --text-cyan: #00ffff;
+  --text-purple: #ff00ff;
+  --border-color: #00ff00;
+  
+  /* CRT效果 */
+  --scanline-opacity: 0.05;
+  --glow-intensity: 0.8;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background-color: var(--bg-color);
+  color: var(--text-primary);
+  font-family: 'VT323', monospace;
+  font-size: 18px;
+  line-height: 1.4;
+}
+
+#app {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CRT 扫描线效果
+   ═══════════════════════════════════════════════════════════ */
+
+.crt-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+.crt-overlay::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, var(--scanline-opacity)),
+    rgba(0, 0, 0, var(--scanline-opacity)) 1px,
+    transparent 1px,
+    transparent 2px
+  );
+}
+
+.crt-overlay::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 0%,
+    rgba(0, 0, 0, 0.2) 80%,
+    rgba(0, 0, 0, 0.4) 100%
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════
+   终端窗口容器
+   ═══════════════════════════════════════════════════════════ */
+
+.terminal-container {
+  width: 100%;
+  height: 100%;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.terminal-window {
+  flex: 1;
+  border: 2px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 
+    0 0 10px rgba(0, 255, 0, 0.3),
+    inset 0 0 30px rgba(0, 255, 0, 0.05);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   标题栏
+   ═══════════════════════════════════════════════════════════ */
+
+.terminal-header {
+  background: var(--bg-color);
+  border-bottom: 2px solid var(--border-color);
+  padding: 8px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.terminal-title {
+  color: var(--text-primary);
+  text-shadow: 0 0 10px var(--text-primary);
+}
+
+.terminal-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.terminal-btn {
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+
+.terminal-btn:hover {
+  background: var(--text-primary);
+  color: var(--bg-color);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   主内容区域
+   ═══════════════════════════════════════════════════════════ */
+
+.terminal-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.terminal-content {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* 自定义滚动条 */
+.terminal-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.terminal-content::-webkit-scrollbar-track {
+  background: var(--bg-color);
+  border-left: 1px solid var(--text-dim);
+}
+
+.terminal-content::-webkit-scrollbar-thumb {
+  background: var(--text-dim);
+}
+
+.terminal-content::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   战斗日志
+   ═══════════════════════════════════════════════════════════ */
+
+.battle-log {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.log-line {
+  display: flex;
+  gap: 12px;
+  animation: typewriter 0.1s ease-out;
+}
+
+@keyframes typewriter {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.log-time {
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.log-message {
+  flex: 1;
+}
+
+/* 日志类型颜色 */
+.log-type-info { color: var(--text-primary); }
+.log-type-damage { color: var(--text-damage); }
+.log-type-heal { color: #44ff44; }
+.log-type-loot { color: var(--text-gold); }
+.log-type-exp { color: var(--text-cyan); }
+.log-type-levelup { 
+  color: var(--text-gold); 
+  text-shadow: 0 0 10px var(--text-gold);
+  font-weight: bold;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   状态栏
+   ═══════════════════════════════════════════════════════════ */
+
+.status-bar {
+  border-top: 2px solid var(--border-color);
+  padding: 12px 16px;
+  background: rgba(0, 255, 0, 0.02);
+}
+
+.status-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.status-row:last-child {
+  margin-bottom: 0;
+}
+
+.character-info {
+  display: flex;
+  gap: 24px;
+}
+
+.stat-label {
+  color: var(--text-dim);
+}
+
+.stat-value {
+  color: var(--text-primary);
+}
+
+.stat-gold {
+  color: var(--text-gold);
+}
+
+/* 生命值/能量条 */
+.bar-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.bar-label {
+  width: 30px;
+  color: var(--text-dim);
+}
+
+.bar-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bar {
+  width: 200px;
+  height: 16px;
+  background: var(--bg-color);
+  border: 1px solid var(--text-dim);
+  position: relative;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.bar-hp .bar-fill {
+  background: linear-gradient(90deg, #00ff00, #44ff44);
+  box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+}
+
+.bar-mp .bar-fill {
+  background: linear-gradient(90deg, #0066ff, #00aaff);
+  box-shadow: 0 0 10px rgba(0, 100, 255, 0.5);
+}
+
+.bar-exp .bar-fill {
+  background: linear-gradient(90deg, #ffaa00, #ffdd00);
+  box-shadow: 0 0 10px rgba(255, 200, 0, 0.5);
+}
+
+.bar-text {
+  font-size: 14px;
+  color: var(--text-secondary);
+  min-width: 80px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   控制栏
+   ═══════════════════════════════════════════════════════════ */
+
+.control-bar {
+  border-top: 1px solid var(--text-dim);
+  padding: 12px 16px;
+  display: flex;
+  gap: 16px;
+}
+
+.cmd-btn {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 8px 16px;
+  font-family: 'VT323', monospace;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cmd-btn:hover {
+  background: var(--text-primary);
+  color: var(--bg-color);
+  box-shadow: 0 0 10px var(--text-primary);
+}
+
+.cmd-btn.active {
+  background: var(--text-primary);
+  color: var(--bg-color);
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.cmd-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   角色创建界面
+   ═══════════════════════════════════════════════════════════ */
+
+.create-character {
+  padding: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+.create-title {
+  font-size: 32px;
+  color: var(--text-primary);
+  text-shadow: 0 0 20px var(--text-primary);
+  margin-bottom: 20px;
+}
+
+.create-section {
+  width: 100%;
+  max-width: 600px;
+}
+
+.create-label {
+  color: var(--text-yellow);
+  margin-bottom: 12px;
+  display: block;
+}
+
+.create-input {
+  width: 100%;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 12px 16px;
+  font-family: 'VT323', monospace;
+  font-size: 18px;
+  outline: none;
+}
+
+.create-input:focus {
+  box-shadow: 0 0 10px var(--text-primary);
+}
+
+.option-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.option-btn {
+  background: transparent;
+  border: 1px solid var(--text-dim);
+  color: var(--text-secondary);
+  padding: 12px;
+  font-family: 'VT323', monospace;
+  font-size: 16px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.2s;
+}
+
+.option-btn:hover {
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+.option-btn.selected {
+  border-color: var(--text-primary);
+  color: var(--text-primary);
+  background: rgba(0, 255, 0, 0.1);
+  box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+}
+
+.start-btn {
+  margin-top: 20px;
+  padding: 16px 48px;
+  font-size: 24px;
+  background: var(--text-primary);
+  color: var(--bg-color);
+  border: none;
+  cursor: pointer;
+  font-family: 'VT323', monospace;
+}
+
+.start-btn:hover {
+  box-shadow: 0 0 20px var(--text-primary);
+}
+
+.start-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   闪烁光标
+   ═══════════════════════════════════════════════════════════ */
+
+.cursor {
+  display: inline-block;
+  width: 10px;
+  height: 18px;
+  background: var(--text-primary);
+  animation: blink 1s step-end infinite;
+  vertical-align: middle;
+  margin-left: 4px;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   敌人信息
+   ═══════════════════════════════════════════════════════════ */
+
+.enemy-info {
+  border: 1px solid var(--text-dim);
+  padding: 8px 16px;
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.enemy-name {
+  color: var(--text-red);
+}
+
+.enemy-hp {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.enemy-bar {
+  width: 150px;
+  height: 12px;
+  background: var(--bg-color);
+  border: 1px solid var(--text-red);
+}
+
+.enemy-bar-fill {
+  height: 100%;
+  background: var(--text-red);
+  transition: width 0.3s ease;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   响应式设计
+   ═══════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+  body {
+    font-size: 14px;
+  }
+  
+  .terminal-container {
+    padding: 10px;
+  }
+  
+  .bar {
+    width: 120px;
+  }
+  
+  .character-info {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  
+  .control-bar {
+    flex-wrap: wrap;
+  }
+}
+
+
