@@ -14,18 +14,82 @@
 -- 槽位5: 队伍中任意角色达到 50 级
 
 -- ═══════════════════════════════════════════════════════════
--- 种族数据
+-- 种族被动效果 (全部为被动，适合放置游戏自动战斗)
 -- ═══════════════════════════════════════════════════════════
 
-INSERT OR REPLACE INTO races (id, name, faction, description, strength_mod, agility_mod, intellect_mod, stamina_mod, spirit_mod) VALUES
-('human', '人类', 'alliance', '适应力强的种族，各项属性平衡。', 1, 0, 0, 0, 1),
-('dwarf', '矮人', 'alliance', '坚韧的山地种族，擅长近战和工艺。', 2, 0, 0, 2, 0),
-('nightelf', '暗夜精灵', 'alliance', '古老的精灵种族，与自然和谐共存。', 0, 2, 0, 0, 1),
-('gnome', '侏儒', 'alliance', '聪明的小型种族，擅长魔法和机械。', 0, 0, 3, 0, 0),
-('orc', '兽人', 'horde', '强壮的战士种族，崇尚力量和荣耀。', 3, 0, 0, 1, 0),
-('undead', '亡灵', 'horde', '不死的存在，对暗影魔法有天赋。', 0, 0, 2, 0, 2),
-('tauren', '牛头人', 'horde', '高大温和的种族，与大地之母相连。', 2, 0, 0, 2, 1),
-('troll', '巨魔', 'horde', '敏捷的丛林种族，拥有快速再生能力。', 0, 2, 0, 1, 0);
+INSERT OR REPLACE INTO effects (id, name, description, type, is_buff, is_stackable, max_stacks, duration, value_type, value, stat_affected, can_dispel) VALUES
+-- 人类被动
+('racial_human_exp', '适应力', '经验获取+10%', 'stat_mod', 1, 0, 1, 999, 'percent', 10, 'exp_gain', 0),
+('racial_human_sword', '剑术专精', '物理伤害+3%', 'stat_mod', 1, 0, 1, 999, 'percent', 3, 'physical_damage', 0),
+-- 矮人被动
+('racial_dwarf_frost', '霜抗', '冰霜伤害-15%', 'stat_mod', 1, 0, 1, 999, 'percent', -15, 'frost_damage_taken', 0),
+('racial_dwarf_stone', '石肤', '受到暴击伤害-10%', 'stat_mod', 1, 0, 1, 999, 'percent', -10, 'crit_damage_taken', 0),
+-- 暗夜精灵被动
+('racial_nelf_shadow', '暗影之心', '夜间伤害+8%', 'stat_mod', 1, 0, 1, 999, 'percent', 8, 'damage_dealt', 0),
+('racial_nelf_dodge', '敏锐', '闪避率+2%', 'stat_mod', 1, 0, 1, 999, 'percent', 2, 'dodge_rate', 0),
+-- 侏儒被动
+('racial_gnome_crit', '灵巧心智', '法术暴击+3%', 'stat_mod', 1, 0, 1, 999, 'percent', 3, 'spell_crit', 0),
+('racial_gnome_mech', '工程专精', '对机械怪伤害+15%', 'stat_mod', 1, 0, 1, 999, 'percent', 15, 'damage_vs_mechanical', 0),
+-- 兽人被动
+('racial_orc_fury', '嗜血', 'HP<30%时攻击+15%', 'stat_mod', 1, 0, 1, 999, 'percent', 15, 'attack_low_hp', 0),
+('racial_orc_stun', '坚韧', '眩晕时间-25%', 'stat_mod', 1, 0, 1, 999, 'percent', -25, 'stun_duration', 0),
+-- 亡灵被动
+('racial_undead_touch', '亡者之触', '攻击5%几率恐惧', 'proc', 1, 0, 1, 999, 'percent', 5, 'fear_on_hit', 0),
+('racial_undead_shadow', '暗影抗性', '暗影伤害-15%', 'stat_mod', 1, 0, 1, 999, 'percent', -15, 'shadow_damage_taken', 0),
+-- 牛头人被动
+('racial_tauren_hp', '坚忍', '最大HP+5%', 'stat_mod', 1, 0, 1, 999, 'percent', 5, 'max_hp', 0),
+('racial_tauren_heal', '自然亲和', '受到治疗+10%', 'stat_mod', 1, 0, 1, 999, 'percent', 10, 'healing_taken', 0),
+-- 巨魔被动
+('racial_troll_regen', '再生', '每回合恢复2%HP', 'hot', 1, 0, 1, 999, 'percent', 2, NULL, 0),
+('racial_troll_beast', '野兽杀手', '对野兽伤害+15%', 'stat_mod', 1, 0, 1, 999, 'percent', 15, 'damage_vs_beast', 0);
+
+-- ═══════════════════════════════════════════════════════════
+-- 种族数据 (纯被动设计，适合自动战斗)
+-- ═══════════════════════════════════════════════════════════
+
+-- 种族数据说明:
+-- strength_base等: 基础固定加成
+-- strength_pct等: 百分比加成(5 = 5%)
+-- 公式: 最终属性 = (基础 + 成长 + 装备 + 种族基础) × (1 + 种族百分比/100)
+
+INSERT OR REPLACE INTO races (id, name, faction, description, 
+    strength_base, agility_base, intellect_base, stamina_base, spirit_base,
+    strength_pct, agility_pct, intellect_pct, stamina_pct, spirit_pct,
+    racial_passive_id, racial_passive2_id) VALUES
+-- 联盟
+('human', '人类', 'alliance', '适应力强的种族，学习能力出众，剑术精湛。',
+    0, 0, 0, 0, 3,    -- 基础: 精神+3
+    0, 0, 0, 0, 3,    -- 百分比: 精神+3%
+    'racial_human_exp', 'racial_human_sword'),
+('dwarf', '矮人', 'alliance', '坚韧的山地种族，皮糙肉厚，抵抗寒冷。',
+    3, 0, 0, 0, 0,    -- 基础: 力量+3
+    0, 0, 0, 5, 0,    -- 百分比: 耐力+5%
+    'racial_dwarf_frost', 'racial_dwarf_stone'),
+('nightelf', '暗夜精灵', 'alliance', '古老的精灵种族，夜间行动敏捷。',
+    0, 5, 0, 0, 0,    -- 基础: 敏捷+5
+    0, 3, 0, 0, 0,    -- 百分比: 敏捷+3%
+    'racial_nelf_shadow', 'racial_nelf_dodge'),
+('gnome', '侏儒', 'alliance', '聪明的小型种族，精通魔法和机械。',
+    0, 0, 5, 0, 0,    -- 基础: 智力+5
+    0, 0, 5, 0, 0,    -- 百分比: 智力+5%
+    'racial_gnome_crit', 'racial_gnome_mech'),
+-- 部落
+('orc', '兽人', 'horde', '强壮的战士种族，濒死时爆发战斗本能。',
+    5, 0, 0, 0, 0,    -- 基础: 力量+5
+    5, 0, 0, 0, 0,    -- 百分比: 力量+5%
+    'racial_orc_fury', 'racial_orc_stun'),
+('undead', '亡灵', 'horde', '不死的存在，攻击带有恐惧之力。',
+    0, 0, 3, 0, 0,    -- 基础: 智力+3
+    0, 0, 0, 0, 5,    -- 百分比: 精神+5% (暗影亲和)
+    'racial_undead_touch', 'racial_undead_shadow'),
+('tauren', '牛头人', 'horde', '高大温和的种族，生命力顽强。',
+    0, 0, 0, 5, 0,    -- 基础: 耐力+5
+    0, 0, 0, 5, 0,    -- 百分比: 耐力+5%
+    'racial_tauren_hp', 'racial_tauren_heal'),
+('troll', '巨魔', 'horde', '敏捷的丛林种族，拥有惊人的再生能力。',
+    0, 3, 0, 0, 0,    -- 基础: 敏捷+3
+    0, 5, 0, 0, 0,    -- 百分比: 敏捷+5%
+    'racial_troll_regen', 'racial_troll_beast');
 
 -- ═══════════════════════════════════════════════════════════
 -- 职业数据

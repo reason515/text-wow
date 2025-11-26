@@ -80,18 +80,30 @@ CREATE INDEX IF NOT EXISTS idx_characters_team ON characters(user_id, team_slot)
 -- 游戏配置表
 -- ═══════════════════════════════════════════════════════════
 
--- 种族配置表
+-- 种族配置表 (基础值+百分比加成，适合放置游戏)
 CREATE TABLE IF NOT EXISTS races (
     id VARCHAR(32) PRIMARY KEY,
     name VARCHAR(32) NOT NULL,
     faction VARCHAR(16) NOT NULL,
     description TEXT,
-    strength_mod INTEGER DEFAULT 0,
-    agility_mod INTEGER DEFAULT 0,
-    intellect_mod INTEGER DEFAULT 0,
-    stamina_mod INTEGER DEFAULT 0,
-    spirit_mod INTEGER DEFAULT 0,
-    racial_skill_id VARCHAR(32)
+    -- 基础加成(固定值，创建时一次性加)
+    strength_base INTEGER DEFAULT 0,
+    agility_base INTEGER DEFAULT 0,
+    intellect_base INTEGER DEFAULT 0,
+    stamina_base INTEGER DEFAULT 0,
+    spirit_base INTEGER DEFAULT 0,
+    -- 百分比加成(乘算，随等级保持意义) 5 = 5%
+    strength_pct REAL DEFAULT 0,
+    agility_pct REAL DEFAULT 0,
+    intellect_pct REAL DEFAULT 0,
+    stamina_pct REAL DEFAULT 0,
+    spirit_pct REAL DEFAULT 0,
+    -- 被动特性
+    racial_passive_id VARCHAR(32),
+    racial_passive2_id VARCHAR(32),
+    allowed_classes TEXT,
+    FOREIGN KEY (racial_passive_id) REFERENCES effects(id),
+    FOREIGN KEY (racial_passive2_id) REFERENCES effects(id)
 );
 
 -- 职业配置表

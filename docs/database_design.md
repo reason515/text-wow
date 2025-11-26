@@ -219,18 +219,27 @@ CREATE INDEX idx_characters_team ON characters(user_id, team_slot);
 
 ### 3. races - 种族配置表
 
+> 📌 **种族差异化**: 每个种族有独特的属性加成、主动技能和被动特性
+
 | 字段 | 类型 | 约束 | 说明 |
 |-----|------|-----|------|
 | id | VARCHAR(32) | PRIMARY KEY | 种族ID |
 | name | VARCHAR(32) | NOT NULL | 种族名称 |
 | faction | VARCHAR(16) | NOT NULL | 阵营 |
 | description | TEXT | | 描述 |
-| strength_mod | INTEGER | DEFAULT 0 | 力量修正 |
-| agility_mod | INTEGER | DEFAULT 0 | 敏捷修正 |
-| intellect_mod | INTEGER | DEFAULT 0 | 智力修正 |
-| stamina_mod | INTEGER | DEFAULT 0 | 耐力修正 |
-| spirit_mod | INTEGER | DEFAULT 0 | 精神修正 |
-| racial_skill_id | VARCHAR(32) | | 种族技能 |
+| strength_base | INTEGER | DEFAULT 0 | 力量基础加成(固定值) |
+| strength_pct | REAL | DEFAULT 0 | 力量百分比加成 |
+| agility_base | INTEGER | DEFAULT 0 | 敏捷基础加成 |
+| agility_pct | REAL | DEFAULT 0 | 敏捷百分比加成 |
+| intellect_base | INTEGER | DEFAULT 0 | 智力基础加成 |
+| intellect_pct | REAL | DEFAULT 0 | 智力百分比加成 |
+| stamina_base | INTEGER | DEFAULT 0 | 耐力基础加成 |
+| stamina_pct | REAL | DEFAULT 0 | 耐力百分比加成 |
+| spirit_base | INTEGER | DEFAULT 0 | 精神基础加成 |
+| spirit_pct | REAL | DEFAULT 0 | 精神百分比加成 |
+| racial_passive_id | VARCHAR(32) | | 种族被动特性1 |
+| racial_passive2_id | VARCHAR(32) | | 种族被动特性2 |
+| allowed_classes | TEXT | | 可选职业(JSON数组,null为全部) |
 
 ```sql
 CREATE TABLE races (
@@ -238,14 +247,88 @@ CREATE TABLE races (
     name VARCHAR(32) NOT NULL,
     faction VARCHAR(16) NOT NULL,
     description TEXT,
-    strength_mod INTEGER DEFAULT 0,
-    agility_mod INTEGER DEFAULT 0,
-    intellect_mod INTEGER DEFAULT 0,
-    stamina_mod INTEGER DEFAULT 0,
-    spirit_mod INTEGER DEFAULT 0,
-    racial_skill_id VARCHAR(32)
+    -- 基础加成(固定值，创建时一次性加)
+    strength_base INTEGER DEFAULT 0,
+    agility_base INTEGER DEFAULT 0,
+    intellect_base INTEGER DEFAULT 0,
+    stamina_base INTEGER DEFAULT 0,
+    spirit_base INTEGER DEFAULT 0,
+    -- 百分比加成(乘算，随等级保持意义)
+    strength_pct REAL DEFAULT 0,
+    agility_pct REAL DEFAULT 0,
+    intellect_pct REAL DEFAULT 0,
+    stamina_pct REAL DEFAULT 0,
+    spirit_pct REAL DEFAULT 0,
+    -- 被动特性
+    racial_passive_id VARCHAR(32),
+    racial_passive2_id VARCHAR(32),
+    allowed_classes TEXT,
+    FOREIGN KEY (racial_passive_id) REFERENCES effects(id),
+    FOREIGN KEY (racial_passive2_id) REFERENCES effects(id)
 );
 ```
+
+### 种族差异化设计
+
+> 📌 **放置游戏适配**: 所有种族特性都设计为自动触发或被动效果，适合挂机场景
+
+#### 属性加成机制
+
+**采用"基础值 + 百分比"混合方案：**
+
+| 组成部分 | 说明 | 示例(兽人力量) |
+|---------|------|--------------|
+| 基础加成 | 创建角色时一次性加成 | +5点力量 |
+| 百分比加成 | 该属性总值的额外加成 | +5%力量 |
+
+**计算公式：**
+```
+最终属性 = (基础属性 + 职业成长 × 等级 + 装备加成) × (1 + 种族百分比加成)
+```
+
+**示例计算（兽人战士 Lv.30）：**
+```
+基础力量 = 15 (职业基础)
+等级成长 = 2 × 30 = 60
+种族基础 = +5
+装备加成 = +20 (假设)
+小计 = 15 + 60 + 5 + 20 = 100
+
+种族百分比 = +5%
+最终力量 = 100 × 1.05 = 105
+
+vs 人类战士: 100 × 1.00 = 100 (差5点，约5%)
+```
+
+这样设计的好处：
+- ✅ 初期差异明显（基础值）
+- ✅ 后期仍有意义（百分比）
+- ✅ 差距不会过于悬殊（只有5%左右）
+
+---
+
+**联盟种族:**
+
+| 种族 | 属性加成 | 被动特性1 | 被动特性2 |
+|-----|---------|---------|---------|
+| **人类** | 精神+3, 精神+3% | 💡 适应力：经验获取+10% | 🗡️ 剑术专精：物理伤害+3% |
+| **矮人** | 力量+3, 耐力+5% | ❄️ 霜抗：冰霜伤害-15% | 🛡️ 石肤：受到暴击伤害-10% |
+| **暗夜精灵** | 敏捷+5, 敏捷+3% | 🌙 暗影之心：伤害+5% | 👁️ 敏锐：闪避率+2% |
+| **侏儒** | 智力+5, 智力+5% | ⚡ 灵巧心智：法术暴击+3% | 🔧 工程专精：对机械怪伤害+15% |
+
+**部落种族:**
+
+| 种族 | 属性加成 | 被动特性1 | 被动特性2 |
+|-----|---------|---------|---------|
+| **兽人** | 力量+5, 力量+5% | 💢 嗜血：HP<30%时攻击+15% | 💪 坚韧：眩晕时间-25% |
+| **亡灵** | 智力+3, 暗影伤害+5% | 💀 亡者之触：攻击5%几率恐惧 | 🌑 暗影抗性：暗影伤害-15% |
+| **牛头人** | 耐力+5, 最大HP+5% | ❤️ 坚忍：防御+3% | 🌿 自然亲和：受到治疗+10% |
+| **巨魔** | 敏捷+3, 攻速+5% | 💚 再生：每回合恢复2%HP | 🐾 野兽杀手：野兽伤害+15% |
+
+**种族特性触发机制:**
+- 所有特性都是被动效果，无需玩家操作
+- 属性加成在计算面板时自动应用
+- 战斗特性由战斗引擎自动检测触发
 
 ---
 
