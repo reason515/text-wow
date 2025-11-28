@@ -92,19 +92,52 @@ INSERT OR REPLACE INTO races (id, name, faction, description,
     'racial_troll_regen', 'racial_troll_beast');
 
 -- ═══════════════════════════════════════════════════════════
--- 职业数据
+-- 职业数据 (含能量系统)
 -- ═══════════════════════════════════════════════════════════
+-- resource_type: rage(怒气) / energy(能量) / mana(法力)
+-- resource_regen: 每回合固定恢复值
+-- resource_regen_pct: 每回合基于精神的百分比恢复(仅法力有效)
 
-INSERT OR REPLACE INTO classes (id, name, description, role, primary_stat, base_hp, base_mp, hp_per_level, mp_per_level, base_strength, base_agility, base_intellect, base_stamina, base_spirit) VALUES
-('warrior', '战士', '近战格斗专家，可以承受大量伤害。', 'tank', 'strength', 120, 20, 12, 2, 15, 10, 5, 14, 8),
-('paladin', '圣骑士', '神圣战士，可以治疗和保护盟友。', 'tank', 'strength', 110, 60, 10, 6, 13, 8, 10, 13, 12),
-('hunter', '猎人', '远程物理攻击者，与宠物并肩作战。', 'dps', 'agility', 90, 40, 8, 4, 8, 15, 8, 10, 10),
-('rogue', '盗贼', '潜行刺客，擅长连击和爆发伤害。', 'dps', 'agility', 85, 50, 7, 5, 10, 16, 6, 9, 8),
-('priest', '牧师', '治疗者和暗影施法者。', 'healer', 'intellect', 70, 100, 5, 12, 5, 6, 15, 8, 16),
-('mage', '法师', '强大的奥术施法者，擅长范围伤害。', 'dps', 'intellect', 65, 120, 4, 15, 4, 6, 18, 6, 12),
-('warlock', '术士', '黑暗魔法师，召唤恶魔作战。', 'dps', 'intellect', 75, 110, 5, 13, 5, 6, 17, 8, 10),
-('druid', '德鲁伊', '自然的守护者，可变形为多种形态。', 'dps', 'intellect', 85, 80, 7, 10, 10, 10, 13, 10, 12),
-('shaman', '萨满', '元素的操控者，可治疗和增益。', 'dps', 'intellect', 90, 90, 8, 10, 12, 8, 14, 11, 12);
+INSERT OR REPLACE INTO classes (id, name, description, role, primary_stat, 
+    resource_type, base_hp, base_resource, hp_per_level, resource_per_level, 
+    resource_regen, resource_regen_pct,
+    base_strength, base_agility, base_intellect, base_stamina, base_spirit) VALUES
+-- 战士: 怒气系统 (初始0，通过攻击/受击获得)
+('warrior', '战士', '近战格斗专家，可以承受大量伤害。', 'tank', 'strength',
+    'rage', 120, 0, 12, 0, 0, 0,  -- 怒气不自动恢复，通过战斗获得
+    15, 10, 5, 14, 8),
+-- 盗贼: 能量系统 (固定100上限，快速恢复)
+('rogue', '盗贼', '潜行刺客，擅长连击和爆发伤害。', 'dps', 'agility',
+    'energy', 85, 100, 7, 0, 20, 0,  -- 每回合恢复20能量
+    10, 16, 6, 9, 8),
+-- 法师: 法力系统 (高法力，基于精神恢复)
+('mage', '法师', '强大的奥术施法者，擅长范围伤害。', 'dps', 'intellect',
+    'mana', 65, 120, 4, 15, 0, 0.5,  -- 每回合恢复精神×0.5%的法力
+    4, 6, 18, 6, 12),
+-- 牧师: 法力系统 (高法力，高精神恢复)
+('priest', '牧师', '治疗者和暗影施法者。', 'healer', 'intellect',
+    'mana', 70, 100, 5, 12, 0, 0.8,  -- 每回合恢复精神×0.8%的法力
+    5, 6, 15, 8, 16),
+-- 术士: 法力系统
+('warlock', '术士', '黑暗魔法师，召唤恶魔作战。', 'dps', 'intellect',
+    'mana', 75, 110, 5, 13, 0, 0.5,
+    5, 6, 17, 8, 10),
+-- 德鲁伊: 法力系统
+('druid', '德鲁伊', '自然的守护者，可变形为多种形态。', 'dps', 'intellect',
+    'mana', 85, 80, 7, 10, 0, 0.6,
+    10, 10, 13, 10, 12),
+-- 萨满: 法力系统
+('shaman', '萨满', '元素的操控者，可治疗和增益。', 'dps', 'intellect',
+    'mana', 90, 90, 8, 10, 0, 0.6,
+    12, 8, 14, 11, 12),
+-- 圣骑士: 法力系统 (较低法力)
+('paladin', '圣骑士', '神圣战士，可以治疗和保护盟友。', 'tank', 'strength',
+    'mana', 110, 60, 10, 6, 0, 0.4,
+    13, 8, 10, 13, 12),
+-- 猎人: 法力系统 (较低法力)
+('hunter', '猎人', '远程物理攻击者，与宠物并肩作战。', 'dps', 'agility',
+    'mana', 90, 40, 8, 4, 0, 0.3,
+    8, 15, 8, 10, 10);
 
 -- ═══════════════════════════════════════════════════════════
 -- 效果配置 (Buff/Debuff) - 每场战斗开始时清空
@@ -142,7 +175,7 @@ INSERT OR REPLACE INTO effects (id, name, description, type, is_buff, is_stackab
 -- ═══════════════════════════════════════════════════════════
 
 -- 战士技能
-INSERT OR REPLACE INTO skills (id, name, description, class_id, type, target_type, damage_type, base_value, scaling_stat, scaling_ratio, mp_cost, cooldown, level_required, effect_id, effect_chance) VALUES
+INSERT OR REPLACE INTO skills (id, name, description, class_id, type, target_type, damage_type, base_value, scaling_stat, scaling_ratio, resource_cost, cooldown, level_required, effect_id, effect_chance) VALUES
 ('heroic_strike', '英勇打击', '一次强力的武器攻击。', 'warrior', 'attack', 'enemy', 'physical', 15, 'strength', 1.2, 5, 0, 1, NULL, 1.0),
 ('charge', '冲锋', '冲向敌人，造成伤害并眩晕。', 'warrior', 'attack', 'enemy', 'physical', 10, 'strength', 0.8, 10, 3, 1, 'eff_stun', 1.0),
 ('rend', '撕裂', '造成流血效果。', 'warrior', 'dot', 'enemy', 'physical', 5, 'strength', 0.3, 8, 0, 2, 'eff_rend', 1.0),
@@ -153,7 +186,7 @@ INSERT OR REPLACE INTO skills (id, name, description, class_id, type, target_typ
 ('battle_shout', '战斗怒吼', '提升全队攻击力。', 'warrior', 'buff', 'ally_all', NULL, 0, NULL, 0, 15, 5, 3, 'eff_battle_shout', 1.0);
 
 -- 法师技能
-INSERT OR REPLACE INTO skills (id, name, description, class_id, type, target_type, damage_type, base_value, scaling_stat, scaling_ratio, mp_cost, cooldown, level_required, effect_id, effect_chance) VALUES
+INSERT OR REPLACE INTO skills (id, name, description, class_id, type, target_type, damage_type, base_value, scaling_stat, scaling_ratio, resource_cost, cooldown, level_required, effect_id, effect_chance) VALUES
 ('fireball', '火球术', '发射火球，有几率点燃敌人。', 'mage', 'attack', 'enemy', 'fire', 25, 'intellect', 1.3, 15, 0, 1, 'eff_ignite', 0.3),
 ('frostbolt', '寒冰箭', '发射寒冰箭，减缓敌人。', 'mage', 'attack', 'enemy', 'frost', 18, 'intellect', 1.1, 12, 0, 1, 'eff_frostbite', 0.5),
 ('arcane_missiles', '奥术飞弹', '发射多道奥术飞弹。', 'mage', 'attack', 'enemy', 'magic', 30, 'intellect', 1.4, 20, 2, 4, NULL, 1.0),
@@ -163,7 +196,7 @@ INSERT OR REPLACE INTO skills (id, name, description, class_id, type, target_typ
 ('arcane_intellect', '奥术智慧', '提升智力。', 'mage', 'buff', 'ally', NULL, 0, NULL, 0, 20, 0, 2, 'eff_arcane_intellect', 1.0);
 
 -- 盗贼技能
-INSERT OR REPLACE INTO skills (id, name, description, class_id, type, target_type, damage_type, base_value, scaling_stat, scaling_ratio, mp_cost, cooldown, level_required, effect_id, effect_chance) VALUES
+INSERT OR REPLACE INTO skills (id, name, description, class_id, type, target_type, damage_type, base_value, scaling_stat, scaling_ratio, resource_cost, cooldown, level_required, effect_id, effect_chance) VALUES
 ('sinister_strike', '邪恶攻击', '快速的攻击。', 'rogue', 'attack', 'enemy', 'physical', 15, 'agility', 1.1, 8, 0, 1, NULL, 1.0),
 ('backstab', '背刺', '从背后攻击造成大量伤害。', 'rogue', 'attack', 'enemy', 'physical', 35, 'agility', 1.6, 18, 0, 1, NULL, 1.0),
 ('deadly_poison', '致命毒药', '使敌人中毒。', 'rogue', 'dot', 'enemy', 'nature', 0, 'agility', 0.2, 12, 0, 3, 'eff_poison', 1.0),
@@ -173,7 +206,7 @@ INSERT OR REPLACE INTO skills (id, name, description, class_id, type, target_typ
 ('vanish', '消失', '进入潜行状态。', 'rogue', 'buff', 'self', NULL, 0, NULL, 0, 40, 10, 10, 'eff_stealth', 1.0);
 
 -- 牧师技能
-INSERT OR REPLACE INTO skills (id, name, description, class_id, type, target_type, damage_type, base_value, scaling_stat, scaling_ratio, mp_cost, cooldown, level_required, effect_id, effect_chance) VALUES
+INSERT OR REPLACE INTO skills (id, name, description, class_id, type, target_type, damage_type, base_value, scaling_stat, scaling_ratio, resource_cost, cooldown, level_required, effect_id, effect_chance) VALUES
 ('smite', '惩击', '用神圣能量攻击敌人。', 'priest', 'attack', 'enemy', 'holy', 18, 'intellect', 1.0, 10, 0, 1, NULL, 1.0),
 ('shadow_word_pain', '暗言术:痛', '对敌人施加持续伤害。', 'priest', 'dot', 'enemy', 'shadow', 0, 'intellect', 0.3, 12, 0, 1, 'eff_sw_pain', 1.0),
 ('lesser_heal', '次级治疗术', '恢复生命值。', 'priest', 'heal', 'ally_lowest_hp', 'holy', 25, 'spirit', 1.0, 15, 0, 1, NULL, 1.0),
@@ -185,7 +218,7 @@ INSERT OR REPLACE INTO skills (id, name, description, class_id, type, target_typ
 ('silence', '沉默', '使敌人无法施法。', 'priest', 'control', 'enemy', 'shadow', 0, NULL, 0, 25, 6, 10, 'eff_silence', 1.0);
 
 -- 通用技能
-INSERT OR REPLACE INTO skills (id, name, description, class_id, type, target_type, damage_type, base_value, scaling_stat, scaling_ratio, mp_cost, cooldown, level_required, effect_id, effect_chance) VALUES
+INSERT OR REPLACE INTO skills (id, name, description, class_id, type, target_type, damage_type, base_value, scaling_stat, scaling_ratio, resource_cost, cooldown, level_required, effect_id, effect_chance) VALUES
 ('basic_attack', '普通攻击', '基础的物理攻击。', NULL, 'attack', 'enemy', 'physical', 0, 'strength', 1.0, 0, 0, 1, NULL, 1.0);
 
 -- ═══════════════════════════════════════════════════════════

@@ -149,8 +149,9 @@ CREATE INDEX idx_users_username ON users(username);
 | exp_to_next | INTEGER | DEFAULT 100 | 升级所需经验 |
 | hp | INTEGER | NOT NULL | 当前生命值 |
 | max_hp | INTEGER | NOT NULL | 最大生命值 |
-| mp | INTEGER | NOT NULL | 当前法力值 |
-| max_mp | INTEGER | NOT NULL | 最大法力值 |
+| resource | INTEGER | NOT NULL | 当前能量值(怒气/能量/法力) |
+| max_resource | INTEGER | NOT NULL | 最大能量值 |
+| resource_type | VARCHAR(16) | NOT NULL | 能量类型: mana/rage/energy (继承自职业) |
 | strength | INTEGER | DEFAULT 10 | 力量 |
 | agility | INTEGER | DEFAULT 10 | 敏捷 |
 | intellect | INTEGER | DEFAULT 10 | 智力 |
@@ -334,6 +335,86 @@ vs 人类战士: 100 × 1.00 = 100 (差5点，约5%)
 
 ### 4. classes - 职业配置表
 
+> 📌 **能量系统差异**: 不同职业使用不同的能量类型，体现职业特色
+
+#### 能量类型设计
+
+> 📌 **职业差异化核心**: 不同职业的能量系统完全不同，这是职业特色的重要体现
+
+| 能量类型 | 使用职业 | 初始值 | 最大值 | 恢复机制 | 特色 |
+|---------|---------|-------|-------|---------|------|
+| **怒气 (rage)** | 战士 | 0 | 100 | 攻击/受击获得，脱战衰减 | 越打越强 |
+| **能量 (energy)** | 盗贼 | 100 | 100 | 每回合+20，上限固定 | 快速循环 |
+| **法力 (mana)** | 法师、牧师、术士、德鲁伊、萨满 | 满 | 基于智力成长 | 每回合恢复(精神×系数) | 持续施法 |
+| **法力 (mana)** | 圣骑士、猎人 | 满 | 较低 | 每回合恢复(较慢) | 混合职业 |
+
+**怒气机制详解 (战士):**
+```
+获得怒气:
+  - 普通攻击命中: +5 怒气
+  - 造成暴击: +10 怒气  
+  - 受到伤害: +怒气 (受伤比例 × 2)
+  - 使用某些技能: +怒气
+  
+消耗怒气:
+  - 使用技能消耗怒气 (10-30点)
+  - 脱战后每回合 -10 怒气 (衰减到0)
+  
+策略要点:
+  - 开局无怒气，需要先攻击积累
+  - 受伤也能获得怒气，坦克优势
+  - 需要持续战斗保持怒气值
+```
+
+**能量机制详解 (盗贼):**
+```
+恢复能量:
+  - 每回合自动 +20 能量
+  - 上限固定100，不会超过
+  - 某些技能/天赋可加速恢复
+  
+消耗能量:
+  - 使用技能消耗能量 (20-40点)
+  - 不会自然衰减
+  - 能量不足时无法使用技能
+  
+策略要点:
+  - 能量恢复快，适合频繁使用技能
+  - 需要合理分配能量，避免浪费
+  - 连击技能组合需要能量管理
+```
+
+**法力机制详解 (法系职业):**
+```
+恢复法力:
+  - 每回合恢复 = 精神 × 恢复系数
+  - 法师/术士: 精神 × 0.5%
+  - 牧师: 精神 × 0.8% (治疗职业)
+  - 德鲁伊/萨满: 精神 × 0.6%
+  - 圣骑士/猎人: 精神 × 0.3-0.4% (混合职业)
+  
+消耗法力:
+  - 使用技能消耗法力 (15-50点)
+  - 法力不足时无法施法
+  
+策略要点:
+  - 精神属性影响恢复速度
+  - 需要平衡输出和治疗
+  - 法力耗尽会失去战斗力
+```
+
+**能量系统对比表:**
+
+| 特性 | 怒气 | 能量 | 法力 |
+|-----|------|------|------|
+| 开局状态 | 0 (需积累) | 100 (满) | 满 |
+| 恢复方式 | 战斗获得 | 每回合+20 | 每回合恢复(精神) |
+| 上限 | 100 | 100 | 成长型 |
+| 衰减 | 脱战衰减 | 无 | 无 |
+| 策略重点 | 保持战斗节奏 | 快速循环 | 资源管理 |
+
+---
+
 | 字段 | 类型 | 约束 | 说明 |
 |-----|------|-----|------|
 | id | VARCHAR(32) | PRIMARY KEY | 职业ID |
@@ -341,10 +422,13 @@ vs 人类战士: 100 × 1.00 = 100 (差5点，约5%)
 | description | TEXT | | 描述 |
 | role | VARCHAR(16) | NOT NULL | 定位: tank/dps/healer |
 | primary_stat | VARCHAR(16) | NOT NULL | 主属性 |
+| resource_type | VARCHAR(16) | NOT NULL | 能量类型: mana/rage/energy |
 | base_hp | INTEGER | NOT NULL | 基础HP |
-| base_mp | INTEGER | NOT NULL | 基础MP |
+| base_resource | INTEGER | NOT NULL | 基础能量值 |
 | hp_per_level | INTEGER | NOT NULL | 每级HP成长 |
-| mp_per_level | INTEGER | NOT NULL | 每级MP成长 |
+| resource_per_level | INTEGER | NOT NULL | 每级能量成长 |
+| resource_regen | REAL | DEFAULT 0 | 每回合能量恢复(固定值) |
+| resource_regen_pct | REAL | DEFAULT 0 | 每回合能量恢复(百分比) |
 | base_strength | INTEGER | DEFAULT 10 | 基础力量 |
 | base_agility | INTEGER | DEFAULT 10 | 基础敏捷 |
 | base_intellect | INTEGER | DEFAULT 10 | 基础智力 |
@@ -358,10 +442,13 @@ CREATE TABLE classes (
     description TEXT,
     role VARCHAR(16) NOT NULL,
     primary_stat VARCHAR(16) NOT NULL,
+    resource_type VARCHAR(16) NOT NULL,  -- mana/rage/energy
     base_hp INTEGER NOT NULL,
-    base_mp INTEGER NOT NULL,
+    base_resource INTEGER NOT NULL,       -- 基础能量值
     hp_per_level INTEGER NOT NULL,
-    mp_per_level INTEGER NOT NULL,
+    resource_per_level INTEGER NOT NULL,  -- 每级能量成长
+    resource_regen REAL DEFAULT 0,        -- 每回合固定恢复
+    resource_regen_pct REAL DEFAULT 0,    -- 每回合百分比恢复
     base_strength INTEGER DEFAULT 10,
     base_agility INTEGER DEFAULT 10,
     base_intellect INTEGER DEFAULT 10,
@@ -389,7 +476,7 @@ CREATE TABLE classes (
 | base_value | INTEGER | DEFAULT 0 | 基础数值(伤害/治疗/效果强度) |
 | scaling_stat | VARCHAR(16) | | 成长属性: strength/agility/intellect/spirit |
 | scaling_ratio | REAL | DEFAULT 1.0 | 属性加成系数 |
-| mp_cost | INTEGER | DEFAULT 0 | 法力消耗 |
+| resource_cost | INTEGER | DEFAULT 0 | 能量消耗(怒气/能量/法力) |
 | cooldown | INTEGER | DEFAULT 0 | 冷却时间(回合) |
 | level_required | INTEGER | DEFAULT 1 | 需求等级 |
 | effect_id | VARCHAR(32) | | 附加效果ID(关联effects表) |
@@ -482,26 +569,8 @@ CREATE TABLE classes (
 - `healing_done` - 造成的治疗
 
 ```sql
-CREATE TABLE skills (
-    id VARCHAR(32) PRIMARY KEY,
-    name VARCHAR(32) NOT NULL,
-    description TEXT,
-    class_id VARCHAR(32),
-    type VARCHAR(16) NOT NULL,
-    target VARCHAR(16) NOT NULL,
-    damage_type VARCHAR(16),
-    base_damage INTEGER DEFAULT 0,
-    damage_scaling REAL DEFAULT 1.0,
-    mp_cost INTEGER DEFAULT 0,
-    cooldown INTEGER DEFAULT 0,
-    level_required INTEGER DEFAULT 1,
-    effect_type VARCHAR(32),
-    effect_value REAL,
-    effect_duration INTEGER,
-    FOREIGN KEY (class_id) REFERENCES classes(id)
-);
-
-CREATE INDEX idx_skills_class_id ON skills(class_id);
+-- 技能表定义见上方"5. skills - 技能配置表"章节的完整定义
+-- 主要字段包括: resource_cost (能量消耗，支持怒气/能量/法力)
 ```
 
 ---
@@ -978,4 +1047,699 @@ END;
 3. **迁移到其他数据库**
    - 表结构兼容 MySQL/PostgreSQL
    - 需调整自增语法和部分数据类型
+
+---
+
+## 🎮 后期玩法系统
+
+### 一、无尽深渊系统
+
+> 📌 **核心后期挑战**: 无限层数的挑战塔，层数越高难度越大，奖励越丰富
+
+#### abyss_config - 深渊配置表
+
+| 字段 | 类型 | 约束 | 说明 |
+|-----|------|-----|------|
+| floor | INTEGER | PRIMARY KEY | 层数 |
+| monster_level_base | INTEGER | NOT NULL | 怪物基础等级 |
+| monster_level_growth | REAL | DEFAULT 0.5 | 每层等级增长 |
+| monster_hp_mult | REAL | DEFAULT 1.0 | 怪物HP倍率 |
+| monster_atk_mult | REAL | DEFAULT 1.0 | 怪物攻击倍率 |
+| reward_exp_mult | REAL | DEFAULT 1.0 | 经验奖励倍率 |
+| reward_gold_mult | REAL | DEFAULT 1.0 | 金币奖励倍率 |
+| special_reward | TEXT | | 特殊奖励(JSON) |
+| boss_id | VARCHAR(32) | | Boss怪物ID(每10层) |
+
+```sql
+CREATE TABLE abyss_config (
+    floor INTEGER PRIMARY KEY,
+    monster_level_base INTEGER NOT NULL,
+    monster_level_growth REAL DEFAULT 0.5,
+    monster_hp_mult REAL DEFAULT 1.0,
+    monster_atk_mult REAL DEFAULT 1.0,
+    reward_exp_mult REAL DEFAULT 1.0,
+    reward_gold_mult REAL DEFAULT 1.0,
+    special_reward TEXT,
+    boss_id VARCHAR(32),
+    FOREIGN KEY (boss_id) REFERENCES monsters(id)
+);
+```
+
+#### abyss_progress - 深渊进度表
+
+| 字段 | 类型 | 约束 | 说明 |
+|-----|------|-----|------|
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT | ID |
+| user_id | INTEGER | NOT NULL FK UNIQUE | 用户ID |
+| highest_floor | INTEGER | DEFAULT 0 | 最高通关层数 |
+| current_floor | INTEGER | DEFAULT 1 | 当前挑战层数 |
+| weekly_attempts | INTEGER | DEFAULT 0 | 本周已挑战次数 |
+| weekly_reset_at | DATETIME | | 周重置时间 |
+| total_clears | INTEGER | DEFAULT 0 | 总通关次数 |
+| best_time | INTEGER | | 最快通关时间(秒) |
+
+```sql
+CREATE TABLE abyss_progress (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL UNIQUE,
+    highest_floor INTEGER DEFAULT 0,
+    current_floor INTEGER DEFAULT 1,
+    weekly_attempts INTEGER DEFAULT 0,
+    weekly_reset_at DATETIME,
+    total_clears INTEGER DEFAULT 0,
+    best_time INTEGER,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_abyss_highest ON abyss_progress(highest_floor DESC);
+```
+
+---
+
+### 二、装备强化系统
+
+> 📌 **装备深度**: 通过强化、精炼、镶嵌、附魔让装备持续成长
+
+#### 2.1 equipment_enhance - 装备强化表
+
+| 字段 | 类型 | 约束 | 说明 |
+|-----|------|-----|------|
+| equipment_id | INTEGER | PRIMARY KEY FK | 装备记录ID |
+| enhance_level | INTEGER | DEFAULT 0 | 强化等级 (0-15) |
+| refine_level | INTEGER | DEFAULT 0 | 精炼等级 (0-10) |
+| enchant_id | VARCHAR(32) | | 附魔ID |
+| gem_slot_1 | VARCHAR(32) | | 宝石槽1 |
+| gem_slot_2 | VARCHAR(32) | | 宝石槽2 |
+| gem_slot_3 | VARCHAR(32) | | 宝石槽3 |
+
+```sql
+CREATE TABLE equipment_enhance (
+    equipment_id INTEGER PRIMARY KEY,
+    enhance_level INTEGER DEFAULT 0,
+    refine_level INTEGER DEFAULT 0,
+    enchant_id VARCHAR(32),
+    gem_slot_1 VARCHAR(32),
+    gem_slot_2 VARCHAR(32),
+    gem_slot_3 VARCHAR(32),
+    FOREIGN KEY (equipment_id) REFERENCES equipment(id) ON DELETE CASCADE,
+    FOREIGN KEY (enchant_id) REFERENCES enchants(id),
+    FOREIGN KEY (gem_slot_1) REFERENCES gems(id),
+    FOREIGN KEY (gem_slot_2) REFERENCES gems(id),
+    FOREIGN KEY (gem_slot_3) REFERENCES gems(id)
+);
+```
+
+#### 2.2 enchants - 附魔配置表
+
+| 字段 | 类型 | 约束 | 说明 |
+|-----|------|-----|------|
+| id | VARCHAR(32) | PRIMARY KEY | 附魔ID |
+| name | VARCHAR(32) | NOT NULL | 附魔名称 |
+| description | TEXT | | 描述 |
+| slot_type | VARCHAR(16) | | 适用槽位 |
+| effect_type | VARCHAR(32) | NOT NULL | 效果类型 |
+| effect_value | REAL | NOT NULL | 效果数值 |
+| quality | VARCHAR(16) | | 品质 |
+
+```sql
+CREATE TABLE enchants (
+    id VARCHAR(32) PRIMARY KEY,
+    name VARCHAR(32) NOT NULL,
+    description TEXT,
+    slot_type VARCHAR(16),
+    effect_type VARCHAR(32) NOT NULL,
+    effect_value REAL NOT NULL,
+    quality VARCHAR(16)
+);
+```
+
+#### 2.3 gems - 宝石配置表
+
+| 字段 | 类型 | 约束 | 说明 |
+|-----|------|-----|------|
+| id | VARCHAR(32) | PRIMARY KEY | 宝石ID |
+| name | VARCHAR(32) | NOT NULL | 宝石名称 |
+| color | VARCHAR(16) | NOT NULL | 颜色: red/blue/yellow/green/purple |
+| stat_type | VARCHAR(32) | NOT NULL | 属性类型 |
+| stat_value | INTEGER | NOT NULL | 属性数值 |
+| quality | VARCHAR(16) | | 品质 |
+
+```sql
+CREATE TABLE gems (
+    id VARCHAR(32) PRIMARY KEY,
+    name VARCHAR(32) NOT NULL,
+    color VARCHAR(16) NOT NULL,
+    stat_type VARCHAR(32) NOT NULL,
+    stat_value INTEGER NOT NULL,
+    quality VARCHAR(16)
+);
+```
+
+#### 强化效果说明
+
+| 系统 | 效果 | 上限 | 消耗 |
+|-----|------|-----|------|
+| **强化** | 基础属性 +3%/级 | +15 (+45%) | 金币 |
+| **精炼** | 基础属性 +5%/级 | +10 (+50%) | 精炼石 |
+| **附魔** | 特殊效果 | 1个 | 附魔材料 |
+| **宝石** | 额外属性 | 3颗 | 宝石 |
+
+---
+
+### 三、收集与成就系统
+
+#### 3.1 achievements - 成就配置表
+
+| 字段 | 类型 | 约束 | 说明 |
+|-----|------|-----|------|
+| id | VARCHAR(32) | PRIMARY KEY | 成就ID |
+| name | VARCHAR(64) | NOT NULL | 成就名称 |
+| description | TEXT | | 描述 |
+| category | VARCHAR(32) | NOT NULL | 分类: combat/explore/collect/social |
+| condition_type | VARCHAR(32) | NOT NULL | 条件类型 |
+| condition_value | INTEGER | NOT NULL | 条件数值 |
+| points | INTEGER | DEFAULT 10 | 成就点数 |
+| reward_type | VARCHAR(32) | | 奖励类型 |
+| reward_value | TEXT | | 奖励内容(JSON) |
+| icon | VARCHAR(64) | | 图标 |
+| is_hidden | INTEGER | DEFAULT 0 | 是否隐藏成就 |
+
+```sql
+CREATE TABLE achievements (
+    id VARCHAR(32) PRIMARY KEY,
+    name VARCHAR(64) NOT NULL,
+    description TEXT,
+    category VARCHAR(32) NOT NULL,
+    condition_type VARCHAR(32) NOT NULL,
+    condition_value INTEGER NOT NULL,
+    points INTEGER DEFAULT 10,
+    reward_type VARCHAR(32),
+    reward_value TEXT,
+    icon VARCHAR(64),
+    is_hidden INTEGER DEFAULT 0
+);
+
+CREATE INDEX idx_achievements_category ON achievements(category);
+```
+
+**成就分类:**
+- `combat` - 战斗成就 (击杀数、伤害、连胜...)
+- `explore` - 探索成就 (区域、副本、深渊层数...)
+- `collect` - 收集成就 (装备、图鉴、宠物...)
+- `social` - 社交成就 (组队、公会、PvP...)
+- `special` - 特殊成就 (限时、首杀、极限挑战...)
+
+#### 3.2 user_achievements - 玩家成就表
+
+| 字段 | 类型 | 约束 | 说明 |
+|-----|------|-----|------|
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT | ID |
+| user_id | INTEGER | NOT NULL FK | 用户ID |
+| achievement_id | VARCHAR(32) | NOT NULL FK | 成就ID |
+| progress | INTEGER | DEFAULT 0 | 当前进度 |
+| completed_at | DATETIME | | 完成时间 |
+| rewarded | INTEGER | DEFAULT 0 | 是否已领奖 |
+
+```sql
+CREATE TABLE user_achievements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    achievement_id VARCHAR(32) NOT NULL,
+    progress INTEGER DEFAULT 0,
+    completed_at DATETIME,
+    rewarded INTEGER DEFAULT 0,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (achievement_id) REFERENCES achievements(id),
+    UNIQUE(user_id, achievement_id)
+);
+
+CREATE INDEX idx_user_achievements_user ON user_achievements(user_id);
+```
+
+#### 3.3 codex - 图鉴配置表
+
+| 字段 | 类型 | 约束 | 说明 |
+|-----|------|-----|------|
+| id | VARCHAR(32) | PRIMARY KEY | 图鉴ID |
+| category | VARCHAR(32) | NOT NULL | 分类: monster/item/boss/zone |
+| target_id | VARCHAR(32) | NOT NULL | 关联目标ID |
+| name | VARCHAR(64) | NOT NULL | 名称 |
+| description | TEXT | | 描述 |
+| unlock_condition | TEXT | | 解锁条件 |
+| bonus_type | VARCHAR(32) | | 收集奖励类型 |
+| bonus_value | REAL | | 收集奖励数值 |
+
+```sql
+CREATE TABLE codex (
+    id VARCHAR(32) PRIMARY KEY,
+    category VARCHAR(32) NOT NULL,
+    target_id VARCHAR(32) NOT NULL,
+    name VARCHAR(64) NOT NULL,
+    description TEXT,
+    unlock_condition TEXT,
+    bonus_type VARCHAR(32),
+    bonus_value REAL
+);
+
+CREATE INDEX idx_codex_category ON codex(category);
+```
+
+#### 3.4 user_codex - 玩家图鉴表
+
+| 字段 | 类型 | 约束 | 说明 |
+|-----|------|-----|------|
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT | ID |
+| user_id | INTEGER | NOT NULL FK | 用户ID |
+| codex_id | VARCHAR(32) | NOT NULL FK | 图鉴ID |
+| unlock_count | INTEGER | DEFAULT 1 | 解锁次数/击杀次数 |
+| first_unlock_at | DATETIME | NOT NULL | 首次解锁时间 |
+
+```sql
+CREATE TABLE user_codex (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    codex_id VARCHAR(32) NOT NULL,
+    unlock_count INTEGER DEFAULT 1,
+    first_unlock_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (codex_id) REFERENCES codex(id),
+    UNIQUE(user_id, codex_id)
+);
+
+CREATE INDEX idx_user_codex_user ON user_codex(user_id);
+```
+
+#### 图鉴收集奖励示例
+
+| 图鉴类型 | 收集进度 | 奖励 |
+|---------|---------|------|
+| 怪物图鉴 | 10% | 伤害+1% |
+| 怪物图鉴 | 50% | 伤害+3% |
+| 怪物图鉴 | 100% | 伤害+5% + 称号"百科全书" |
+| Boss图鉴 | 首杀任意Boss | 专属称号 |
+| Boss图鉴 | 击杀全部Boss | 传说外观 |
+
+---
+
+## ⚔️ 阵营PVP遭遇战系统
+
+> 📌 **核心竞争机制**: 在同一地图挂机的联盟与部落玩家会随机发生PVP遭遇战，胜负影响该地图的阵营效率加成
+
+### 系统概览
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          阵营PVP遭遇战系统                                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│   ┌──────────────────────────────────────────────────────────────────┐     │
+│   │                        地图: 艾尔文森林                            │     │
+│   │  ┌─────────────────┐                  ┌─────────────────┐        │     │
+│   │  │  联盟玩家群体    │    ⚔️ 遭遇战     │   部落玩家群体   │        │     │
+│   │  │  ├─ Player_A    │ ◄─────────────► │   ├─ Player_X   │        │     │
+│   │  │  ├─ Player_B    │                  │   └─ Player_Y   │        │     │
+│   │  │  └─ Player_C    │                  │                 │        │     │
+│   │  └─────────────────┘                  └─────────────────┘        │     │
+│   │                                                                   │     │
+│   │  当前控制方: 联盟 (胜率65%)                                        │     │
+│   │  联盟效率: +10% 经验/金币/掉落                                     │     │
+│   │  部落效率: -5% 经验/金币/掉落                                      │     │
+│   └──────────────────────────────────────────────────────────────────┘     │
+│                                                                             │
+│   📢 全服公告: [艾尔文森林] 联盟<勇士小明>击败了部落<暗影猎手>！            │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 核心机制
+
+| 机制 | 说明 |
+|-----|------|
+| **遭遇触发** | 同一地图的敌对阵营玩家随机匹配，触发自动PVP战斗 |
+| **战斗方式** | 使用玩家设置的战斗策略，自动化对决 |
+| **胜负判定** | 击杀对方或对方投降/逃跑 |
+| **荣誉奖励** | 胜者获得荣誉值，可用于兑换奖励 |
+| **地图控制** | 根据近期胜率计算阵营控制权 |
+| **效率加成** | 控制方获得挂机效率提升，被控方效率降低 |
+| **全服公告** | 所有PVP战斗结果向全服玩家广播 |
+
+---
+
+### 四、地图阵营控制表
+
+#### zone_faction_control - 地图阵营控制表
+
+> 📌 **地图归属**: 记录每个地图的阵营控制状态和效率加成
+
+| 字段 | 类型 | 约束 | 说明 |
+|-----|------|-----|------|
+| zone_id | VARCHAR(32) | PRIMARY KEY FK | 区域ID |
+| controlling_faction | VARCHAR(16) | | 当前控制阵营: alliance/horde/neutral |
+| alliance_wins | INTEGER | DEFAULT 0 | 联盟近期胜场 |
+| horde_wins | INTEGER | DEFAULT 0 | 部落近期胜场 |
+| alliance_win_rate | REAL | DEFAULT 0.5 | 联盟胜率 |
+| control_score | INTEGER | DEFAULT 0 | 控制积分 (正=联盟, 负=部落) |
+| efficiency_bonus | REAL | DEFAULT 0 | 控制方效率加成 (0.0-0.2) |
+| efficiency_penalty | REAL | DEFAULT 0 | 被控方效率惩罚 (0.0-0.1) |
+| last_battle_at | DATETIME | | 最后一次战斗时间 |
+| stats_reset_at | DATETIME | | 统计重置时间 (每周) |
+
+```sql
+CREATE TABLE zone_faction_control (
+    zone_id VARCHAR(32) PRIMARY KEY,
+    controlling_faction VARCHAR(16) DEFAULT 'neutral',
+    alliance_wins INTEGER DEFAULT 0,
+    horde_wins INTEGER DEFAULT 0,
+    alliance_win_rate REAL DEFAULT 0.5,
+    control_score INTEGER DEFAULT 0,
+    efficiency_bonus REAL DEFAULT 0,
+    efficiency_penalty REAL DEFAULT 0,
+    last_battle_at DATETIME,
+    stats_reset_at DATETIME,
+    FOREIGN KEY (zone_id) REFERENCES zones(id)
+);
+```
+
+**控制权计算规则:**
+```
+控制积分变化:
+  - 联盟胜利: +1 分
+  - 部落胜利: -1 分
+  - 积分范围: -100 ~ +100
+
+控制权判定:
+  - 积分 >= +20: 联盟控制
+  - 积分 <= -20: 部落控制
+  - -20 < 积分 < +20: 中立/争夺中
+
+效率加成计算:
+  - 控制方: +效率加成 (最高+20%)
+  - 被控方: -效率惩罚 (最高-10%)
+  - 加成比例 = |积分| / 100 × 最大加成
+```
+
+---
+
+### 五、PVP遭遇战记录表
+
+#### pvp_encounters - PVP遭遇战记录表
+
+> 📌 **战斗记录**: 记录每一场PVP遭遇战的详细信息
+
+| 字段 | 类型 | 约束 | 说明 |
+|-----|------|-----|------|
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT | 战斗ID |
+| zone_id | VARCHAR(32) | NOT NULL FK | 发生区域 |
+| attacker_user_id | INTEGER | NOT NULL FK | 进攻方用户ID |
+| defender_user_id | INTEGER | NOT NULL FK | 防守方用户ID |
+| attacker_faction | VARCHAR(16) | NOT NULL | 进攻方阵营 |
+| defender_faction | VARCHAR(16) | NOT NULL | 防守方阵营 |
+| winner_user_id | INTEGER | | 胜利方用户ID (NULL=平局) |
+| winner_faction | VARCHAR(16) | | 胜利阵营 |
+| attacker_team_info | TEXT | | 进攻方队伍信息 (JSON) |
+| defender_team_info | TEXT | | 防守方队伍信息 (JSON) |
+| battle_rounds | INTEGER | DEFAULT 0 | 战斗回合数 |
+| battle_duration | INTEGER | DEFAULT 0 | 战斗时长(秒) |
+| attacker_damage_dealt | INTEGER | DEFAULT 0 | 进攻方造成伤害 |
+| defender_damage_dealt | INTEGER | DEFAULT 0 | 防守方造成伤害 |
+| honor_reward | INTEGER | DEFAULT 0 | 荣誉奖励 |
+| battle_log | TEXT | | 战斗日志 (JSON) |
+| created_at | DATETIME | DEFAULT CURRENT_TIMESTAMP | 战斗时间 |
+
+```sql
+CREATE TABLE pvp_encounters (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    zone_id VARCHAR(32) NOT NULL,
+    attacker_user_id INTEGER NOT NULL,
+    defender_user_id INTEGER NOT NULL,
+    attacker_faction VARCHAR(16) NOT NULL,
+    defender_faction VARCHAR(16) NOT NULL,
+    winner_user_id INTEGER,
+    winner_faction VARCHAR(16),
+    attacker_team_info TEXT,
+    defender_team_info TEXT,
+    battle_rounds INTEGER DEFAULT 0,
+    battle_duration INTEGER DEFAULT 0,
+    attacker_damage_dealt INTEGER DEFAULT 0,
+    defender_damage_dealt INTEGER DEFAULT 0,
+    honor_reward INTEGER DEFAULT 0,
+    battle_log TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (zone_id) REFERENCES zones(id),
+    FOREIGN KEY (attacker_user_id) REFERENCES users(id),
+    FOREIGN KEY (defender_user_id) REFERENCES users(id),
+    FOREIGN KEY (winner_user_id) REFERENCES users(id)
+);
+
+CREATE INDEX idx_pvp_encounters_zone ON pvp_encounters(zone_id);
+CREATE INDEX idx_pvp_encounters_attacker ON pvp_encounters(attacker_user_id);
+CREATE INDEX idx_pvp_encounters_defender ON pvp_encounters(defender_user_id);
+CREATE INDEX idx_pvp_encounters_time ON pvp_encounters(created_at DESC);
+CREATE INDEX idx_pvp_encounters_winner ON pvp_encounters(winner_faction);
+```
+
+---
+
+### 六、玩家荣誉表
+
+#### user_honor - 玩家荣誉表
+
+> 📌 **荣誉系统**: 记录玩家PVP战绩和荣誉积累
+
+| 字段 | 类型 | 约束 | 说明 |
+|-----|------|-----|------|
+| user_id | INTEGER | PRIMARY KEY FK | 用户ID |
+| faction | VARCHAR(16) | NOT NULL | 所属阵营 |
+| total_honor | INTEGER | DEFAULT 0 | 累计荣誉值 |
+| current_honor | INTEGER | DEFAULT 0 | 当前可用荣誉 |
+| honor_rank | INTEGER | DEFAULT 0 | 荣誉军衔等级 (0-14) |
+| pvp_wins | INTEGER | DEFAULT 0 | PVP胜场 |
+| pvp_losses | INTEGER | DEFAULT 0 | PVP败场 |
+| pvp_draws | INTEGER | DEFAULT 0 | PVP平局 |
+| win_streak | INTEGER | DEFAULT 0 | 当前连胜 |
+| best_win_streak | INTEGER | DEFAULT 0 | 最高连胜 |
+| total_kills | INTEGER | DEFAULT 0 | 总击杀角色数 |
+| total_deaths | INTEGER | DEFAULT 0 | 总死亡角色数 |
+| total_damage_dealt | INTEGER | DEFAULT 0 | 总造成伤害 |
+| weekly_honor | INTEGER | DEFAULT 0 | 本周荣誉 |
+| weekly_reset_at | DATETIME | | 周重置时间 |
+
+```sql
+CREATE TABLE user_honor (
+    user_id INTEGER PRIMARY KEY,
+    faction VARCHAR(16) NOT NULL,
+    total_honor INTEGER DEFAULT 0,
+    current_honor INTEGER DEFAULT 0,
+    honor_rank INTEGER DEFAULT 0,
+    pvp_wins INTEGER DEFAULT 0,
+    pvp_losses INTEGER DEFAULT 0,
+    pvp_draws INTEGER DEFAULT 0,
+    win_streak INTEGER DEFAULT 0,
+    best_win_streak INTEGER DEFAULT 0,
+    total_kills INTEGER DEFAULT 0,
+    total_deaths INTEGER DEFAULT 0,
+    total_damage_dealt INTEGER DEFAULT 0,
+    weekly_honor INTEGER DEFAULT 0,
+    weekly_reset_at DATETIME,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_user_honor_rank ON user_honor(honor_rank DESC);
+CREATE INDEX idx_user_honor_wins ON user_honor(pvp_wins DESC);
+CREATE INDEX idx_user_honor_faction ON user_honor(faction);
+```
+
+**荣誉军衔体系:**
+
+| 等级 | 联盟军衔 | 部落军衔 | 所需累计荣誉 |
+|-----|---------|---------|------------|
+| 0 | 无军衔 | 无军衔 | 0 |
+| 1 | 列兵 | 斥候 | 100 |
+| 2 | 下士 | 步兵 | 500 |
+| 3 | 中士 | 中士 | 1,000 |
+| 4 | 军士长 | 高级中士 | 2,000 |
+| 5 | 准尉 | 一等军士长 | 5,000 |
+| 6 | 少尉 | 石卫士 | 10,000 |
+| 7 | 中尉 | 血卫士 | 20,000 |
+| 8 | 上尉 | 军团士兵 | 35,000 |
+| 9 | 少校 | 百夫长 | 50,000 |
+| 10 | 中校 | 勇士 | 75,000 |
+| 11 | 上校 | 将军 | 100,000 |
+| 12 | 准将 | 军阀 | 150,000 |
+| 13 | 元帅 | 高阶督军 | 250,000 |
+| 14 | 大元帅 | 大督军 | 500,000 |
+
+---
+
+### 七、全服公告表
+
+#### server_announcements - 全服公告表
+
+> 📌 **实时广播**: 记录并推送PVP战斗结果到全服
+
+| 字段 | 类型 | 约束 | 说明 |
+|-----|------|-----|------|
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT | 公告ID |
+| type | VARCHAR(32) | NOT NULL | 公告类型 |
+| content | TEXT | NOT NULL | 公告内容 |
+| zone_id | VARCHAR(32) | | 相关区域 |
+| winner_user_id | INTEGER | | 胜利者ID |
+| loser_user_id | INTEGER | | 失败者ID |
+| pvp_encounter_id | INTEGER | | 关联PVP战斗ID |
+| importance | INTEGER | DEFAULT 1 | 重要程度 (1-5) |
+| expires_at | DATETIME | | 过期时间 |
+| created_at | DATETIME | DEFAULT CURRENT_TIMESTAMP | 创建时间 |
+
+```sql
+CREATE TABLE server_announcements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    type VARCHAR(32) NOT NULL,
+    content TEXT NOT NULL,
+    zone_id VARCHAR(32),
+    winner_user_id INTEGER,
+    loser_user_id INTEGER,
+    pvp_encounter_id INTEGER,
+    importance INTEGER DEFAULT 1,
+    expires_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (zone_id) REFERENCES zones(id),
+    FOREIGN KEY (winner_user_id) REFERENCES users(id),
+    FOREIGN KEY (loser_user_id) REFERENCES users(id),
+    FOREIGN KEY (pvp_encounter_id) REFERENCES pvp_encounters(id)
+);
+
+CREATE INDEX idx_announcements_time ON server_announcements(created_at DESC);
+CREATE INDEX idx_announcements_type ON server_announcements(type);
+```
+
+**公告类型:**
+
+| 类型 | 说明 | 示例 |
+|-----|------|-----|
+| `pvp_victory` | PVP胜利 | [西部荒野] 联盟「勇士小明」击败了部落「暗影猎手」！ |
+| `zone_captured` | 区域易主 | ⚔️ 联盟已占领「石爪山脉」！该区域联盟效率+15% |
+| `kill_streak` | 连杀公告 | 🔥 联盟「死亡骑士」达成5连杀！ |
+| `zone_contested` | 区域争夺激烈 | ⚠️ 「灰谷」正在激烈争夺中！双方势均力敌 |
+| `faction_dominant` | 阵营优势 | 👑 部落本周在全服7个区域保持控制！ |
+
+---
+
+### 八、荣誉商店表
+
+#### honor_shop - 荣誉商店配置表
+
+> 📌 **荣誉兑换**: 使用荣誉值兑换独特奖励
+
+| 字段 | 类型 | 约束 | 说明 |
+|-----|------|-----|------|
+| id | VARCHAR(32) | PRIMARY KEY | 商品ID |
+| name | VARCHAR(64) | NOT NULL | 商品名称 |
+| description | TEXT | | 描述 |
+| item_type | VARCHAR(32) | NOT NULL | 物品类型: equipment/consumable/cosmetic/title |
+| item_id | VARCHAR(32) | | 关联物品ID |
+| honor_cost | INTEGER | NOT NULL | 荣誉花费 |
+| rank_required | INTEGER | DEFAULT 0 | 需求军衔等级 |
+| faction | VARCHAR(16) | | 阵营限制 (NULL=双阵营) |
+| weekly_limit | INTEGER | | 每周购买限制 |
+| stock | INTEGER | | 库存 (NULL=无限) |
+| is_active | INTEGER | DEFAULT 1 | 是否在售 |
+
+```sql
+CREATE TABLE honor_shop (
+    id VARCHAR(32) PRIMARY KEY,
+    name VARCHAR(64) NOT NULL,
+    description TEXT,
+    item_type VARCHAR(32) NOT NULL,
+    item_id VARCHAR(32),
+    honor_cost INTEGER NOT NULL,
+    rank_required INTEGER DEFAULT 0,
+    faction VARCHAR(16),
+    weekly_limit INTEGER,
+    stock INTEGER,
+    is_active INTEGER DEFAULT 1,
+    FOREIGN KEY (item_id) REFERENCES items(id)
+);
+
+CREATE INDEX idx_honor_shop_rank ON honor_shop(rank_required);
+```
+
+**荣誉商店示例商品:**
+
+| 商品 | 类型 | 荣誉花费 | 需求军衔 |
+|-----|------|---------|---------|
+| PVP套装·头盔 | 装备 | 2,000 | 5 (准尉) |
+| PVP套装·胸甲 | 装备 | 3,500 | 7 (中尉) |
+| 战斗徽章 | 饰品 | 1,500 | 3 (中士) |
+| 荣誉药剂 | 消耗品 | 100 | 0 |
+| 征服者称号 | 称号 | 10,000 | 10 (中校) |
+| 战马坐骑皮肤 | 外观 | 50,000 | 12 (准将) |
+
+---
+
+### PVP遭遇战流程图
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           PVP遭遇战触发流程                                   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  1. 匹配检测                                                                 │
+│     ┌─────────────────────────────────────────────────────────────────┐    │
+│     │ 每X秒检测各地图的联盟/部落在线玩家                                 │    │
+│     │ IF 双方都有玩家 AND 随机触发(概率Y%)                              │    │
+│     │ THEN 随机匹配一对敌对玩家进行PVP                                  │    │
+│     └─────────────────────────────────────────────────────────────────┘    │
+│                                       ▼                                     │
+│  2. 战斗执行                                                                 │
+│     ┌─────────────────────────────────────────────────────────────────┐    │
+│     │ 双方使用各自的战斗策略自动对战                                     │    │
+│     │ 战斗引擎模拟回合制PVP                                             │    │
+│     │ 记录战斗日志和伤害统计                                            │    │
+│     └─────────────────────────────────────────────────────────────────┘    │
+│                                       ▼                                     │
+│  3. 结算奖励                                                                 │
+│     ┌─────────────────────────────────────────────────────────────────┐    │
+│     │ 胜者: +荣誉值 (基于对手等级/军衔)                                  │    │
+│     │ 败者: 无惩罚 (避免挫败感)                                         │    │
+│     │ 更新双方PVP统计                                                   │    │
+│     └─────────────────────────────────────────────────────────────────┘    │
+│                                       ▼                                     │
+│  4. 更新地图控制                                                             │
+│     ┌─────────────────────────────────────────────────────────────────┐    │
+│     │ 更新 zone_faction_control 的胜败统计                              │    │
+│     │ 重新计算控制积分和效率加成                                         │    │
+│     │ IF 控制权变化 THEN 触发区域易主公告                               │    │
+│     └─────────────────────────────────────────────────────────────────┘    │
+│                                       ▼                                     │
+│  5. 发布公告                                                                 │
+│     ┌─────────────────────────────────────────────────────────────────┐    │
+│     │ 生成战斗结果公告                                                   │    │
+│     │ 推送到全服在线玩家                                                 │    │
+│     │ 记录到 server_announcements 表供查询                              │    │
+│     └─────────────────────────────────────────────────────────────────┘    │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 效率加成计算示例
+
+```
+场景: 艾尔文森林 - 联盟控制 (积分+45)
+
+联盟玩家挂机效率:
+  基础经验: 100/分钟
+  控制加成: +9% (积分45 ÷ 100 × 20%)
+  实际经验: 100 × 1.09 = 109/分钟
+
+部落玩家挂机效率:
+  基础经验: 100/分钟
+  被控惩罚: -4.5% (积分45 ÷ 100 × 10%)
+  实际经验: 100 × 0.955 = 95.5/分钟
+
+差距: 联盟比部落多获得 14% 经验
+```
+
+> 💡 这个机制激励玩家提升战力和优化策略来争夺地图控制权，同时保持竞争的持续性
 

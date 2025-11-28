@@ -73,3 +73,6 @@ type BattleResult struct {
 }
 
 
+
+
+
