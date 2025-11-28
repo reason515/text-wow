@@ -98,75 +98,85 @@ INSERT OR REPLACE INTO races (id, name, faction, description,
 -- resource_regen: 每回合固定恢复值
 -- resource_regen_pct: 每回合基于精神的百分比恢复(仅法力有效)
 
+-- ═══════════════════════════════════════════════════════════
+-- 职业数据 (小数值设计：HP 25-35起步，每级+3)
+-- ═══════════════════════════════════════════════════════════
+-- resource_type: rage(怒气) / energy(能量) / mana(法力)
+-- 数值规范: HP 25~230, MP 15~100, 属性 5~50
+
 INSERT OR REPLACE INTO classes (id, name, description, role, primary_stat, 
     resource_type, base_hp, base_resource, hp_per_level, resource_per_level, 
     resource_regen, resource_regen_pct,
     base_strength, base_agility, base_intellect, base_stamina, base_spirit) VALUES
 -- 战士: 怒气系统 (初始0，通过攻击/受击获得)
 ('warrior', '战士', '近战格斗专家，可以承受大量伤害。', 'tank', 'strength',
-    'rage', 120, 0, 12, 0, 0, 0,  -- 怒气不自动恢复，通过战斗获得
-    15, 10, 5, 14, 8),
+    'rage', 35, 0, 3, 0, 0, 0,  -- HP35起步，每级+3
+    12, 8, 5, 10, 6),
 -- 盗贼: 能量系统 (固定100上限，快速恢复)
 ('rogue', '盗贼', '潜行刺客，擅长连击和爆发伤害。', 'dps', 'agility',
-    'energy', 85, 100, 7, 0, 20, 0,  -- 每回合恢复20能量
-    10, 16, 6, 9, 8),
+    'energy', 25, 100, 2, 0, 20, 0,  -- HP25起步，每级+2
+    8, 12, 5, 7, 6),
 -- 法师: 法力系统 (高法力，基于精神恢复)
 ('mage', '法师', '强大的奥术施法者，擅长范围伤害。', 'dps', 'intellect',
-    'mana', 65, 120, 4, 15, 0, 0.5,  -- 每回合恢复精神×0.5%的法力
-    4, 6, 18, 6, 12),
+    'mana', 20, 40, 2, 2, 0, 0.5,  -- HP20起步，MP40起步
+    4, 5, 14, 5, 10),
 -- 牧师: 法力系统 (高法力，高精神恢复)
 ('priest', '牧师', '治疗者和暗影施法者。', 'healer', 'intellect',
-    'mana', 70, 100, 5, 12, 0, 0.8,  -- 每回合恢复精神×0.8%的法力
-    5, 6, 15, 8, 16),
+    'mana', 22, 35, 2, 2, 0, 0.8,  -- HP22起步
+    4, 5, 12, 6, 14),
 -- 术士: 法力系统
 ('warlock', '术士', '黑暗魔法师，召唤恶魔作战。', 'dps', 'intellect',
-    'mana', 75, 110, 5, 13, 0, 0.5,
-    5, 6, 17, 8, 10),
+    'mana', 24, 38, 2, 2, 0, 0.5,
+    5, 5, 13, 6, 9),
 -- 德鲁伊: 法力系统
 ('druid', '德鲁伊', '自然的守护者，可变形为多种形态。', 'dps', 'intellect',
-    'mana', 85, 80, 7, 10, 0, 0.6,
-    10, 10, 13, 10, 12),
+    'mana', 28, 30, 2, 1, 0, 0.6,
+    8, 8, 10, 8, 10),
 -- 萨满: 法力系统
 ('shaman', '萨满', '元素的操控者，可治疗和增益。', 'dps', 'intellect',
-    'mana', 90, 90, 8, 10, 0, 0.6,
-    12, 8, 14, 11, 12),
+    'mana', 28, 32, 2, 1, 0, 0.6,
+    9, 7, 11, 8, 10),
 -- 圣骑士: 法力系统 (较低法力)
 ('paladin', '圣骑士', '神圣战士，可以治疗和保护盟友。', 'tank', 'strength',
-    'mana', 110, 60, 10, 6, 0, 0.4,
-    13, 8, 10, 13, 12),
+    'mana', 32, 20, 3, 1, 0, 0.4,
+    10, 6, 8, 10, 10),
 -- 猎人: 法力系统 (较低法力)
 ('hunter', '猎人', '远程物理攻击者，与宠物并肩作战。', 'dps', 'agility',
-    'mana', 90, 40, 8, 4, 0, 0.3,
-    8, 15, 8, 10, 10);
+    'mana', 26, 18, 2, 1, 0, 0.3,
+    6, 12, 6, 8, 8);
 
 -- ═══════════════════════════════════════════════════════════
 -- 效果配置 (Buff/Debuff) - 每场战斗开始时清空
 -- ═══════════════════════════════════════════════════════════
 
+-- ═══════════════════════════════════════════════════════════
+-- 效果配置 (小数值设计：DOT伤害2~5/回合，护盾10~20吸收)
+-- ═══════════════════════════════════════════════════════════
+
 INSERT OR REPLACE INTO effects (id, name, description, type, is_buff, is_stackable, max_stacks, duration, value_type, value, stat_affected, damage_type, can_dispel) VALUES
 -- 增益效果 (Buff)
 ('eff_shield_wall', '盾墙', '受到的伤害降低50%', 'stat_mod', 1, 0, 1, 3, 'percent', -50, 'damage_taken', NULL, 0),
-('eff_ice_barrier', '寒冰护体', '吸收伤害的护盾', 'shield', 1, 0, 1, 5, 'flat', 100, NULL, NULL, 1),
-('eff_pw_shield', '真言术:盾', '吸收伤害', 'shield', 1, 0, 1, 4, 'flat', 80, NULL, NULL, 1),
+('eff_ice_barrier', '寒冰护体', '吸收15点伤害', 'shield', 1, 0, 1, 5, 'flat', 15, NULL, NULL, 1),
+('eff_pw_shield', '真言术:盾', '吸收12点伤害', 'shield', 1, 0, 1, 4, 'flat', 12, NULL, NULL, 1),
 ('eff_battle_shout', '战斗怒吼', '攻击力提升10%', 'stat_mod', 1, 0, 1, 5, 'percent', 10, 'attack', NULL, 1),
 ('eff_blade_flurry', '剑刃乱舞', '攻击力提升20%', 'stat_mod', 1, 0, 1, 4, 'percent', 20, 'attack', NULL, 1),
-('eff_renew', '恢复', '每回合恢复生命', 'hot', 1, 0, 1, 4, 'flat', 15, NULL, 'holy', 1),
+('eff_renew', '恢复', '每回合恢复3点生命', 'hot', 1, 0, 1, 4, 'flat', 3, NULL, 'holy', 1),
 ('eff_stealth', '潜行', '进入隐身状态', 'stealth', 1, 0, 1, 3, NULL, NULL, NULL, NULL, 1),
 ('eff_inner_fire', '心灵之火', '防御力提升15%', 'stat_mod', 1, 0, 1, 10, 'percent', 15, 'defense', NULL, 1),
-('eff_blessing_might', '力量祝福', '攻击力提升', 'stat_mod', 1, 0, 1, 8, 'flat', 20, 'attack', NULL, 1),
+('eff_blessing_might', '力量祝福', '攻击力+3', 'stat_mod', 1, 0, 1, 8, 'flat', 3, 'attack', NULL, 1),
 ('eff_arcane_intellect', '奥术智慧', '智力提升10%', 'stat_mod', 1, 0, 1, 30, 'percent', 10, 'intellect', NULL, 1),
 
 -- 减益效果 (Debuff)
 ('eff_stun', '眩晕', '无法行动', 'stun', 0, 0, 1, 1, NULL, NULL, NULL, NULL, 1),
 ('eff_silence', '沉默', '无法施放法术', 'silence', 0, 0, 1, 2, NULL, NULL, NULL, NULL, 1),
 ('eff_slow', '减速', '攻击速度降低30%', 'slow', 0, 0, 1, 3, 'percent', -30, 'attack_speed', NULL, 1),
-('eff_sw_pain', '暗言术:痛', '每回合造成暗影伤害', 'dot', 0, 0, 1, 4, 'flat', 12, NULL, 'shadow', 1),
-('eff_rend', '撕裂', '每回合造成物理流血伤害', 'dot', 0, 1, 3, 3, 'flat', 8, NULL, 'physical', 1),
-('eff_ignite', '点燃', '每回合造成火焰伤害', 'dot', 0, 1, 5, 3, 'flat', 10, NULL, 'fire', 1),
+('eff_sw_pain', '暗言术:痛', '每回合3点暗影伤害', 'dot', 0, 0, 1, 4, 'flat', 3, NULL, 'shadow', 1),
+('eff_rend', '撕裂', '每回合2点流血伤害', 'dot', 0, 1, 3, 3, 'flat', 2, NULL, 'physical', 1),
+('eff_ignite', '点燃', '每回合2点火焰伤害', 'dot', 0, 1, 5, 3, 'flat', 2, NULL, 'fire', 1),
 ('eff_frostbite', '冻伤', '攻击力降低15%', 'stat_mod', 0, 0, 1, 3, 'percent', -15, 'attack', 'frost', 1),
 ('eff_curse_weakness', '虚弱诅咒', '造成的伤害降低20%', 'stat_mod', 0, 0, 1, 4, 'percent', -20, 'damage_dealt', 'shadow', 1),
 ('eff_sunder_armor', '破甲', '防御力降低20%', 'stat_mod', 0, 1, 5, 5, 'percent', -20, 'defense', NULL, 0),
-('eff_poison', '中毒', '每回合造成自然伤害', 'dot', 0, 1, 5, 5, 'flat', 6, NULL, 'nature', 1),
+('eff_poison', '中毒', '每回合2点自然伤害', 'dot', 0, 1, 5, 5, 'flat', 2, NULL, 'nature', 1),
 ('eff_taunt', '嘲讽', '强制攻击施法者', 'taunt', 0, 0, 1, 2, NULL, NULL, NULL, NULL, 0),
 ('eff_fear', '恐惧', '无法控制行动', 'stun', 0, 0, 1, 2, NULL, NULL, 'shadow', NULL, 1);
 
@@ -174,52 +184,56 @@ INSERT OR REPLACE INTO effects (id, name, description, type, is_buff, is_stackab
 -- 技能数据 (扩展版)
 -- ═══════════════════════════════════════════════════════════
 
--- 战士技能
-INSERT OR REPLACE INTO skills (id, name, description, class_id, type, target_type, damage_type, base_value, scaling_stat, scaling_ratio, resource_cost, cooldown, level_required, effect_id, effect_chance) VALUES
-('heroic_strike', '英勇打击', '一次强力的武器攻击。', 'warrior', 'attack', 'enemy', 'physical', 15, 'strength', 1.2, 5, 0, 1, NULL, 1.0),
-('charge', '冲锋', '冲向敌人，造成伤害并眩晕。', 'warrior', 'attack', 'enemy', 'physical', 10, 'strength', 0.8, 10, 3, 1, 'eff_stun', 1.0),
-('rend', '撕裂', '造成流血效果。', 'warrior', 'dot', 'enemy', 'physical', 5, 'strength', 0.3, 8, 0, 2, 'eff_rend', 1.0),
-('thunder_clap', '雷霆一击', '对所有敌人造成伤害并减速。', 'warrior', 'attack', 'enemy_all', 'physical', 20, 'strength', 0.6, 15, 2, 4, 'eff_slow', 0.8),
-('sunder_armor', '破甲攻击', '降低敌人防御力。', 'warrior', 'debuff', 'enemy', 'physical', 8, 'strength', 0.5, 10, 0, 6, 'eff_sunder_armor', 1.0),
-('execute', '斩杀', '对低血量敌人造成大量伤害。', 'warrior', 'attack', 'enemy_lowest_hp', 'physical', 60, 'strength', 1.8, 20, 0, 8, NULL, 1.0),
-('shield_wall', '盾墙', '大幅减少受到的伤害。', 'warrior', 'buff', 'self', NULL, 0, NULL, 0, 30, 10, 10, 'eff_shield_wall', 1.0),
-('battle_shout', '战斗怒吼', '提升全队攻击力。', 'warrior', 'buff', 'ally_all', NULL, 0, NULL, 0, 15, 5, 3, 'eff_battle_shout', 1.0);
+-- ═══════════════════════════════════════════════════════════
+-- 技能数据 (小数值设计：伤害5~40, 消耗3~20)
+-- ═══════════════════════════════════════════════════════════
 
--- 法师技能
+-- 战士技能 (怒气消耗5~25)
 INSERT OR REPLACE INTO skills (id, name, description, class_id, type, target_type, damage_type, base_value, scaling_stat, scaling_ratio, resource_cost, cooldown, level_required, effect_id, effect_chance) VALUES
-('fireball', '火球术', '发射火球，有几率点燃敌人。', 'mage', 'attack', 'enemy', 'fire', 25, 'intellect', 1.3, 15, 0, 1, 'eff_ignite', 0.3),
-('frostbolt', '寒冰箭', '发射寒冰箭，减缓敌人。', 'mage', 'attack', 'enemy', 'frost', 18, 'intellect', 1.1, 12, 0, 1, 'eff_frostbite', 0.5),
-('arcane_missiles', '奥术飞弹', '发射多道奥术飞弹。', 'mage', 'attack', 'enemy', 'magic', 30, 'intellect', 1.4, 20, 2, 4, NULL, 1.0),
-('flamestrike', '烈焰风暴', '对所有敌人造成火焰伤害。', 'mage', 'attack', 'enemy_all', 'fire', 35, 'intellect', 1.0, 30, 3, 6, 'eff_ignite', 0.2),
-('pyroblast', '炎爆术', '施放巨大的火球。', 'mage', 'attack', 'enemy', 'fire', 80, 'intellect', 2.0, 45, 5, 8, 'eff_ignite', 0.8),
-('ice_barrier', '寒冰护体', '创造吸收伤害的护盾。', 'mage', 'shield', 'self', NULL, 0, 'intellect', 1.0, 35, 8, 10, 'eff_ice_barrier', 1.0),
-('arcane_intellect', '奥术智慧', '提升智力。', 'mage', 'buff', 'ally', NULL, 0, NULL, 0, 20, 0, 2, 'eff_arcane_intellect', 1.0);
+('heroic_strike', '英勇打击', '一次强力的武器攻击。', 'warrior', 'attack', 'enemy', 'physical', 8, 'strength', 0.5, 5, 0, 1, NULL, 1.0),
+('charge', '冲锋', '冲向敌人，造成伤害并眩晕。', 'warrior', 'attack', 'enemy', 'physical', 5, 'strength', 0.3, 8, 3, 1, 'eff_stun', 1.0),
+('rend', '撕裂', '造成流血效果。', 'warrior', 'dot', 'enemy', 'physical', 2, 'strength', 0.15, 6, 0, 2, 'eff_rend', 1.0),
+('thunder_clap', '雷霆一击', '对所有敌人造成伤害并减速。', 'warrior', 'attack', 'enemy_all', 'physical', 6, 'strength', 0.3, 12, 2, 4, 'eff_slow', 0.8),
+('sunder_armor', '破甲攻击', '降低敌人防御力。', 'warrior', 'debuff', 'enemy', 'physical', 4, 'strength', 0.2, 8, 0, 6, 'eff_sunder_armor', 1.0),
+('execute', '斩杀', '对低血量敌人造成大量伤害。', 'warrior', 'attack', 'enemy_lowest_hp', 'physical', 20, 'strength', 0.8, 18, 0, 8, NULL, 1.0),
+('shield_wall', '盾墙', '大幅减少受到的伤害。', 'warrior', 'buff', 'self', NULL, 0, NULL, 0, 25, 10, 10, 'eff_shield_wall', 1.0),
+('battle_shout', '战斗怒吼', '提升全队攻击力。', 'warrior', 'buff', 'ally_all', NULL, 0, NULL, 0, 10, 5, 3, 'eff_battle_shout', 1.0);
 
--- 盗贼技能
+-- 法师技能 (法力消耗4~18)
 INSERT OR REPLACE INTO skills (id, name, description, class_id, type, target_type, damage_type, base_value, scaling_stat, scaling_ratio, resource_cost, cooldown, level_required, effect_id, effect_chance) VALUES
-('sinister_strike', '邪恶攻击', '快速的攻击。', 'rogue', 'attack', 'enemy', 'physical', 15, 'agility', 1.1, 8, 0, 1, NULL, 1.0),
-('backstab', '背刺', '从背后攻击造成大量伤害。', 'rogue', 'attack', 'enemy', 'physical', 35, 'agility', 1.6, 18, 0, 1, NULL, 1.0),
-('deadly_poison', '致命毒药', '使敌人中毒。', 'rogue', 'dot', 'enemy', 'nature', 0, 'agility', 0.2, 12, 0, 3, 'eff_poison', 1.0),
-('eviscerate', '剔骨', '造成大量伤害。', 'rogue', 'attack', 'enemy', 'physical', 50, 'agility', 1.8, 25, 0, 4, NULL, 1.0),
-('kidney_shot', '肾击', '眩晕敌人。', 'rogue', 'control', 'enemy', 'physical', 10, 'agility', 0.5, 20, 4, 6, 'eff_stun', 1.0),
-('blade_flurry', '剑刃乱舞', '攻击力大幅提升。', 'rogue', 'buff', 'self', NULL, 0, NULL, 0, 30, 8, 8, 'eff_blade_flurry', 1.0),
-('vanish', '消失', '进入潜行状态。', 'rogue', 'buff', 'self', NULL, 0, NULL, 0, 40, 10, 10, 'eff_stealth', 1.0);
+('fireball', '火球术', '发射火球，有几率点燃敌人。', 'mage', 'attack', 'enemy', 'fire', 10, 'intellect', 0.5, 6, 0, 1, 'eff_ignite', 0.3),
+('frostbolt', '寒冰箭', '发射寒冰箭，减缓敌人。', 'mage', 'attack', 'enemy', 'frost', 8, 'intellect', 0.4, 5, 0, 1, 'eff_frostbite', 0.5),
+('arcane_missiles', '奥术飞弹', '发射多道奥术飞弹。', 'mage', 'attack', 'enemy', 'magic', 12, 'intellect', 0.6, 8, 2, 4, NULL, 1.0),
+('flamestrike', '烈焰风暴', '对所有敌人造成火焰伤害。', 'mage', 'attack', 'enemy_all', 'fire', 10, 'intellect', 0.4, 12, 3, 6, 'eff_ignite', 0.2),
+('pyroblast', '炎爆术', '施放巨大的火球。', 'mage', 'attack', 'enemy', 'fire', 25, 'intellect', 1.0, 18, 5, 8, 'eff_ignite', 0.8),
+('ice_barrier', '寒冰护体', '创造吸收伤害的护盾。', 'mage', 'shield', 'self', NULL, 15, 'intellect', 0.5, 14, 8, 10, 'eff_ice_barrier', 1.0),
+('arcane_intellect', '奥术智慧', '提升智力。', 'mage', 'buff', 'ally', NULL, 0, NULL, 0, 8, 0, 2, 'eff_arcane_intellect', 1.0);
 
--- 牧师技能
+-- 盗贼技能 (能量消耗15~40)
 INSERT OR REPLACE INTO skills (id, name, description, class_id, type, target_type, damage_type, base_value, scaling_stat, scaling_ratio, resource_cost, cooldown, level_required, effect_id, effect_chance) VALUES
-('smite', '惩击', '用神圣能量攻击敌人。', 'priest', 'attack', 'enemy', 'holy', 18, 'intellect', 1.0, 10, 0, 1, NULL, 1.0),
-('shadow_word_pain', '暗言术:痛', '对敌人施加持续伤害。', 'priest', 'dot', 'enemy', 'shadow', 0, 'intellect', 0.3, 12, 0, 1, 'eff_sw_pain', 1.0),
-('lesser_heal', '次级治疗术', '恢复生命值。', 'priest', 'heal', 'ally_lowest_hp', 'holy', 25, 'spirit', 1.0, 15, 0, 1, NULL, 1.0),
-('renew', '恢复', '持续恢复生命。', 'priest', 'hot', 'ally_lowest_hp', 'holy', 0, 'spirit', 0.5, 18, 0, 2, 'eff_renew', 1.0),
-('heal', '治疗术', '恢复大量生命值。', 'priest', 'heal', 'ally_lowest_hp', 'holy', 50, 'spirit', 1.5, 25, 0, 4, NULL, 1.0),
-('inner_fire', '心灵之火', '提升防御力。', 'priest', 'buff', 'self', NULL, 0, NULL, 0, 20, 0, 4, 'eff_inner_fire', 1.0),
-('power_word_shield', '真言术:盾', '创造吸收伤害的护盾。', 'priest', 'shield', 'ally_lowest_hp', 'holy', 0, 'spirit', 1.2, 25, 4, 6, 'eff_pw_shield', 1.0),
-('flash_heal', '快速治疗', '快速恢复生命值。', 'priest', 'heal', 'ally_lowest_hp', 'holy', 40, 'spirit', 1.2, 20, 0, 8, NULL, 1.0),
-('silence', '沉默', '使敌人无法施法。', 'priest', 'control', 'enemy', 'shadow', 0, NULL, 0, 25, 6, 10, 'eff_silence', 1.0);
+('sinister_strike', '邪恶攻击', '快速的攻击。', 'rogue', 'attack', 'enemy', 'physical', 6, 'agility', 0.4, 20, 0, 1, NULL, 1.0),
+('backstab', '背刺', '从背后攻击造成大量伤害。', 'rogue', 'attack', 'enemy', 'physical', 12, 'agility', 0.6, 35, 0, 1, NULL, 1.0),
+('deadly_poison', '致命毒药', '使敌人中毒。', 'rogue', 'dot', 'enemy', 'nature', 2, 'agility', 0.1, 25, 0, 3, 'eff_poison', 1.0),
+('eviscerate', '剔骨', '造成大量伤害。', 'rogue', 'attack', 'enemy', 'physical', 18, 'agility', 0.7, 40, 0, 4, NULL, 1.0),
+('kidney_shot', '肾击', '眩晕敌人。', 'rogue', 'control', 'enemy', 'physical', 4, 'agility', 0.2, 30, 4, 6, 'eff_stun', 1.0),
+('blade_flurry', '剑刃乱舞', '攻击力大幅提升。', 'rogue', 'buff', 'self', NULL, 0, NULL, 0, 35, 8, 8, 'eff_blade_flurry', 1.0),
+('vanish', '消失', '进入潜行状态。', 'rogue', 'buff', 'self', NULL, 0, NULL, 0, 50, 10, 10, 'eff_stealth', 1.0);
+
+-- 牧师技能 (法力消耗4~12)
+INSERT OR REPLACE INTO skills (id, name, description, class_id, type, target_type, damage_type, base_value, scaling_stat, scaling_ratio, resource_cost, cooldown, level_required, effect_id, effect_chance) VALUES
+('smite', '惩击', '用神圣能量攻击敌人。', 'priest', 'attack', 'enemy', 'holy', 7, 'intellect', 0.4, 4, 0, 1, NULL, 1.0),
+('shadow_word_pain', '暗言术:痛', '对敌人施加持续伤害。', 'priest', 'dot', 'enemy', 'shadow', 2, 'intellect', 0.15, 5, 0, 1, 'eff_sw_pain', 1.0),
+('lesser_heal', '次级治疗术', '恢复生命值。', 'priest', 'heal', 'ally_lowest_hp', 'holy', 8, 'spirit', 0.4, 5, 0, 1, NULL, 1.0),
+('renew', '恢复', '持续恢复生命。', 'priest', 'hot', 'ally_lowest_hp', 'holy', 3, 'spirit', 0.2, 6, 0, 2, 'eff_renew', 1.0),
+('heal', '治疗术', '恢复大量生命值。', 'priest', 'heal', 'ally_lowest_hp', 'holy', 15, 'spirit', 0.6, 10, 0, 4, NULL, 1.0),
+('inner_fire', '心灵之火', '提升防御力。', 'priest', 'buff', 'self', NULL, 0, NULL, 0, 8, 0, 4, 'eff_inner_fire', 1.0),
+('power_word_shield', '真言术:盾', '创造吸收伤害的护盾。', 'priest', 'shield', 'ally_lowest_hp', 'holy', 12, 'spirit', 0.5, 10, 4, 6, 'eff_pw_shield', 1.0),
+('flash_heal', '快速治疗', '快速恢复生命值。', 'priest', 'heal', 'ally_lowest_hp', 'holy', 12, 'spirit', 0.5, 8, 0, 8, NULL, 1.0),
+('silence', '沉默', '使敌人无法施法。', 'priest', 'control', 'enemy', 'shadow', 0, NULL, 0, 10, 6, 10, 'eff_silence', 1.0);
 
 -- 通用技能
 INSERT OR REPLACE INTO skills (id, name, description, class_id, type, target_type, damage_type, base_value, scaling_stat, scaling_ratio, resource_cost, cooldown, level_required, effect_id, effect_chance) VALUES
-('basic_attack', '普通攻击', '基础的物理攻击。', NULL, 'attack', 'enemy', 'physical', 0, 'strength', 1.0, 0, 0, 1, NULL, 1.0);
+('basic_attack', '普通攻击', '基础的物理攻击。', NULL, 'attack', 'enemy', 'physical', 0, 'strength', 0.5, 0, 0, 1, NULL, 1.0);
 
 -- ═══════════════════════════════════════════════════════════
 -- 区域数据
@@ -239,65 +253,73 @@ INSERT OR REPLACE INTO zones (id, name, description, min_level, max_level, facti
 -- 怪物数据
 -- ═══════════════════════════════════════════════════════════
 
--- 艾尔文森林 (1-10级)
-INSERT OR REPLACE INTO monsters (id, zone_id, name, level, type, hp, attack, defense, exp_reward, gold_min, gold_max, spawn_weight) VALUES
-('wolf', 'elwynn', '森林狼', 1, 'normal', 30, 5, 1, 15, 1, 3, 100),
-('young_boar', 'elwynn', '小野猪', 1, 'normal', 25, 4, 2, 12, 1, 2, 100),
-('kobold_worker', 'elwynn', '狗头人矿工', 2, 'normal', 40, 6, 2, 20, 2, 5, 80),
-('kobold_tunneler', 'elwynn', '狗头人掘地工', 3, 'normal', 50, 7, 3, 25, 2, 6, 60),
-('defias_thug', 'elwynn', '迪菲亚暴徒', 4, 'normal', 60, 9, 3, 35, 3, 8, 50),
-('defias_bandit', 'elwynn', '迪菲亚劫匪', 5, 'normal', 75, 11, 4, 45, 4, 10, 40),
-('murloc', 'elwynn', '鱼人', 3, 'normal', 45, 8, 2, 28, 2, 7, 70),
-('murloc_warrior', 'elwynn', '鱼人战士', 5, 'normal', 70, 12, 5, 50, 5, 12, 30),
-('prowler', 'elwynn', '潜伏者', 6, 'normal', 85, 14, 5, 60, 5, 15, 25),
-('hogger', 'elwynn', '霍格', 8, 'elite', 300, 25, 10, 200, 20, 50, 5);
+-- ═══════════════════════════════════════════════════════════
+-- 怪物数据 (小数值设计：HP 15~300, 攻击3~50, 经验5~80)
+-- ═══════════════════════════════════════════════════════════
 
--- 西部荒野 (10-20级)
+-- 艾尔文森林 (1-10级) - HP: 15~45, 攻击: 3~10
 INSERT OR REPLACE INTO monsters (id, zone_id, name, level, type, hp, attack, defense, exp_reward, gold_min, gold_max, spawn_weight) VALUES
-('harvest_golem', 'westfall', '收割傀儡', 10, 'normal', 150, 20, 8, 80, 8, 20, 100),
-('defias_rogue', 'westfall', '迪菲亚盗贼', 11, 'normal', 170, 22, 9, 95, 10, 25, 80),
-('defias_highwayman', 'westfall', '迪菲亚拦路贼', 12, 'normal', 190, 25, 10, 110, 12, 30, 60),
-('gnoll_brute', 'westfall', '豺狼人蛮兵', 13, 'normal', 210, 28, 11, 125, 14, 35, 50),
-('gnoll_mystic', 'westfall', '豺狼人秘法师', 14, 'normal', 180, 32, 9, 140, 16, 40, 40),
-('defias_overlord', 'westfall', '迪菲亚霸主', 16, 'elite', 500, 45, 18, 350, 40, 100, 5),
-('dust_devil', 'westfall', '尘土恶魔', 15, 'normal', 250, 35, 12, 160, 18, 45, 30);
+('wolf', 'elwynn', '森林狼', 1, 'normal', 15, 3, 1, 5, 1, 2, 100),
+('young_boar', 'elwynn', '小野猪', 1, 'normal', 12, 3, 1, 4, 1, 1, 100),
+('kobold_worker', 'elwynn', '狗头人矿工', 2, 'normal', 18, 4, 1, 6, 1, 2, 80),
+('kobold_tunneler', 'elwynn', '狗头人掘地工', 3, 'normal', 22, 5, 2, 7, 1, 3, 60),
+('defias_thug', 'elwynn', '迪菲亚暴徒', 4, 'normal', 26, 6, 2, 8, 2, 3, 50),
+('defias_bandit', 'elwynn', '迪菲亚劫匪', 5, 'normal', 30, 7, 3, 10, 2, 4, 40),
+('murloc', 'elwynn', '鱼人', 3, 'normal', 20, 5, 2, 7, 1, 3, 70),
+('murloc_warrior', 'elwynn', '鱼人战士', 5, 'normal', 28, 7, 3, 9, 2, 4, 30),
+('prowler', 'elwynn', '潜伏者', 6, 'normal', 32, 8, 3, 11, 2, 5, 25),
+('hogger', 'elwynn', '霍格', 8, 'elite', 80, 12, 5, 35, 5, 12, 5);
 
--- 暮色森林 (20-30级)
+-- 西部荒野 (10-20级) - HP: 35~80, 攻击: 9~18
 INSERT OR REPLACE INTO monsters (id, zone_id, name, level, type, hp, attack, defense, exp_reward, gold_min, gold_max, spawn_weight) VALUES
-('skeleton_warrior', 'duskwood', '骷髅战士', 20, 'normal', 300, 40, 15, 200, 20, 50, 100),
-('skeleton_mage', 'duskwood', '骷髅法师', 21, 'normal', 250, 50, 12, 220, 22, 55, 80),
-('ghoul', 'duskwood', '食尸鬼', 22, 'normal', 350, 45, 16, 240, 25, 60, 70),
-('dire_wolf', 'duskwood', '恐狼', 23, 'normal', 380, 48, 18, 260, 28, 65, 60),
-('worgen', 'duskwood', '狼人', 24, 'normal', 420, 55, 20, 300, 30, 75, 50),
-('worgen_alpha', 'duskwood', '狼人首领', 26, 'elite', 800, 80, 30, 600, 60, 150, 5),
-('abomination', 'duskwood', '憎恶', 28, 'elite', 1000, 90, 35, 800, 80, 200, 3),
-('stitches', 'duskwood', '缝合怪', 30, 'boss', 2000, 120, 45, 1500, 150, 400, 1);
+('harvest_golem', 'westfall', '收割傀儡', 10, 'normal', 40, 10, 5, 14, 2, 5, 100),
+('defias_rogue', 'westfall', '迪菲亚盗贼', 11, 'normal', 44, 11, 5, 16, 3, 6, 80),
+('defias_highwayman', 'westfall', '迪菲亚拦路贼', 12, 'normal', 48, 12, 6, 18, 3, 7, 60),
+('gnoll_brute', 'westfall', '豺狼人蛮兵', 13, 'normal', 52, 13, 6, 20, 4, 8, 50),
+('gnoll_mystic', 'westfall', '豺狼人秘法师', 14, 'normal', 45, 15, 5, 22, 4, 9, 40),
+('defias_overlord', 'westfall', '迪菲亚霸主', 16, 'elite', 120, 20, 10, 50, 10, 20, 5),
+('dust_devil', 'westfall', '尘土恶魔', 15, 'normal', 55, 14, 6, 24, 5, 10, 30);
+
+-- 暮色森林 (20-30级) - HP: 55~150, 攻击: 16~35
+INSERT OR REPLACE INTO monsters (id, zone_id, name, level, type, hp, attack, defense, exp_reward, gold_min, gold_max, spawn_weight) VALUES
+('skeleton_warrior', 'duskwood', '骷髅战士', 20, 'normal', 65, 18, 9, 28, 5, 10, 100),
+('skeleton_mage', 'duskwood', '骷髅法师', 21, 'normal', 55, 22, 7, 30, 5, 11, 80),
+('ghoul', 'duskwood', '食尸鬼', 22, 'normal', 70, 20, 9, 32, 6, 12, 70),
+('dire_wolf', 'duskwood', '恐狼', 23, 'normal', 75, 22, 10, 34, 6, 13, 60),
+('worgen', 'duskwood', '狼人', 24, 'normal', 85, 25, 11, 36, 7, 14, 50),
+('worgen_alpha', 'duskwood', '狼人首领', 26, 'elite', 180, 35, 15, 65, 12, 25, 5),
+('abomination', 'duskwood', '憎恶', 28, 'elite', 220, 40, 18, 75, 15, 30, 3),
+('stitches', 'duskwood', '缝合怪', 30, 'boss', 350, 50, 22, 100, 25, 50, 1);
 
 -- ═══════════════════════════════════════════════════════════
 -- 物品数据
 -- ═══════════════════════════════════════════════════════════
 
--- 消耗品
+-- ═══════════════════════════════════════════════════════════
+-- 物品数据 (小数值设计：药水恢复10~40，装备加成1~12)
+-- ═══════════════════════════════════════════════════════════
+
+-- 消耗品 (恢复量：初级10，中级20，高级40)
 INSERT OR REPLACE INTO items (id, name, description, type, subtype, quality, stackable, max_stack, sell_price, buy_price, effect_type, effect_value) VALUES
-('minor_healing_potion', '初级治疗药水', '恢复50点生命值。', 'consumable', 'potion', 'common', 1, 20, 1, 5, 'heal_hp', 50),
-('healing_potion', '治疗药水', '恢复150点生命值。', 'consumable', 'potion', 'uncommon', 1, 20, 5, 25, 'heal_hp', 150),
-('greater_healing_potion', '强效治疗药水', '恢复400点生命值。', 'consumable', 'potion', 'rare', 1, 20, 20, 100, 'heal_hp', 400),
-('minor_mana_potion', '初级法力药水', '恢复50点法力值。', 'consumable', 'potion', 'common', 1, 20, 1, 5, 'heal_mp', 50),
-('mana_potion', '法力药水', '恢复150点法力值。', 'consumable', 'potion', 'uncommon', 1, 20, 5, 25, 'heal_mp', 150);
+('minor_healing_potion', '初级治疗药水', '恢复10点生命值。', 'consumable', 'potion', 'common', 1, 20, 1, 3, 'heal_hp', 10),
+('healing_potion', '治疗药水', '恢复20点生命值。', 'consumable', 'potion', 'uncommon', 1, 20, 2, 8, 'heal_hp', 20),
+('greater_healing_potion', '强效治疗药水', '恢复40点生命值。', 'consumable', 'potion', 'rare', 1, 20, 5, 20, 'heal_hp', 40),
+('minor_mana_potion', '初级法力药水', '恢复8点法力值。', 'consumable', 'potion', 'common', 1, 20, 1, 3, 'heal_mp', 8),
+('mana_potion', '法力药水', '恢复16点法力值。', 'consumable', 'potion', 'uncommon', 1, 20, 2, 8, 'heal_mp', 16);
 
--- 装备 - 武器
+-- 装备 - 武器 (攻击加成1~10)
 INSERT OR REPLACE INTO items (id, name, description, type, subtype, quality, level_required, slot, sell_price, attack, strength) VALUES
-('worn_sword', '破旧的剑', '一把破旧的铁剑。', 'equipment', 'weapon', 'common', 1, 'main_hand', 5, 3, 1),
-('militia_sword', '民兵之剑', '联盟民兵的标准武器。', 'equipment', 'weapon', 'common', 5, 'main_hand', 20, 8, 2),
-('outlaw_sabre', '逃犯军刀', '从迪菲亚成员身上缴获。', 'equipment', 'weapon', 'uncommon', 10, 'main_hand', 80, 15, 4),
-('corpsemaker', '尸体收割者', '沉重的双手斧。', 'equipment', 'weapon', 'rare', 20, 'main_hand', 300, 30, 8);
+('worn_sword', '破旧的剑', '一把破旧的铁剑。', 'equipment', 'weapon', 'common', 1, 'main_hand', 2, 1, 0),
+('militia_sword', '民兵之剑', '联盟民兵的标准武器。', 'equipment', 'weapon', 'common', 5, 'main_hand', 5, 2, 1),
+('outlaw_sabre', '逃犯军刀', '从迪菲亚成员身上缴获。', 'equipment', 'weapon', 'uncommon', 10, 'main_hand', 15, 4, 2),
+('corpsemaker', '尸体收割者', '沉重的双手斧。', 'equipment', 'weapon', 'rare', 20, 'main_hand', 40, 8, 4);
 
--- 装备 - 护甲
+-- 装备 - 护甲 (防御加成1~8)
 INSERT OR REPLACE INTO items (id, name, description, type, subtype, quality, level_required, slot, sell_price, defense, stamina) VALUES
-('worn_leather_vest', '破旧皮甲', '一件破旧的皮甲。', 'equipment', 'armor', 'common', 1, 'chest', 3, 2, 1),
-('militia_chain_vest', '民兵锁甲', '联盟民兵的标准护甲。', 'equipment', 'armor', 'common', 5, 'chest', 15, 5, 2),
-('defias_leather_vest', '迪菲亚皮甲', '迪菲亚兄弟会的制服。', 'equipment', 'armor', 'uncommon', 10, 'chest', 60, 10, 4),
-('blackened_defias_armor', '黑化迪菲亚护甲', '高级成员的护甲。', 'equipment', 'armor', 'rare', 15, 'chest', 150, 18, 7);
+('worn_leather_vest', '破旧皮甲', '一件破旧的皮甲。', 'equipment', 'armor', 'common', 1, 'chest', 1, 1, 0),
+('militia_chain_vest', '民兵锁甲', '联盟民兵的标准护甲。', 'equipment', 'armor', 'common', 5, 'chest', 4, 2, 1),
+('defias_leather_vest', '迪菲亚皮甲', '迪菲亚兄弟会的制服。', 'equipment', 'armor', 'uncommon', 10, 'chest', 12, 4, 2),
+('blackened_defias_armor', '黑化迪菲亚护甲', '高级成员的护甲。', 'equipment', 'armor', 'rare', 15, 'chest', 30, 6, 3);
 
 -- 材料
 INSERT OR REPLACE INTO items (id, name, description, type, subtype, quality, stackable, max_stack, sell_price) VALUES
