@@ -374,6 +374,187 @@ BEGIN
 END;
 
 -- ═══════════════════════════════════════════════════════════
+-- 战斗数据分析系统
+-- ═══════════════════════════════════════════════════════════
+
+-- 战斗记录表 - 每场战斗的基本信息
+CREATE TABLE IF NOT EXISTS battle_records (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    zone_id VARCHAR(32) NOT NULL,
+    battle_type VARCHAR(16) NOT NULL,           -- pve/pvp/boss/abyss
+    monster_id VARCHAR(32),                     -- PVE怪物ID
+    opponent_user_id INTEGER,                   -- PVP对手ID
+    total_rounds INTEGER DEFAULT 0,             -- 总回合数
+    duration_seconds INTEGER DEFAULT 0,         -- 战斗时长
+    result VARCHAR(16) NOT NULL,                -- victory/defeat/draw/flee
+    team_damage_dealt INTEGER DEFAULT 0,        -- 队伍总输出
+    team_damage_taken INTEGER DEFAULT 0,        -- 队伍总承伤
+    team_healing_done INTEGER DEFAULT 0,        -- 队伍总治疗
+    exp_gained INTEGER DEFAULT 0,
+    gold_gained INTEGER DEFAULT 0,
+    battle_log TEXT,                            -- 详细战斗日志(JSON)
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (zone_id) REFERENCES zones(id),
+    FOREIGN KEY (monster_id) REFERENCES monsters(id),
+    FOREIGN KEY (opponent_user_id) REFERENCES users(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_battle_records_user ON battle_records(user_id);
+CREATE INDEX IF NOT EXISTS idx_battle_records_time ON battle_records(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_battle_records_zone ON battle_records(zone_id);
+CREATE INDEX IF NOT EXISTS idx_battle_records_type ON battle_records(battle_type);
+
+-- 战斗角色统计表 - 单场战斗中每个角色的详细数据
+CREATE TABLE IF NOT EXISTS battle_character_stats (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    battle_id INTEGER NOT NULL,
+    character_id INTEGER NOT NULL,
+    team_slot INTEGER NOT NULL,
+    -- 伤害统计
+    damage_dealt INTEGER DEFAULT 0,             -- 造成总伤害
+    physical_damage INTEGER DEFAULT 0,          -- 物理伤害
+    magic_damage INTEGER DEFAULT 0,             -- 魔法伤害
+    fire_damage INTEGER DEFAULT 0,              -- 火焰伤害
+    frost_damage INTEGER DEFAULT 0,             -- 冰霜伤害
+    shadow_damage INTEGER DEFAULT 0,            -- 暗影伤害
+    holy_damage INTEGER DEFAULT 0,              -- 神圣伤害
+    nature_damage INTEGER DEFAULT 0,            -- 自然伤害
+    dot_damage INTEGER DEFAULT 0,               -- DOT伤害
+    -- 暴击统计
+    crit_count INTEGER DEFAULT 0,               -- 暴击次数
+    crit_damage INTEGER DEFAULT 0,              -- 暴击总伤害
+    max_crit INTEGER DEFAULT 0,                 -- 最高单次暴击
+    -- 承伤统计
+    damage_taken INTEGER DEFAULT 0,             -- 受到总伤害
+    physical_taken INTEGER DEFAULT 0,           -- 物理承伤
+    magic_taken INTEGER DEFAULT 0,              -- 魔法承伤
+    damage_blocked INTEGER DEFAULT 0,           -- 格挡伤害
+    damage_absorbed INTEGER DEFAULT 0,          -- 护盾吸收
+    -- 闪避统计
+    dodge_count INTEGER DEFAULT 0,              -- 闪避次数
+    block_count INTEGER DEFAULT 0,              -- 格挡次数
+    hit_count INTEGER DEFAULT 0,                -- 被命中次数
+    -- 治疗统计
+    healing_done INTEGER DEFAULT 0,             -- 造成治疗
+    healing_received INTEGER DEFAULT 0,         -- 受到治疗
+    overhealing INTEGER DEFAULT 0,              -- 过量治疗
+    self_healing INTEGER DEFAULT 0,             -- 自我治疗
+    hot_healing INTEGER DEFAULT 0,              -- HOT治疗
+    -- 技能统计
+    skill_uses INTEGER DEFAULT 0,               -- 技能使用次数
+    skill_hits INTEGER DEFAULT 0,               -- 技能命中次数
+    skill_misses INTEGER DEFAULT 0,             -- 技能未命中
+    -- 控制统计
+    cc_applied INTEGER DEFAULT 0,               -- 施加控制次数
+    cc_received INTEGER DEFAULT 0,              -- 受到控制次数
+    dispels INTEGER DEFAULT 0,                  -- 驱散次数
+    interrupts INTEGER DEFAULT 0,               -- 打断次数
+    -- 其他统计
+    kills INTEGER DEFAULT 0,                    -- 击杀数
+    deaths INTEGER DEFAULT 0,                   -- 死亡次数
+    resurrects INTEGER DEFAULT 0,               -- 复活次数
+    resource_used INTEGER DEFAULT 0,            -- 消耗能量
+    resource_generated INTEGER DEFAULT 0,       -- 获得能量
+    FOREIGN KEY (battle_id) REFERENCES battle_records(id) ON DELETE CASCADE,
+    FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_battle_char_stats_battle ON battle_character_stats(battle_id);
+CREATE INDEX IF NOT EXISTS idx_battle_char_stats_char ON battle_character_stats(character_id);
+
+-- 角色生涯统计表 - 累计统计数据
+CREATE TABLE IF NOT EXISTS character_lifetime_stats (
+    character_id INTEGER PRIMARY KEY,
+    -- 战斗场次
+    total_battles INTEGER DEFAULT 0,
+    victories INTEGER DEFAULT 0,
+    defeats INTEGER DEFAULT 0,
+    pve_battles INTEGER DEFAULT 0,
+    pvp_battles INTEGER DEFAULT 0,
+    boss_kills INTEGER DEFAULT 0,
+    -- 累计伤害
+    total_damage_dealt INTEGER DEFAULT 0,
+    total_physical_damage INTEGER DEFAULT 0,
+    total_magic_damage INTEGER DEFAULT 0,
+    total_crit_damage INTEGER DEFAULT 0,
+    total_crit_count INTEGER DEFAULT 0,
+    highest_damage_single INTEGER DEFAULT 0,
+    highest_damage_battle INTEGER DEFAULT 0,
+    -- 累计承伤
+    total_damage_taken INTEGER DEFAULT 0,
+    total_damage_blocked INTEGER DEFAULT 0,
+    total_damage_absorbed INTEGER DEFAULT 0,
+    total_dodge_count INTEGER DEFAULT 0,
+    -- 累计治疗
+    total_healing_done INTEGER DEFAULT 0,
+    total_healing_received INTEGER DEFAULT 0,
+    total_overhealing INTEGER DEFAULT 0,
+    highest_healing_single INTEGER DEFAULT 0,
+    highest_healing_battle INTEGER DEFAULT 0,
+    -- 击杀与死亡
+    total_kills INTEGER DEFAULT 0,
+    total_deaths INTEGER DEFAULT 0,
+    kill_streak_best INTEGER DEFAULT 0,
+    current_kill_streak INTEGER DEFAULT 0,
+    -- 技能使用
+    total_skill_uses INTEGER DEFAULT 0,
+    total_skill_hits INTEGER DEFAULT 0,
+    -- 资源统计
+    total_resource_used INTEGER DEFAULT 0,
+    total_rounds INTEGER DEFAULT 0,
+    total_battle_time INTEGER DEFAULT 0,
+    -- 最后更新
+    last_battle_at DATETIME,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE
+);
+
+-- 战斗技能明细表 - 每场战斗中各技能的使用和效果
+CREATE TABLE IF NOT EXISTS battle_skill_breakdown (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    battle_id INTEGER NOT NULL,
+    character_id INTEGER NOT NULL,
+    skill_id VARCHAR(32) NOT NULL,
+    use_count INTEGER DEFAULT 0,                -- 使用次数
+    hit_count INTEGER DEFAULT 0,                -- 命中次数
+    crit_count INTEGER DEFAULT 0,               -- 暴击次数
+    total_damage INTEGER DEFAULT 0,             -- 造成总伤害
+    total_healing INTEGER DEFAULT 0,            -- 造成总治疗
+    resource_cost INTEGER DEFAULT 0,            -- 总消耗能量
+    FOREIGN KEY (battle_id) REFERENCES battle_records(id) ON DELETE CASCADE,
+    FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE,
+    FOREIGN KEY (skill_id) REFERENCES skills(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_skill_breakdown_battle ON battle_skill_breakdown(battle_id);
+CREATE INDEX IF NOT EXISTS idx_skill_breakdown_char ON battle_skill_breakdown(character_id);
+
+-- 每日统计汇总表 - 每日战斗数据快照
+CREATE TABLE IF NOT EXISTS daily_statistics (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    stat_date DATE NOT NULL,
+    battles_count INTEGER DEFAULT 0,
+    victories INTEGER DEFAULT 0,
+    defeats INTEGER DEFAULT 0,
+    total_damage INTEGER DEFAULT 0,
+    total_healing INTEGER DEFAULT 0,
+    total_damage_taken INTEGER DEFAULT 0,
+    exp_gained INTEGER DEFAULT 0,
+    gold_gained INTEGER DEFAULT 0,
+    play_time INTEGER DEFAULT 0,
+    kills INTEGER DEFAULT 0,
+    deaths INTEGER DEFAULT 0,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE(user_id, stat_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_daily_stats_user ON daily_statistics(user_id);
+CREATE INDEX IF NOT EXISTS idx_daily_stats_date ON daily_statistics(stat_date DESC);
+
+-- ═══════════════════════════════════════════════════════════
 -- 后期玩法系统
 -- ═══════════════════════════════════════════════════════════
 

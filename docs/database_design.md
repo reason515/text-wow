@@ -1400,6 +1400,487 @@ CREATE INDEX idx_sessions_char_id ON game_sessions(character_id);
 
 ---
 
+## 📊 战斗数据分析系统
+
+> 📌 **数据驱动决策**: 完整记录每场战斗和每个角色的详细数据，帮助玩家分析团队表现、优化战术配置
+
+### 系统概览
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          战斗数据分析系统                                     │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                        实时战斗面板                                   │   │
+│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐  │   │
+│  │  │ 战士     │ │ 法师     │ │ 牧师     │ │ 盗贼     │ │ 猎人     │  │   │
+│  │  │ DPS:156  │ │ DPS:203  │ │ HPS:89   │ │ DPS:178  │ │ DPS:145  │  │   │
+│  │  │ 承伤:45% │ │ 承伤:8%  │ │ 承伤:12% │ │ 承伤:15% │ │ 承伤:20% │  │   │
+│  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘  │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  ┌─────────────────────┐  ┌─────────────────────┐  ┌──────────────────┐    │
+│  │ 📈 伤害统计          │  │ 🛡️ 承伤统计          │  │ 💚 治疗统计     │    │
+│  │ 总伤害: 125,432     │  │ 总承伤: 45,678      │  │ 总治疗: 32,100  │    │
+│  │ 暴击率: 23.5%       │  │ 闪避次数: 156       │  │ 过量治疗: 12%   │    │
+│  │ 最高单次: 1,234     │  │ 格挡次数: 89        │  │ 治疗目标分布    │    │
+│  └─────────────────────┘  └─────────────────────┘  └──────────────────┘    │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 核心统计指标
+
+| 类别 | 指标 | 说明 | 用途 |
+|-----|------|-----|------|
+| **输出** | 总伤害 (Damage Dealt) | 造成的总伤害值 | 评估输出能力 |
+| | DPS (每回合伤害) | 伤害 ÷ 战斗回合数 | 对比输出效率 |
+| | 暴击次数/率 | 暴击触发统计 | 验证暴击收益 |
+| | 技能伤害占比 | 各技能贡献比例 | 优化技能选择 |
+| **承伤** | 总承伤 (Damage Taken) | 受到的总伤害值 | 评估坦克压力 |
+| | DTPS (每回合承伤) | 承伤 ÷ 战斗回合数 | 评估生存压力 |
+| | 闪避/格挡/减伤 | 防御触发统计 | 验证防御收益 |
+| **治疗** | 总治疗 (Healing Done) | 产生的总治疗量 | 评估治疗能力 |
+| | HPS (每回合治疗) | 治疗 ÷ 战斗回合数 | 对比治疗效率 |
+| | 过量治疗 (Overheal) | 溢出的治疗量 | 优化治疗时机 |
+| | 受到治疗 | 收到的治疗量 | 评估被关注度 |
+| **效率** | 击杀数 | 击杀的敌人数量 | 综合贡献 |
+| | 死亡数 | 被击倒次数 | 生存能力 |
+| | 技能命中率 | 技能实际命中比例 | 技能效率 |
+
+---
+
+### 15. battle_records - 战斗记录表
+
+> 📌 **单场战斗记录**: 记录每一场战斗的基本信息
+
+| 字段 | 类型 | 约束 | 说明 |
+|-----|------|-----|------|
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT | 战斗ID |
+| user_id | INTEGER | NOT NULL FK | 用户ID |
+| zone_id | VARCHAR(32) | NOT NULL FK | 区域ID |
+| battle_type | VARCHAR(16) | NOT NULL | 类型: pve/pvp/boss/abyss |
+| monster_id | VARCHAR(32) | | 怪物ID(PVE) |
+| opponent_user_id | INTEGER | | 对手ID(PVP) |
+| total_rounds | INTEGER | DEFAULT 0 | 总回合数 |
+| duration_seconds | INTEGER | DEFAULT 0 | 战斗时长(秒) |
+| result | VARCHAR(16) | NOT NULL | 结果: victory/defeat/draw/flee |
+| team_damage_dealt | INTEGER | DEFAULT 0 | 队伍总输出伤害 |
+| team_damage_taken | INTEGER | DEFAULT 0 | 队伍总承受伤害 |
+| team_healing_done | INTEGER | DEFAULT 0 | 队伍总治疗量 |
+| exp_gained | INTEGER | DEFAULT 0 | 获得经验 |
+| gold_gained | INTEGER | DEFAULT 0 | 获得金币 |
+| battle_log | TEXT | | 详细战斗日志(JSON) |
+| created_at | DATETIME | DEFAULT CURRENT_TIMESTAMP | 战斗时间 |
+
+```sql
+CREATE TABLE battle_records (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    zone_id VARCHAR(32) NOT NULL,
+    battle_type VARCHAR(16) NOT NULL,
+    monster_id VARCHAR(32),
+    opponent_user_id INTEGER,
+    total_rounds INTEGER DEFAULT 0,
+    duration_seconds INTEGER DEFAULT 0,
+    result VARCHAR(16) NOT NULL,
+    team_damage_dealt INTEGER DEFAULT 0,
+    team_damage_taken INTEGER DEFAULT 0,
+    team_healing_done INTEGER DEFAULT 0,
+    exp_gained INTEGER DEFAULT 0,
+    gold_gained INTEGER DEFAULT 0,
+    battle_log TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (zone_id) REFERENCES zones(id),
+    FOREIGN KEY (monster_id) REFERENCES monsters(id),
+    FOREIGN KEY (opponent_user_id) REFERENCES users(id)
+);
+
+CREATE INDEX idx_battle_records_user ON battle_records(user_id);
+CREATE INDEX idx_battle_records_time ON battle_records(created_at DESC);
+CREATE INDEX idx_battle_records_zone ON battle_records(zone_id);
+CREATE INDEX idx_battle_records_type ON battle_records(battle_type);
+```
+
+---
+
+### 16. battle_character_stats - 战斗角色统计表
+
+> 📌 **单场角色数据**: 记录每场战斗中每个角色的详细表现
+
+| 字段 | 类型 | 约束 | 说明 |
+|-----|------|-----|------|
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT | ID |
+| battle_id | INTEGER | NOT NULL FK | 战斗记录ID |
+| character_id | INTEGER | NOT NULL FK | 角色ID |
+| team_slot | INTEGER | NOT NULL | 队伍位置 |
+| **─── 伤害统计 ───** |
+| damage_dealt | INTEGER | DEFAULT 0 | 造成总伤害 |
+| physical_damage | INTEGER | DEFAULT 0 | 物理伤害 |
+| magic_damage | INTEGER | DEFAULT 0 | 魔法伤害 |
+| fire_damage | INTEGER | DEFAULT 0 | 火焰伤害 |
+| frost_damage | INTEGER | DEFAULT 0 | 冰霜伤害 |
+| shadow_damage | INTEGER | DEFAULT 0 | 暗影伤害 |
+| holy_damage | INTEGER | DEFAULT 0 | 神圣伤害 |
+| nature_damage | INTEGER | DEFAULT 0 | 自然伤害 |
+| dot_damage | INTEGER | DEFAULT 0 | DOT伤害 |
+| **─── 暴击统计 ───** |
+| crit_count | INTEGER | DEFAULT 0 | 暴击次数 |
+| crit_damage | INTEGER | DEFAULT 0 | 暴击造成的总伤害 |
+| max_crit | INTEGER | DEFAULT 0 | 最高单次暴击 |
+| **─── 承伤统计 ───** |
+| damage_taken | INTEGER | DEFAULT 0 | 受到总伤害 |
+| physical_taken | INTEGER | DEFAULT 0 | 物理承伤 |
+| magic_taken | INTEGER | DEFAULT 0 | 魔法承伤 |
+| damage_blocked | INTEGER | DEFAULT 0 | 格挡伤害 |
+| damage_absorbed | INTEGER | DEFAULT 0 | 护盾吸收 |
+| **─── 闪避统计 ───** |
+| dodge_count | INTEGER | DEFAULT 0 | 闪避次数 |
+| block_count | INTEGER | DEFAULT 0 | 格挡次数 |
+| hit_count | INTEGER | DEFAULT 0 | 被命中次数 |
+| **─── 治疗统计 ───** |
+| healing_done | INTEGER | DEFAULT 0 | 造成治疗量 |
+| healing_received | INTEGER | DEFAULT 0 | 受到治疗量 |
+| overhealing | INTEGER | DEFAULT 0 | 过量治疗 |
+| self_healing | INTEGER | DEFAULT 0 | 自我治疗 |
+| hot_healing | INTEGER | DEFAULT 0 | HOT治疗 |
+| **─── 技能统计 ───** |
+| skill_uses | INTEGER | DEFAULT 0 | 技能使用次数 |
+| skill_hits | INTEGER | DEFAULT 0 | 技能命中次数 |
+| skill_misses | INTEGER | DEFAULT 0 | 技能未命中 |
+| **─── 控制统计 ───** |
+| cc_applied | INTEGER | DEFAULT 0 | 施加控制次数 |
+| cc_received | INTEGER | DEFAULT 0 | 受到控制次数 |
+| dispels | INTEGER | DEFAULT 0 | 驱散次数 |
+| interrupts | INTEGER | DEFAULT 0 | 打断次数 |
+| **─── 其他统计 ───** |
+| kills | INTEGER | DEFAULT 0 | 击杀数(最后一击) |
+| deaths | INTEGER | DEFAULT 0 | 死亡次数 |
+| resurrects | INTEGER | DEFAULT 0 | 复活次数 |
+| resource_used | INTEGER | DEFAULT 0 | 消耗能量总量 |
+| resource_generated | INTEGER | DEFAULT 0 | 获得能量总量 |
+
+```sql
+CREATE TABLE battle_character_stats (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    battle_id INTEGER NOT NULL,
+    character_id INTEGER NOT NULL,
+    team_slot INTEGER NOT NULL,
+    -- 伤害统计
+    damage_dealt INTEGER DEFAULT 0,
+    physical_damage INTEGER DEFAULT 0,
+    magic_damage INTEGER DEFAULT 0,
+    fire_damage INTEGER DEFAULT 0,
+    frost_damage INTEGER DEFAULT 0,
+    shadow_damage INTEGER DEFAULT 0,
+    holy_damage INTEGER DEFAULT 0,
+    nature_damage INTEGER DEFAULT 0,
+    dot_damage INTEGER DEFAULT 0,
+    -- 暴击统计
+    crit_count INTEGER DEFAULT 0,
+    crit_damage INTEGER DEFAULT 0,
+    max_crit INTEGER DEFAULT 0,
+    -- 承伤统计
+    damage_taken INTEGER DEFAULT 0,
+    physical_taken INTEGER DEFAULT 0,
+    magic_taken INTEGER DEFAULT 0,
+    damage_blocked INTEGER DEFAULT 0,
+    damage_absorbed INTEGER DEFAULT 0,
+    -- 闪避统计
+    dodge_count INTEGER DEFAULT 0,
+    block_count INTEGER DEFAULT 0,
+    hit_count INTEGER DEFAULT 0,
+    -- 治疗统计
+    healing_done INTEGER DEFAULT 0,
+    healing_received INTEGER DEFAULT 0,
+    overhealing INTEGER DEFAULT 0,
+    self_healing INTEGER DEFAULT 0,
+    hot_healing INTEGER DEFAULT 0,
+    -- 技能统计
+    skill_uses INTEGER DEFAULT 0,
+    skill_hits INTEGER DEFAULT 0,
+    skill_misses INTEGER DEFAULT 0,
+    -- 控制统计
+    cc_applied INTEGER DEFAULT 0,
+    cc_received INTEGER DEFAULT 0,
+    dispels INTEGER DEFAULT 0,
+    interrupts INTEGER DEFAULT 0,
+    -- 其他统计
+    kills INTEGER DEFAULT 0,
+    deaths INTEGER DEFAULT 0,
+    resurrects INTEGER DEFAULT 0,
+    resource_used INTEGER DEFAULT 0,
+    resource_generated INTEGER DEFAULT 0,
+    FOREIGN KEY (battle_id) REFERENCES battle_records(id) ON DELETE CASCADE,
+    FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_battle_char_stats_battle ON battle_character_stats(battle_id);
+CREATE INDEX idx_battle_char_stats_char ON battle_character_stats(character_id);
+```
+
+---
+
+### 17. character_lifetime_stats - 角色生涯统计表
+
+> 📌 **累计统计数据**: 角色从创建至今的所有战斗数据汇总
+
+| 字段 | 类型 | 约束 | 说明 |
+|-----|------|-----|------|
+| character_id | INTEGER | PRIMARY KEY FK | 角色ID |
+| **─── 战斗场次 ───** |
+| total_battles | INTEGER | DEFAULT 0 | 总战斗场数 |
+| victories | INTEGER | DEFAULT 0 | 胜利场数 |
+| defeats | INTEGER | DEFAULT 0 | 失败场数 |
+| pve_battles | INTEGER | DEFAULT 0 | PVE战斗数 |
+| pvp_battles | INTEGER | DEFAULT 0 | PVP战斗数 |
+| boss_kills | INTEGER | DEFAULT 0 | Boss击杀数 |
+| **─── 累计伤害 ───** |
+| total_damage_dealt | INTEGER | DEFAULT 0 | 总造成伤害 |
+| total_physical_damage | INTEGER | DEFAULT 0 | 物理总伤害 |
+| total_magic_damage | INTEGER | DEFAULT 0 | 魔法总伤害 |
+| total_crit_damage | INTEGER | DEFAULT 0 | 暴击总伤害 |
+| total_crit_count | INTEGER | DEFAULT 0 | 总暴击次数 |
+| highest_damage_single | INTEGER | DEFAULT 0 | 单次最高伤害 |
+| highest_damage_battle | INTEGER | DEFAULT 0 | 单场最高伤害 |
+| **─── 累计承伤 ───** |
+| total_damage_taken | INTEGER | DEFAULT 0 | 总承受伤害 |
+| total_damage_blocked | INTEGER | DEFAULT 0 | 总格挡伤害 |
+| total_damage_absorbed | INTEGER | DEFAULT 0 | 总吸收伤害 |
+| total_dodge_count | INTEGER | DEFAULT 0 | 总闪避次数 |
+| **─── 累计治疗 ───** |
+| total_healing_done | INTEGER | DEFAULT 0 | 总治疗量 |
+| total_healing_received | INTEGER | DEFAULT 0 | 总受到治疗 |
+| total_overhealing | INTEGER | DEFAULT 0 | 总过量治疗 |
+| highest_healing_single | INTEGER | DEFAULT 0 | 单次最高治疗 |
+| highest_healing_battle | INTEGER | DEFAULT 0 | 单场最高治疗 |
+| **─── 击杀与死亡 ───** |
+| total_kills | INTEGER | DEFAULT 0 | 总击杀数 |
+| total_deaths | INTEGER | DEFAULT 0 | 总死亡数 |
+| kill_streak_best | INTEGER | DEFAULT 0 | 最长连杀 |
+| current_kill_streak | INTEGER | DEFAULT 0 | 当前连杀 |
+| **─── 技能使用 ───** |
+| total_skill_uses | INTEGER | DEFAULT 0 | 技能总使用次数 |
+| total_skill_hits | INTEGER | DEFAULT 0 | 技能总命中数 |
+| **─── 资源统计 ───** |
+| total_resource_used | INTEGER | DEFAULT 0 | 总消耗能量 |
+| total_rounds | INTEGER | DEFAULT 0 | 总战斗回合数 |
+| total_battle_time | INTEGER | DEFAULT 0 | 总战斗时间(秒) |
+| **─── 最后更新 ───** |
+| last_battle_at | DATETIME | | 最后战斗时间 |
+| updated_at | DATETIME | DEFAULT CURRENT_TIMESTAMP | 更新时间 |
+
+```sql
+CREATE TABLE character_lifetime_stats (
+    character_id INTEGER PRIMARY KEY,
+    -- 战斗场次
+    total_battles INTEGER DEFAULT 0,
+    victories INTEGER DEFAULT 0,
+    defeats INTEGER DEFAULT 0,
+    pve_battles INTEGER DEFAULT 0,
+    pvp_battles INTEGER DEFAULT 0,
+    boss_kills INTEGER DEFAULT 0,
+    -- 累计伤害
+    total_damage_dealt INTEGER DEFAULT 0,
+    total_physical_damage INTEGER DEFAULT 0,
+    total_magic_damage INTEGER DEFAULT 0,
+    total_crit_damage INTEGER DEFAULT 0,
+    total_crit_count INTEGER DEFAULT 0,
+    highest_damage_single INTEGER DEFAULT 0,
+    highest_damage_battle INTEGER DEFAULT 0,
+    -- 累计承伤
+    total_damage_taken INTEGER DEFAULT 0,
+    total_damage_blocked INTEGER DEFAULT 0,
+    total_damage_absorbed INTEGER DEFAULT 0,
+    total_dodge_count INTEGER DEFAULT 0,
+    -- 累计治疗
+    total_healing_done INTEGER DEFAULT 0,
+    total_healing_received INTEGER DEFAULT 0,
+    total_overhealing INTEGER DEFAULT 0,
+    highest_healing_single INTEGER DEFAULT 0,
+    highest_healing_battle INTEGER DEFAULT 0,
+    -- 击杀与死亡
+    total_kills INTEGER DEFAULT 0,
+    total_deaths INTEGER DEFAULT 0,
+    kill_streak_best INTEGER DEFAULT 0,
+    current_kill_streak INTEGER DEFAULT 0,
+    -- 技能使用
+    total_skill_uses INTEGER DEFAULT 0,
+    total_skill_hits INTEGER DEFAULT 0,
+    -- 资源统计
+    total_resource_used INTEGER DEFAULT 0,
+    total_rounds INTEGER DEFAULT 0,
+    total_battle_time INTEGER DEFAULT 0,
+    -- 最后更新
+    last_battle_at DATETIME,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE
+);
+```
+
+---
+
+### 18. battle_skill_breakdown - 战斗技能明细表
+
+> 📌 **技能使用明细**: 记录每场战斗中各技能的使用和效果
+
+| 字段 | 类型 | 约束 | 说明 |
+|-----|------|-----|------|
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT | ID |
+| battle_id | INTEGER | NOT NULL FK | 战斗记录ID |
+| character_id | INTEGER | NOT NULL FK | 角色ID |
+| skill_id | VARCHAR(32) | NOT NULL FK | 技能ID |
+| use_count | INTEGER | DEFAULT 0 | 使用次数 |
+| hit_count | INTEGER | DEFAULT 0 | 命中次数 |
+| crit_count | INTEGER | DEFAULT 0 | 暴击次数 |
+| total_damage | INTEGER | DEFAULT 0 | 造成总伤害 |
+| total_healing | INTEGER | DEFAULT 0 | 造成总治疗 |
+| resource_cost | INTEGER | DEFAULT 0 | 总消耗能量 |
+
+```sql
+CREATE TABLE battle_skill_breakdown (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    battle_id INTEGER NOT NULL,
+    character_id INTEGER NOT NULL,
+    skill_id VARCHAR(32) NOT NULL,
+    use_count INTEGER DEFAULT 0,
+    hit_count INTEGER DEFAULT 0,
+    crit_count INTEGER DEFAULT 0,
+    total_damage INTEGER DEFAULT 0,
+    total_healing INTEGER DEFAULT 0,
+    resource_cost INTEGER DEFAULT 0,
+    FOREIGN KEY (battle_id) REFERENCES battle_records(id) ON DELETE CASCADE,
+    FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE,
+    FOREIGN KEY (skill_id) REFERENCES skills(id)
+);
+
+CREATE INDEX idx_skill_breakdown_battle ON battle_skill_breakdown(battle_id);
+CREATE INDEX idx_skill_breakdown_char ON battle_skill_breakdown(character_id);
+```
+
+---
+
+### 19. daily_statistics - 每日统计汇总表
+
+> 📌 **每日快照**: 记录每日战斗数据，便于趋势分析
+
+| 字段 | 类型 | 约束 | 说明 |
+|-----|------|-----|------|
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT | ID |
+| user_id | INTEGER | NOT NULL FK | 用户ID |
+| stat_date | DATE | NOT NULL | 统计日期 |
+| battles_count | INTEGER | DEFAULT 0 | 战斗次数 |
+| victories | INTEGER | DEFAULT 0 | 胜利次数 |
+| defeats | INTEGER | DEFAULT 0 | 失败次数 |
+| total_damage | INTEGER | DEFAULT 0 | 总伤害 |
+| total_healing | INTEGER | DEFAULT 0 | 总治疗 |
+| total_damage_taken | INTEGER | DEFAULT 0 | 总承伤 |
+| exp_gained | INTEGER | DEFAULT 0 | 获得经验 |
+| gold_gained | INTEGER | DEFAULT 0 | 获得金币 |
+| play_time | INTEGER | DEFAULT 0 | 游戏时长(秒) |
+| kills | INTEGER | DEFAULT 0 | 击杀数 |
+| deaths | INTEGER | DEFAULT 0 | 死亡数 |
+
+```sql
+CREATE TABLE daily_statistics (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    stat_date DATE NOT NULL,
+    battles_count INTEGER DEFAULT 0,
+    victories INTEGER DEFAULT 0,
+    defeats INTEGER DEFAULT 0,
+    total_damage INTEGER DEFAULT 0,
+    total_healing INTEGER DEFAULT 0,
+    total_damage_taken INTEGER DEFAULT 0,
+    exp_gained INTEGER DEFAULT 0,
+    gold_gained INTEGER DEFAULT 0,
+    play_time INTEGER DEFAULT 0,
+    kills INTEGER DEFAULT 0,
+    deaths INTEGER DEFAULT 0,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE(user_id, stat_date)
+);
+
+CREATE INDEX idx_daily_stats_user ON daily_statistics(user_id);
+CREATE INDEX idx_daily_stats_date ON daily_statistics(stat_date DESC);
+```
+
+---
+
+### 数据分析查询命令
+
+> 💡 玩家可通过游戏内命令查询战斗数据
+
+| 命令 | 说明 | 示例 |
+|-----|------|-----|
+| `/stats` | 查看当前角色生涯统计 | 显示总伤害、总治疗、胜率等 |
+| `/stats [角色名]` | 查看指定角色统计 | `/stats 小明` |
+| `/team stats` | 查看全队统计对比 | 各角色DPS/HPS对比 |
+| `/battle last` | 查看上一场战斗详情 | 详细伤害/治疗分解 |
+| `/battle history [N]` | 查看最近N场战斗 | `/battle history 10` |
+| `/dps` | 查看实时DPS排行 | 当前战斗中的输出排名 |
+| `/hps` | 查看实时HPS排行 | 当前战斗中的治疗排名 |
+| `/skill stats` | 查看技能使用统计 | 各技能伤害/命中率 |
+| `/trend [天数]` | 查看数据趋势 | `/trend 7` 最近7天趋势 |
+
+### 数据可视化面板
+
+```
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                        战斗数据面板 - 最近一战                              ║
+╠═══════════════════════════════════════════════════════════════════════════╣
+║                                                                           ║
+║  📊 伤害输出                                                               ║
+║  ┌─────────────────────────────────────────────────────────────────────┐ ║
+║  │ 法师·火焰   ████████████████████████████████████████  45,230 (38%)│ ║
+║  │ 盗贼·暗影   ██████████████████████████████           32,100 (27%)│ ║
+║  │ 战士·破坏   ████████████████████████                 25,890 (22%)│ ║
+║  │ 猎人·精准   ████████████████                         15,432 (13%)│ ║
+║  └─────────────────────────────────────────────────────────────────────┘ ║
+║                                                                           ║
+║  🛡️ 伤害承受                                                               ║
+║  ┌─────────────────────────────────────────────────────────────────────┐ ║
+║  │ 战士·守护   ████████████████████████████████████████  28,500 (55%)│ ║
+║  │ 盗贼·暗影   █████████████                             8,230 (16%)│ ║
+║  │ 猎人·精准   ████████████                              7,850 (15%)│ ║
+║  │ 法师·火焰   ███████                                   4,520  (9%)│ ║
+║  │ 牧师·神圣   ███                                       2,100  (4%)│ ║
+║  └─────────────────────────────────────────────────────────────────────┘ ║
+║                                                                           ║
+║  💚 治疗输出                                                               ║
+║  ┌─────────────────────────────────────────────────────────────────────┐ ║
+║  │ 牧师·神圣   ████████████████████████████████████████  32,100 (92%)│ ║
+║  │ 战士·守护   ███                                       2,800  (8%)│ ║
+║  │ (自我治疗)                                                         │ ║
+║  └─────────────────────────────────────────────────────────────────────┘ ║
+║                                                                           ║
+║  📈 关键数据                                                               ║
+║  ├─ 战斗时长: 2分35秒 (38回合)                                            ║
+║  ├─ 团队DPS: 3,068/回合                                                   ║
+║  ├─ 团队HPS: 922/回合                                                     ║
+║  ├─ 最高单次: 法师·炎爆术 暴击 2,456                                      ║
+║  └─ 总过量治疗: 4,230 (13%)                                               ║
+║                                                                           ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+```
+
+### 战术优化建议
+
+基于战斗数据，系统可以提供智能建议：
+
+| 数据表现 | 可能问题 | 优化建议 |
+|---------|---------|---------|
+| 坦克承伤<40% | 仇恨不稳定 | 调整战斗策略，优先使用嘲讽 |
+| DPS差距大 | 装备/等级差异 | 优先培养落后角色 |
+| 过量治疗>30% | 治疗时机不佳 | 调整治疗触发条件(HP<70%) |
+| 暴击率<10% | 敏捷/智力不足 | 提升对应属性或装备 |
+| 治疗者频繁死亡 | 仇恨问题或位置 | 调整治疗策略，减少过量治疗 |
+| 技能命中率低 | 命中属性不足 | 攻击比自己低级的怪物，或提升命中 |
+
+---
+
 ## 🔗 ER 关系图
 
 ```
