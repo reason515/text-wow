@@ -335,4 +335,193 @@ INSERT OR REPLACE INTO monster_drops (monster_id, item_id, drop_rate, min_quanti
 ('hogger', 'defias_leather_vest', 0.15, 1, 1),
 ('hogger', 'healing_potion', 0.5, 1, 2);
 
+-- ═══════════════════════════════════════════════════════════
+-- 游戏公式配置 (玩家可查询)
+-- ═══════════════════════════════════════════════════════════
+-- 所有战斗计算规则对玩家透明，可通过游戏内命令查询
+
+INSERT OR REPLACE INTO game_formulas (id, category, name, formula, description, variables, example, display_order) VALUES
+-- ═══════════════════════════════════════════════════════════
+-- 属性转换公式
+-- ═══════════════════════════════════════════════════════════
+('attr_max_hp', 'attribute', '最大生命值', 
+ 'class_base_hp + stamina × 10 + level × hp_per_level + equipment_bonus',
+ '计算角色的最大生命值。耐力是最主要的生命值来源。',
+ '{"class_base_hp":"职业基础HP(战士120,法师65等)","stamina":"耐力值","level":"角色等级","hp_per_level":"每级HP成长(战士12,法师4等)","equipment_bonus":"装备HP加成"}',
+ '战士(30级,耐力80): 120 + 800 + 360 + 0 = 1280 HP', 1),
+
+('attr_max_mp', 'attribute', '最大法力值',
+ 'class_base_mp + intellect × 5 + level × mp_per_level + equipment_bonus',
+ '计算角色的最大法力值。智力是最主要的法力来源。仅法力职业有效。',
+ '{"class_base_mp":"职业基础MP","intellect":"智力值","level":"角色等级","mp_per_level":"每级MP成长","equipment_bonus":"装备MP加成"}',
+ '法师(30级,智力100): 120 + 500 + 450 + 0 = 1070 MP', 2),
+
+('attr_phys_attack', 'attribute', '物理攻击力',
+ 'base_attack + strength × 2.0 + agility × 0.5 + weapon_damage + equipment_bonus',
+ '计算角色的物理攻击力。力量是主要来源，敏捷提供少量加成。',
+ '{"base_attack":"职业基础攻击(战士15,盗贼12,法师5等)","strength":"力量值","agility":"敏捷值","weapon_damage":"武器伤害","equipment_bonus":"其他装备加成"}',
+ '盗贼(力量40,敏捷100): 12 + 80 + 50 = 142', 3),
+
+('attr_spell_power', 'attribute', '法术攻击力',
+ 'base_spell + intellect × 1.5 + equipment_bonus',
+ '计算角色的法术攻击力。智力是唯一的属性来源。',
+ '{"base_spell":"职业基础法伤(法师20,术士18,牧师15等)","intellect":"智力值","equipment_bonus":"装备法伤加成"}',
+ '法师(智力120): 20 + 180 = 200', 4),
+
+('attr_armor', 'attribute', '护甲值',
+ 'base_armor + stamina × 0.5 + agility × 0.3 + equipment_armor',
+ '计算角色的护甲值。装备提供主要护甲，耐力和敏捷提供少量加成。',
+ '{"base_armor":"职业基础护甲(战士50,法师10等)","stamina":"耐力值","agility":"敏捷值","equipment_armor":"装备护甲"}',
+ '战士(耐力80,敏捷40): 50 + 40 + 12 = 102', 5),
+
+-- ═══════════════════════════════════════════════════════════
+-- 战斗判定公式
+-- ═══════════════════════════════════════════════════════════
+('combat_phys_crit', 'combat', '物理暴击率',
+ '5% + agility ÷ 20 + equipment_bonus% (上限50%)',
+ '计算物理攻击的暴击概率。每20点敏捷增加1%暴击率。',
+ '{"agility":"敏捷值","equipment_bonus":"装备暴击加成%"}',
+ '敏捷100: 5% + 5% = 10%', 10),
+
+('combat_spell_crit', 'combat', '法术暴击率',
+ '5% + intellect ÷ 30 + equipment_bonus% (上限50%)',
+ '计算法术攻击的暴击概率。每30点智力增加1%暴击率。',
+ '{"intellect":"智力值","equipment_bonus":"装备法术暴击加成%"}',
+ '智力120: 5% + 4% = 9%', 11),
+
+('combat_crit_damage', 'combat', '暴击伤害倍率',
+ '物理: 150% + strength ÷ 100 × 10%; 法术: 150% + equipment_bonus% (上限250%)',
+ '暴击时的伤害倍率。物理暴击伤害受力量影响，法术暴击伤害仅受装备影响。',
+ '{"strength":"力量值(仅影响物理暴击)","equipment_bonus":"装备暴击伤害加成%"}',
+ '力量150: 150% + 15% = 165% 暴击伤害', 12),
+
+('combat_dodge', 'combat', '闪避率',
+ '5% + agility ÷ 25 + equipment_bonus% + racial_bonus% (上限30%)',
+ '计算物理攻击的闪避概率。每25点敏捷增加1%闪避率。',
+ '{"agility":"敏捷值","equipment_bonus":"装备闪避加成%","racial_bonus":"种族加成(暗夜精灵+2%)"}',
+ '暗夜精灵(敏捷100): 5% + 4% + 2% = 11%', 13),
+
+('combat_hit', 'combat', '命中率',
+ '95% - (target_level - self_level) × 1% + equipment_bonus% (范围75%~100%)',
+ '计算攻击命中的概率。攻击比自己高级的目标会降低命中率。',
+ '{"target_level":"目标等级","self_level":"自身等级","equipment_bonus":"装备命中加成%"}',
+ '30级攻击35级目标: 95% - 5% = 90%', 14),
+
+('combat_armor_reduction', 'combat', '护甲减伤%',
+ 'armor ÷ (armor + 400 + attacker_level × 10) × 100% (上限75%)',
+ '根据护甲值计算物理伤害减免百分比。减伤存在上限。',
+ '{"armor":"护甲值","attacker_level":"攻击者等级"}',
+ '护甲500,被30级怪攻击: 500÷1200 = 41.7%减伤', 15),
+
+('combat_resist_reduction', 'combat', '法术抗性减伤%',
+ 'resistance ÷ (resistance + attacker_level × 5) × 75% (上限75%)',
+ '根据抗性值计算对应法术类型的伤害减免。',
+ '{"resistance":"对应类型抗性值(火焰/冰霜/暗影等)","attacker_level":"攻击者等级"}',
+ '冰霜抗性100,被30级法师攻击: 100÷250×75% = 30%减伤', 16),
+
+-- ═══════════════════════════════════════════════════════════
+-- 技能伤害公式
+-- ═══════════════════════════════════════════════════════════
+('skill_base_damage', 'skill', '技能基础伤害',
+ '(base_value + scaling_stat × scaling_ratio) × skill_level_mult',
+ '计算技能的基础伤害值，不含暴击和减伤。',
+ '{"base_value":"技能基础值(每个技能不同)","scaling_stat":"成长属性值(力量/敏捷/智力/精神)","scaling_ratio":"成长系数(每个技能不同)","skill_level_mult":"1+(技能等级-1)×0.1"}',
+ '5级火球术(基础50,智力120,系数0.8): (50+96)×1.4 = 204', 20),
+
+('skill_final_damage', 'skill', '最终伤害',
+ 'base_damage × crit_mult × (1 - target_reduction%) × random(0.9~1.1)',
+ '计算造成的实际伤害，包含暴击、减伤和随机波动。',
+ '{"base_damage":"技能基础伤害","crit_mult":"暴击倍率(非暴击=1)","target_reduction":"目标减伤%(护甲或抗性)","random":"±10%随机波动"}',
+ '技能204,暴击1.5倍,目标20%减伤: 204×1.5×0.8×1.0 = 244.8', 21),
+
+('skill_healing', 'skill', '治疗量',
+ '(base_value + spirit × scaling_ratio) × skill_level_mult × (1 + healing_bonus%)',
+ '计算治疗技能的恢复量。精神是主要的治疗成长属性。',
+ '{"base_value":"技能基础治疗量","spirit":"精神值","scaling_ratio":"成长系数","skill_level_mult":"技能等级系数","healing_bonus":"治疗效果加成%(装备/种族)"}',
+ '治疗术(基础50,精神80,系数1.5): (50+120)×1.0 = 170 HP', 22),
+
+-- ═══════════════════════════════════════════════════════════
+-- 能量回复公式
+-- ═══════════════════════════════════════════════════════════
+('resource_mana_regen_combat', 'resource', '法力回复(战斗中)',
+ 'spirit × class_regen_pct% × max_mp ÷ 100 (每回合)',
+ '战斗中每回合的法力恢复量。不同职业有不同的恢复系数。',
+ '{"spirit":"精神值","class_regen_pct":"职业恢复系数(牧师0.8,德鲁伊0.6,法师0.5,圣骑士0.4,猎人0.3)","max_mp":"最大法力值"}',
+ '牧师(精神80,MP500,系数0.8%): 80×0.008×500 = 3.2/回合', 30),
+
+('resource_mana_regen_rest', 'resource', '法力回复(战斗外)',
+ '战斗中回复量 × 3 (每秒)',
+ '战斗外每秒的法力恢复量，是战斗中的3倍。',
+ '{}',
+ '战斗中3.2/回合 → 战斗外9.6/秒', 31),
+
+('resource_rage_gain_attack', 'resource', '怒气获得(攻击)',
+ '普通攻击命中: +5; 造成暴击: 额外+10',
+ '战士通过攻击获得怒气的方式。',
+ '{}',
+ '普通攻击+5怒气，暴击共+15怒气', 32),
+
+('resource_rage_gain_damage', 'resource', '怒气获得(受伤)',
+ 'damage_taken ÷ max_hp × 20',
+ '战士通过受到伤害获得怒气。受伤越重获得越多。',
+ '{"damage_taken":"受到的伤害值","max_hp":"最大生命值"}',
+ '受到200伤害(最大HP1000): 200÷1000×20 = +4怒气', 33),
+
+('resource_rage_decay', 'resource', '怒气衰减',
+ '脱战后每回合: -5怒气',
+ '战士脱离战斗后怒气会逐渐消退。',
+ '{}',
+ '50怒气脱战，10回合后归零', 34),
+
+('resource_energy_regen', 'resource', '能量恢复(盗贼)',
+ '每回合固定: +20能量',
+ '盗贼的能量恢复方式。能量恢复快但技能消耗也高。',
+ '{}',
+ '每回合+20，5回合恢复满100能量', 35),
+
+('resource_hp_regen_combat', 'resource', '生命回复(战斗中)',
+ 'spirit × 0.2 (每回合)',
+ '战斗中每回合的自然生命恢复量。精神提供少量恢复。',
+ '{"spirit":"精神值"}',
+ '精神50: 每回合恢复10 HP', 36),
+
+('resource_hp_regen_rest', 'resource', '生命回复(战斗外)',
+ 'spirit × 1.0 + max_hp × 1% (每秒)',
+ '战斗外每秒的生命恢复量。',
+ '{"spirit":"精神值","max_hp":"最大生命值"}',
+ '精神50,最大HP1000: 50+10 = 60 HP/秒', 37),
+
+('resource_hp_regen_troll', 'resource', '巨魔再生(种族)',
+ '每回合额外恢复: max_hp × 2%',
+ '巨魔种族的特殊被动，提供额外的生命恢复。',
+ '{"max_hp":"最大生命值"}',
+ '最大HP500: 每回合额外恢复10 HP', 38),
+
+-- ═══════════════════════════════════════════════════════════
+-- 经验与等级公式
+-- ═══════════════════════════════════════════════════════════
+('exp_required', 'progression', '升级所需经验',
+ 'base_exp × level × 1.1^(level-1)',
+ '计算升到下一级所需的经验值。等级越高需要的经验越多。',
+ '{"base_exp":"基础经验值(100)","level":"当前等级"}',
+ '10级升11级: 100×10×1.1^9 = 2358 经验', 40),
+
+('exp_gain', 'progression', '击杀经验获取',
+ 'monster_exp × (1 + level_diff × 0.1) × zone_modifier × racial_bonus',
+ '计算击杀怪物获得的经验值。击杀高级怪物获得更多经验。',
+ '{"monster_exp":"怪物基础经验","level_diff":"怪物等级-角色等级(正数有加成，负数有惩罚)","zone_modifier":"区域经验倍率","racial_bonus":"人类种族+10%"}',
+ '基础100经验,怪物高3级,人类: 100×1.3×1.1 = 143 经验', 41),
+
+('exp_penalty', 'progression', '低级怪物经验惩罚',
+ '角色等级 - 怪物等级 > 5: 经验 × (1 - (等级差-5) × 0.1), 最低10%',
+ '击杀比自己低太多级的怪物会减少经验获取。',
+ '{"level_diff":"角色等级-怪物等级"}',
+ '30级打15级怪: 经验×(1-10×0.1) = 0 (最低10%)', 42),
+
+('exp_distribution', 'progression', '小队经验分配',
+ '总经验 ÷ 参战角色数 (平均分配)',
+ '小队中所有参战角色平均分配经验值。',
+ '{}',
+ '获得1000经验,3人参战: 每人333经验', 43);
+
 

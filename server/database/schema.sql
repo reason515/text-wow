@@ -78,6 +78,24 @@ CREATE INDEX IF NOT EXISTS idx_characters_level ON characters(level);
 CREATE INDEX IF NOT EXISTS idx_characters_team ON characters(user_id, team_slot);
 
 -- ═══════════════════════════════════════════════════════════
+-- 游戏规则公式表 (玩家可查询)
+-- ═══════════════════════════════════════════════════════════
+
+-- 公式配置表 - 存储所有战斗计算规则，供玩家查询
+CREATE TABLE IF NOT EXISTS game_formulas (
+    id VARCHAR(64) PRIMARY KEY,
+    category VARCHAR(32) NOT NULL,          -- attribute/combat/skill/resource
+    name VARCHAR(64) NOT NULL,              -- 公式名称
+    formula TEXT NOT NULL,                  -- 公式表达式
+    description TEXT,                       -- 详细说明
+    variables TEXT,                         -- 变量说明(JSON)
+    example TEXT,                           -- 计算示例
+    display_order INTEGER DEFAULT 0         -- 显示顺序
+);
+
+CREATE INDEX IF NOT EXISTS idx_formulas_category ON game_formulas(category);
+
+-- ═══════════════════════════════════════════════════════════
 -- 游戏配置表
 -- ═══════════════════════════════════════════════════════════
 
