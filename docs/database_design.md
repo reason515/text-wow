@@ -694,6 +694,297 @@ INSERT INTO game_formulas (id, category, name, formula, description, variables, 
 
 ---
 
+## 🎯 角色成长系统
+
+> 📌 **核心机制**: 每升1级获得1个属性点自由分配，每升3级从3个技能中选择1个
+
+### 系统概览
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          角色成长系统                                        │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  📈 升级时获得:                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                                                                     │   │
+│  │   每升 1 级  →  +1 属性点 (可自由分配到五大属性)                     │   │
+│  │                                                                     │   │
+│  │   每升 3 级  →  从 3 个技能中选择 1 个 (含主动/被动技能)             │   │
+│  │                                                                     │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  满级 60 级时:                                                               │
+│  ├─ 累计可分配属性点: 59 点                                                 │
+│  └─ 累计可选技能次数: 20 次 (Lv3, 6, 9, 12...60)                           │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 🔢 属性点分配系统
+
+#### 分配规则
+
+| 规则 | 说明 |
+|-----|------|
+| 获得方式 | 每升1级获得1点，满级共59点 |
+| 分配目标 | 力量/敏捷/智力/耐力/精神 |
+| 分配时机 | 升级后可随时分配，无时间限制 |
+| 重置机制 | 消耗金币可重置（费用随等级增加） |
+
+#### 属性点上限（防止极端堆叠）
+
+| 限制类型 | 数值 | 说明 |
+|---------|-----|------|
+| 单项软上限 | 40点 | 超过后每点效果减半 |
+| 单项硬上限 | 50点 | 无法继续分配 |
+| 总分配上限 | 59点 | 等于总升级次数 |
+
+#### 分配策略示例
+
+```
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                    30级战士 - 两种培养流派                                  ║
+╠═══════════════════════════════════════════════════════════════════════════╣
+║                                                                           ║
+║  【输出流】分配29点:                   【坦克流】分配29点:                 ║
+║  ├─ 力量: +18 (攻击力优先)             ├─ 力量: +8  (保证基础输出)        ║
+║  ├─ 敏捷: +6  (暴击加成)               ├─ 敏捷: +3  (少量闪避)            ║
+║  ├─ 智力: +0                          ├─ 智力: +0                        ║
+║  ├─ 耐力: +5  (基础生存)               ├─ 耐力: +15 (生存优先)            ║
+║  └─ 精神: +0                          └─ 精神: +3  (回复)                ║
+║                                                                           ║
+║  最终攻击: ~45 (高)                    最终攻击: ~30 (中)                  ║
+║  最终HP: ~85 (中)                      最终HP: ~120 (高)                   ║
+║                                                                           ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+```
+
+#### character_stat_allocation - 属性分配表
+
+| 字段 | 类型 | 约束 | 说明 |
+|-----|------|-----|------|
+| character_id | INTEGER | PRIMARY KEY FK | 角色ID |
+| unspent_points | INTEGER | DEFAULT 0 | 未分配点数 |
+| allocated_strength | INTEGER | DEFAULT 0 | 已分配力量 |
+| allocated_agility | INTEGER | DEFAULT 0 | 已分配敏捷 |
+| allocated_intellect | INTEGER | DEFAULT 0 | 已分配智力 |
+| allocated_stamina | INTEGER | DEFAULT 0 | 已分配耐力 |
+| allocated_spirit | INTEGER | DEFAULT 0 | 已分配精神 |
+| respec_count | INTEGER | DEFAULT 0 | 重置次数 |
+| last_respec_at | DATETIME | | 上次重置时间 |
+
+```sql
+CREATE TABLE character_stat_allocation (
+    character_id INTEGER PRIMARY KEY,
+    unspent_points INTEGER DEFAULT 0,
+    allocated_strength INTEGER DEFAULT 0,
+    allocated_agility INTEGER DEFAULT 0,
+    allocated_intellect INTEGER DEFAULT 0,
+    allocated_stamina INTEGER DEFAULT 0,
+    allocated_spirit INTEGER DEFAULT 0,
+    respec_count INTEGER DEFAULT 0,
+    last_respec_at DATETIME,
+    FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE
+);
+```
+
+---
+
+### ⚔️ 技能选择系统
+
+#### 选择规则
+
+| 规则 | 说明 |
+|-----|------|
+| 触发时机 | 每升3级触发一次 (Lv3, 6, 9, 12...60) |
+| 选项数量 | 每次提供3个技能选项 |
+| 技能类型 | 主动技能 + 被动技能 混合 |
+| 选择限制 | 必须选择1个，选后不可更改 |
+
+#### 技能池分层
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           技能池分层设计                                     │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  【基础层】Lv3-15 (5次选择)                                                  │
+│  ├─ 核心攻击技能 (必出1个)                                                  │
+│  ├─ 基础增益/减益                                                           │
+│  └─ 入门被动技能                                                            │
+│                                                                             │
+│  【进阶层】Lv18-36 (7次选择)                                                 │
+│  ├─ 特化技能 (AOE/单体/控制)                                                │
+│  ├─ 职业专属强化                                                            │
+│  └─ 进阶被动技能                                                            │
+│                                                                             │
+│  【大师层】Lv39-60 (8次选择)                                                 │
+│  ├─ 终极技能 (大招)                                                         │
+│  ├─ 稀有被动                                                                │
+│  └─ 跨职业通用技能                                                          │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### 技能选择机制
+
+| 机制 | 说明 |
+|-----|------|
+| **重复技能** | 选到已有技能 → 技能升级(+20%效果) |
+| **保底机制** | 每次至少1个未拥有技能 |
+| **稀有度权重** | 普通60% / 精良30% / 史诗10% |
+| **职业限制** | 70%职业专属 + 30%通用技能 |
+
+#### 被动技能示例
+
+| 被动技能 | 效果 | 适合职业 | 稀有度 |
+|---------|------|---------|-------|
+| 利刃专精 | 物理伤害+8% | 战士/盗贼 | 普通 |
+| 护甲掌握 | 护甲值+15% | 战士/圣骑 | 普通 |
+| 法力涌流 | 法力回复+20% | 法系职业 | 普通 |
+| 致命一击 | 暴击伤害+12% | 全职业 | 精良 |
+| 生命汲取 | 伤害的3%转化为HP | 术士 | 精良 |
+| 格挡专精 | 格挡几率+10% | 坦克 | 精良 |
+| 嗜血本能 | HP<30%时攻击+25% | 战士/盗贼 | 史诗 |
+| 魔法屏障 | 法术伤害-15% | 法系职业 | 史诗 |
+| 不灭意志 | 首次致死伤害免疫 | 全职业 | 史诗 |
+
+#### skill_selection_history - 技能选择记录表
+
+| 字段 | 类型 | 约束 | 说明 |
+|-----|------|-----|------|
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT | ID |
+| character_id | INTEGER | NOT NULL FK | 角色ID |
+| level_milestone | INTEGER | NOT NULL | 选择时等级(3,6,9...) |
+| offered_skill_1 | VARCHAR(32) | NOT NULL | 选项1技能ID |
+| offered_skill_2 | VARCHAR(32) | NOT NULL | 选项2技能ID |
+| offered_skill_3 | VARCHAR(32) | NOT NULL | 选项3技能ID |
+| selected_skill_id | VARCHAR(32) | NOT NULL | 选中的技能ID |
+| skill_was_upgrade | INTEGER | DEFAULT 0 | 是否为技能升级 |
+| selected_at | DATETIME | DEFAULT CURRENT_TIMESTAMP | 选择时间 |
+
+```sql
+CREATE TABLE skill_selection_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    character_id INTEGER NOT NULL,
+    level_milestone INTEGER NOT NULL,
+    offered_skill_1 VARCHAR(32) NOT NULL,
+    offered_skill_2 VARCHAR(32) NOT NULL,
+    offered_skill_3 VARCHAR(32) NOT NULL,
+    selected_skill_id VARCHAR(32) NOT NULL,
+    skill_was_upgrade INTEGER DEFAULT 0,
+    selected_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE,
+    FOREIGN KEY (offered_skill_1) REFERENCES skills(id),
+    FOREIGN KEY (offered_skill_2) REFERENCES skills(id),
+    FOREIGN KEY (offered_skill_3) REFERENCES skills(id),
+    FOREIGN KEY (selected_skill_id) REFERENCES skills(id),
+    UNIQUE(character_id, level_milestone)
+);
+
+CREATE INDEX idx_skill_selection_char ON skill_selection_history(character_id);
+```
+
+#### passive_skills - 被动技能配置表
+
+> 📌 被动技能独立于主动技能，无冷却无消耗，永久生效
+
+| 字段 | 类型 | 约束 | 说明 |
+|-----|------|-----|------|
+| id | VARCHAR(32) | PRIMARY KEY | 被动ID |
+| name | VARCHAR(32) | NOT NULL | 名称 |
+| description | TEXT | | 描述 |
+| icon | VARCHAR(64) | | 图标 |
+| class_id | VARCHAR(32) | | 限定职业(NULL=通用) |
+| rarity | VARCHAR(16) | DEFAULT 'common' | 稀有度: common/rare/epic |
+| tier | INTEGER | DEFAULT 1 | 层级: 1基础/2进阶/3大师 |
+| effect_type | VARCHAR(32) | NOT NULL | 效果类型 |
+| effect_value | REAL | NOT NULL | 效果数值 |
+| effect_stat | VARCHAR(32) | | 影响的属性 |
+| max_level | INTEGER | DEFAULT 5 | 最大升级次数 |
+| level_scaling | REAL | DEFAULT 0.2 | 每级提升比例(20%) |
+
+```sql
+CREATE TABLE passive_skills (
+    id VARCHAR(32) PRIMARY KEY,
+    name VARCHAR(32) NOT NULL,
+    description TEXT,
+    icon VARCHAR(64),
+    class_id VARCHAR(32),
+    rarity VARCHAR(16) DEFAULT 'common',
+    tier INTEGER DEFAULT 1,
+    effect_type VARCHAR(32) NOT NULL,
+    effect_value REAL NOT NULL,
+    effect_stat VARCHAR(32),
+    max_level INTEGER DEFAULT 5,
+    level_scaling REAL DEFAULT 0.2,
+    FOREIGN KEY (class_id) REFERENCES classes(id)
+);
+
+CREATE INDEX idx_passive_skills_class ON passive_skills(class_id);
+CREATE INDEX idx_passive_skills_tier ON passive_skills(tier);
+```
+
+#### character_passive_skills - 角色被动技能表
+
+| 字段 | 类型 | 约束 | 说明 |
+|-----|------|-----|------|
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT | ID |
+| character_id | INTEGER | NOT NULL FK | 角色ID |
+| passive_id | VARCHAR(32) | NOT NULL FK | 被动技能ID |
+| level | INTEGER | DEFAULT 1 | 当前等级 |
+| acquired_at | DATETIME | DEFAULT CURRENT_TIMESTAMP | 获得时间 |
+
+```sql
+CREATE TABLE character_passive_skills (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    character_id INTEGER NOT NULL,
+    passive_id VARCHAR(32) NOT NULL,
+    level INTEGER DEFAULT 1,
+    acquired_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE,
+    FOREIGN KEY (passive_id) REFERENCES passive_skills(id),
+    UNIQUE(character_id, passive_id)
+);
+
+CREATE INDEX idx_char_passive_char ON character_passive_skills(character_id);
+```
+
+---
+
+### 升级里程碑一览
+
+| 等级 | 累计属性点 | 技能选择次数 | 里程碑事件 |
+|-----|----------|------------|----------|
+| 1 | 0 | 0 | 角色创建 |
+| 3 | 2 | 1 | 首次技能选择 |
+| 6 | 5 | 2 | |
+| 10 | 9 | 3 | 解锁第2个队伍槽位 |
+| 15 | 14 | 5 | 进入进阶技能池 |
+| 20 | 19 | 6 | 解锁第3个队伍槽位 |
+| 30 | 29 | 10 | 中期里程碑 |
+| 35 | 34 | 11 | 解锁第4个队伍槽位 |
+| 39 | 38 | 13 | 进入大师技能池 |
+| 50 | 49 | 16 | 解锁第5个队伍槽位 |
+| 60 | 59 | 20 | 满级 |
+
+---
+
+### 相关游戏命令
+
+| 命令 | 说明 | 示例 |
+|-----|------|-----|
+| `/points` | 查看可分配点数 | 显示当前未分配点数 |
+| `/allocate [属性] [点数]` | 分配属性点 | `/allocate strength 5` |
+| `/respec` | 重置属性点 | 消耗金币重置所有分配 |
+| `/passives` | 查看已有被动技能 | 列出所有被动及等级 |
+| `/build` | 查看角色培养方案 | 显示属性分配和技能选择 |
+
+---
+
 ## 📋 表结构设计
 
 ### 1. users - 用户表

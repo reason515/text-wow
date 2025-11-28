@@ -236,6 +236,56 @@ INSERT OR REPLACE INTO skills (id, name, description, class_id, type, target_typ
 ('basic_attack', '普通攻击', '基础的物理攻击。', NULL, 'attack', 'enemy', 'physical', 0, 'strength', 0.5, 0, 0, 1, NULL, 1.0);
 
 -- ═══════════════════════════════════════════════════════════
+-- 被动技能数据 (每3级技能选择时可能出现)
+-- ═══════════════════════════════════════════════════════════
+-- tier: 1=基础(Lv3-15), 2=进阶(Lv18-36), 3=大师(Lv39-60)
+-- rarity: common=60%出现率, rare=30%, epic=10%
+
+INSERT OR REPLACE INTO passive_skills (id, name, description, class_id, rarity, tier, effect_type, effect_value, effect_stat, max_level, level_scaling) VALUES
+-- ═══════════════════════════════════════════════════════════
+-- 基础层被动 (Tier 1) - 通用
+-- ═══════════════════════════════════════════════════════════
+('passive_blade_mastery', '利刃专精', '物理伤害+8%', NULL, 'common', 1, 'stat_mod_pct', 8, 'physical_damage', 5, 0.2),
+('passive_armor_mastery', '护甲掌握', '护甲值+15%', NULL, 'common', 1, 'stat_mod_pct', 15, 'armor', 5, 0.2),
+('passive_vitality', '生命力', '最大HP+10%', NULL, 'common', 1, 'stat_mod_pct', 10, 'max_hp', 5, 0.2),
+('passive_quick_learner', '快速学习', '经验获取+5%', NULL, 'common', 1, 'stat_mod_pct', 5, 'exp_gain', 5, 0.2),
+('passive_fortune', '幸运', '金币掉落+10%', NULL, 'common', 1, 'stat_mod_pct', 10, 'gold_gain', 5, 0.2),
+('passive_toughness', '坚韧', '受到伤害-5%', NULL, 'common', 1, 'stat_mod_pct', -5, 'damage_taken', 5, 0.2),
+
+-- 基础层被动 - 职业专属
+('passive_rage_mastery', '怒气掌控', '怒气获取+15%', 'warrior', 'common', 1, 'stat_mod_pct', 15, 'rage_gain', 5, 0.2),
+('passive_mana_flow', '法力涌流', '法力回复+20%', 'mage', 'common', 1, 'stat_mod_pct', 20, 'mana_regen', 5, 0.2),
+('passive_energy_flow', '能量循环', '能量恢复+10%', 'rogue', 'common', 1, 'stat_mod_pct', 10, 'energy_regen', 5, 0.2),
+('passive_holy_light', '圣光祝福', '治疗效果+10%', 'priest', 'common', 1, 'stat_mod_pct', 10, 'healing_done', 5, 0.2),
+
+-- ═══════════════════════════════════════════════════════════
+-- 进阶层被动 (Tier 2)
+-- ═══════════════════════════════════════════════════════════
+('passive_critical_edge', '致命一击', '暴击伤害+12%', NULL, 'rare', 2, 'stat_mod_pct', 12, 'crit_damage', 5, 0.2),
+('passive_evasion', '闪避本能', '闪避率+5%', NULL, 'rare', 2, 'stat_mod_pct', 5, 'dodge_rate', 5, 0.2),
+('passive_precision', '精准打击', '命中率+5%', NULL, 'rare', 2, 'stat_mod_pct', 5, 'hit_rate', 5, 0.2),
+('passive_battle_focus', '战斗专注', '暴击率+4%', NULL, 'rare', 2, 'stat_mod_pct', 4, 'crit_rate', 5, 0.2),
+('passive_regeneration', '再生', '每回合恢复1%HP', NULL, 'rare', 2, 'regen_pct', 1, 'hp', 5, 0.2),
+('passive_mana_shield', '法力护盾', '受到伤害时消耗MP抵消10%', 'mage', 'rare', 2, 'damage_absorb_mp', 10, NULL, 5, 0.2),
+('passive_life_steal', '生命汲取', '伤害的3%转化为HP', 'warlock', 'rare', 2, 'lifesteal', 3, NULL, 5, 0.2),
+('passive_block_mastery', '格挡专精', '格挡几率+8%', 'warrior', 'rare', 2, 'stat_mod_pct', 8, 'block_rate', 5, 0.2),
+('passive_assassin', '刺客本能', '对HP>80%敌人伤害+15%', 'rogue', 'rare', 2, 'conditional_damage', 15, 'enemy_hp_high', 5, 0.2),
+('passive_healing_aura', '治愈光环', '队友每回合恢复1HP', 'priest', 'rare', 2, 'team_regen', 1, 'hp', 5, 0.2),
+
+-- ═══════════════════════════════════════════════════════════
+-- 大师层被动 (Tier 3)
+-- ═══════════════════════════════════════════════════════════
+('passive_berserker', '嗜血本能', 'HP<30%时攻击+25%', NULL, 'epic', 3, 'conditional_stat', 25, 'attack_low_hp', 5, 0.2),
+('passive_magic_barrier', '魔法屏障', '法术伤害-15%', NULL, 'epic', 3, 'stat_mod_pct', -15, 'magic_damage_taken', 5, 0.2),
+('passive_undying', '不灭意志', '首次致死伤害免疫(每战1次)', NULL, 'epic', 3, 'death_prevention', 1, NULL, 3, 0.5),
+('passive_executioner', '处刑者', '对HP<20%敌人伤害+50%', NULL, 'epic', 3, 'conditional_damage', 50, 'enemy_hp_low', 5, 0.2),
+('passive_iron_will', '钢铁意志', '控制效果持续时间-30%', NULL, 'epic', 3, 'stat_mod_pct', -30, 'cc_duration', 5, 0.2),
+('passive_double_strike', '二连击', '普通攻击15%几率攻击两次', 'warrior', 'epic', 3, 'proc_chance', 15, 'double_attack', 5, 0.2),
+('passive_spell_echo', '法术回响', '技能15%几率不消耗法力', 'mage', 'epic', 3, 'proc_chance', 15, 'free_cast', 5, 0.2),
+('passive_shadow_dance', '暗影之舞', '暴击后下次攻击必暴击', 'rogue', 'epic', 3, 'proc_chain', 100, 'guaranteed_crit', 3, 0.3),
+('passive_guardian_angel', '守护天使', '治疗暴击率+15%', 'priest', 'epic', 3, 'stat_mod_pct', 15, 'heal_crit_rate', 5, 0.2);
+
+-- ═══════════════════════════════════════════════════════════
 -- 区域数据
 -- ═══════════════════════════════════════════════════════════
 

@@ -300,6 +300,75 @@ CREATE TABLE IF NOT EXISTS character_skills (
 
 CREATE INDEX IF NOT EXISTS idx_char_skills_char_id ON character_skills(character_id);
 
+-- ═══════════════════════════════════════════════════════════
+-- 角色成长系统
+-- ═══════════════════════════════════════════════════════════
+
+-- 属性分配表 - 记录玩家自由分配的属性点
+CREATE TABLE IF NOT EXISTS character_stat_allocation (
+    character_id INTEGER PRIMARY KEY,
+    unspent_points INTEGER DEFAULT 0,           -- 未分配点数
+    allocated_strength INTEGER DEFAULT 0,       -- 已分配力量
+    allocated_agility INTEGER DEFAULT 0,        -- 已分配敏捷
+    allocated_intellect INTEGER DEFAULT 0,      -- 已分配智力
+    allocated_stamina INTEGER DEFAULT 0,        -- 已分配耐力
+    allocated_spirit INTEGER DEFAULT 0,         -- 已分配精神
+    respec_count INTEGER DEFAULT 0,             -- 重置次数
+    last_respec_at DATETIME,                    -- 上次重置时间
+    FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE
+);
+
+-- 被动技能配置表
+CREATE TABLE IF NOT EXISTS passive_skills (
+    id VARCHAR(32) PRIMARY KEY,
+    name VARCHAR(32) NOT NULL,
+    description TEXT,
+    icon VARCHAR(64),
+    class_id VARCHAR(32),                       -- NULL=通用
+    rarity VARCHAR(16) DEFAULT 'common',        -- common/rare/epic
+    tier INTEGER DEFAULT 1,                     -- 1基础/2进阶/3大师
+    effect_type VARCHAR(32) NOT NULL,           -- 效果类型
+    effect_value REAL NOT NULL,                 -- 效果数值
+    effect_stat VARCHAR(32),                    -- 影响的属性
+    max_level INTEGER DEFAULT 5,                -- 最大升级次数
+    level_scaling REAL DEFAULT 0.2,             -- 每级提升比例(20%)
+    FOREIGN KEY (class_id) REFERENCES classes(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_passive_skills_class ON passive_skills(class_id);
+CREATE INDEX IF NOT EXISTS idx_passive_skills_tier ON passive_skills(tier);
+
+-- 角色被动技能表
+CREATE TABLE IF NOT EXISTS character_passive_skills (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    character_id INTEGER NOT NULL,
+    passive_id VARCHAR(32) NOT NULL,
+    level INTEGER DEFAULT 1,                    -- 当前等级
+    acquired_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE,
+    FOREIGN KEY (passive_id) REFERENCES passive_skills(id),
+    UNIQUE(character_id, passive_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_char_passive_char ON character_passive_skills(character_id);
+
+-- 技能选择记录表 - 记录每3级的技能选择历史
+CREATE TABLE IF NOT EXISTS skill_selection_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    character_id INTEGER NOT NULL,
+    level_milestone INTEGER NOT NULL,           -- 选择时等级(3,6,9...)
+    offered_skill_1 VARCHAR(32) NOT NULL,       -- 选项1
+    offered_skill_2 VARCHAR(32) NOT NULL,       -- 选项2
+    offered_skill_3 VARCHAR(32) NOT NULL,       -- 选项3
+    selected_skill_id VARCHAR(32) NOT NULL,     -- 选中的技能
+    skill_was_upgrade INTEGER DEFAULT 0,        -- 是否为技能升级
+    selected_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE,
+    UNIQUE(character_id, level_milestone)
+);
+
+CREATE INDEX IF NOT EXISTS idx_skill_selection_char ON skill_selection_history(character_id);
+
 -- 背包表
 CREATE TABLE IF NOT EXISTS inventory (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
