@@ -150,90 +150,215 @@ INSERT OR REPLACE INTO classes (id, name, description, role, primary_stat,
 -- ═══════════════════════════════════════════════════════════
 
 -- ═══════════════════════════════════════════════════════════
--- 效果配置 (小数值设计：DOT伤害2~5/回合，护盾10~20吸收)
+-- 效果配置 (回合制战斗优化版)
 -- ═══════════════════════════════════════════════════════════
+-- 设计原则:
+-- 1. 持续时间以"回合"计算
+-- 2. DOT/HOT伤害保持小数值 (2-5/回合)
+-- 3. 护盾吸收量与HP匹配 (10-20点)
 
 INSERT OR REPLACE INTO effects (id, name, description, type, is_buff, is_stackable, max_stacks, duration, value_type, value, stat_affected, damage_type, can_dispel) VALUES
+-- ═══════════════════════════════════════════════════════════
 -- 增益效果 (Buff)
+-- ═══════════════════════════════════════════════════════════
+-- 战士
 ('eff_shield_wall', '盾墙', '受到的伤害降低50%', 'stat_mod', 1, 0, 1, 3, 'percent', -50, 'damage_taken', NULL, 0),
-('eff_ice_barrier', '寒冰护体', '吸收15点伤害', 'shield', 1, 0, 1, 5, 'flat', 15, NULL, NULL, 1),
-('eff_pw_shield', '真言术:盾', '吸收12点伤害', 'shield', 1, 0, 1, 4, 'flat', 12, NULL, NULL, 1),
 ('eff_battle_shout', '战斗怒吼', '攻击力提升10%', 'stat_mod', 1, 0, 1, 5, 'percent', 10, 'attack', NULL, 1),
+-- 法师
+('eff_ice_barrier', '寒冰护体', '吸收15点伤害', 'shield', 1, 0, 1, 5, 'flat', 15, NULL, NULL, 1),
+('eff_arcane_intellect', '奥术智慧', '智力提升10%', 'stat_mod', 1, 0, 1, 99, 'percent', 10, 'intellect', NULL, 1),
+-- 盗贼
 ('eff_blade_flurry', '剑刃乱舞', '攻击力提升20%', 'stat_mod', 1, 0, 1, 4, 'percent', 20, 'attack', NULL, 1),
+('eff_evasion', '闪避', '闪避率提升50%', 'stat_mod', 1, 0, 1, 3, 'percent', 50, 'dodge_rate', NULL, 0),
+-- 牧师
+('eff_pw_shield', '真言术:盾', '吸收12点伤害', 'shield', 1, 0, 1, 4, 'flat', 12, NULL, NULL, 1),
 ('eff_renew', '恢复', '每回合恢复3点生命', 'hot', 1, 0, 1, 4, 'flat', 3, NULL, 'holy', 1),
-('eff_stealth', '潜行', '进入隐身状态', 'stealth', 1, 0, 1, 3, NULL, NULL, NULL, NULL, 1),
-('eff_inner_fire', '心灵之火', '防御力提升15%', 'stat_mod', 1, 0, 1, 10, 'percent', 15, 'defense', NULL, 1),
-('eff_blessing_might', '力量祝福', '攻击力+3', 'stat_mod', 1, 0, 1, 8, 'flat', 3, 'attack', NULL, 1),
-('eff_arcane_intellect', '奥术智慧', '智力提升10%', 'stat_mod', 1, 0, 1, 30, 'percent', 10, 'intellect', NULL, 1),
+('eff_inner_fire', '心灵之火', '防御力提升15%', 'stat_mod', 1, 0, 1, 99, 'percent', 15, 'defense', NULL, 1),
+-- 圣骑士
+('eff_blessing_might', '力量祝福', '攻击力+3', 'stat_mod', 1, 0, 1, 99, 'flat', 3, 'attack', NULL, 1),
+('eff_divine_shield', '圣盾术', '免疫所有伤害', 'invulnerable', 1, 0, 1, 2, NULL, NULL, NULL, NULL, 0),
+('eff_consecration', '奉献', '每回合对敌人造成神圣伤害', 'dot', 1, 0, 1, 4, 'flat', 3, NULL, 'holy', 1),
+-- 猎人
+('eff_rapid_fire', '急速射击', '攻击速度提升30%', 'stat_mod', 1, 0, 1, 4, 'percent', 30, 'attack_speed', NULL, 1),
+('eff_feign_death', '假死', '无法被攻击', 'untargetable', 1, 0, 1, 1, NULL, NULL, NULL, NULL, 0),
+('eff_bestial_wrath', '狂野怒火', '伤害提升50%', 'stat_mod', 1, 0, 1, 3, 'percent', 50, 'damage_dealt', NULL, 0),
+-- 术士
+('eff_drain_life', '吸取生命', '造成伤害的50%转化为生命', 'lifesteal', 1, 0, 1, 1, 'percent', 50, NULL, NULL, 0),
+('eff_soul_link', '灵魂链接', '受到伤害降低30%', 'stat_mod', 1, 0, 1, 99, 'percent', -30, 'damage_taken', NULL, 0),
+-- 德鲁伊
+('eff_rejuvenation', '回春术', '每回合恢复4点生命', 'hot', 1, 0, 1, 4, 'flat', 4, NULL, 'nature', 1),
+('eff_regrowth', '愈合', '每回合恢复2点生命', 'hot', 1, 0, 1, 3, 'flat', 2, NULL, 'nature', 1),
+('eff_barkskin', '树皮术', '受到伤害降低25%', 'stat_mod', 1, 0, 1, 3, 'percent', -25, 'damage_taken', NULL, 0),
+('eff_tranquility', '宁静', '每回合恢复5点生命', 'hot', 1, 0, 1, 3, 'flat', 5, NULL, 'nature', 0),
+-- 萨满
+('eff_windfury', '风怒武器', '20%几率额外攻击', 'proc', 1, 0, 1, 99, 'percent', 20, 'extra_attack', NULL, 1),
+('eff_bloodlust', '嗜血', '攻击速度提升30%', 'stat_mod', 1, 0, 1, 4, 'percent', 30, 'attack_speed', NULL, 0),
 
+-- ═══════════════════════════════════════════════════════════
 -- 减益效果 (Debuff)
+-- ═══════════════════════════════════════════════════════════
+-- 控制效果
 ('eff_stun', '眩晕', '无法行动', 'stun', 0, 0, 1, 1, NULL, NULL, NULL, NULL, 1),
 ('eff_silence', '沉默', '无法施放法术', 'silence', 0, 0, 1, 2, NULL, NULL, NULL, NULL, 1),
+('eff_fear', '恐惧', '无法控制行动', 'stun', 0, 0, 1, 2, NULL, NULL, 'shadow', NULL, 1),
+('eff_root', '缠绕', '无法移动和行动', 'stun', 0, 0, 1, 2, NULL, NULL, 'nature', NULL, 1),
+('eff_interrupt', '打断', '施法被打断', 'interrupt', 0, 0, 1, 1, NULL, NULL, NULL, NULL, 0),
+-- 减益效果
 ('eff_slow', '减速', '攻击速度降低30%', 'slow', 0, 0, 1, 3, 'percent', -30, 'attack_speed', NULL, 1),
-('eff_sw_pain', '暗言术:痛', '每回合3点暗影伤害', 'dot', 0, 0, 1, 4, 'flat', 3, NULL, 'shadow', 1),
-('eff_rend', '撕裂', '每回合2点流血伤害', 'dot', 0, 1, 3, 3, 'flat', 2, NULL, 'physical', 1),
-('eff_ignite', '点燃', '每回合2点火焰伤害', 'dot', 0, 1, 5, 3, 'flat', 2, NULL, 'fire', 1),
-('eff_frostbite', '冻伤', '攻击力降低15%', 'stat_mod', 0, 0, 1, 3, 'percent', -15, 'attack', 'frost', 1),
-('eff_curse_weakness', '虚弱诅咒', '造成的伤害降低20%', 'stat_mod', 0, 0, 1, 4, 'percent', -20, 'damage_dealt', 'shadow', 1),
+('eff_frostbite', '冻伤', '攻击速度降低20%', 'stat_mod', 0, 0, 1, 3, 'percent', -20, 'attack_speed', 'frost', 1),
 ('eff_sunder_armor', '破甲', '防御力降低20%', 'stat_mod', 0, 1, 5, 5, 'percent', -20, 'defense', NULL, 0),
-('eff_poison', '中毒', '每回合2点自然伤害', 'dot', 0, 1, 5, 5, 'flat', 2, NULL, 'nature', 1),
+('eff_curse_weakness', '虚弱诅咒', '造成的伤害降低20%', 'stat_mod', 0, 0, 1, 4, 'percent', -20, 'damage_dealt', 'shadow', 1),
 ('eff_taunt', '嘲讽', '强制攻击施法者', 'taunt', 0, 0, 1, 2, NULL, NULL, NULL, NULL, 0),
-('eff_fear', '恐惧', '无法控制行动', 'stun', 0, 0, 1, 2, NULL, NULL, 'shadow', NULL, 1);
+-- DOT效果 (持续伤害)
+('eff_rend', '撕裂', '每回合2点流血伤害', 'dot', 0, 1, 3, 3, 'flat', 2, NULL, 'physical', 1),
+('eff_rupture', '割裂', '每回合3点流血伤害', 'dot', 0, 0, 1, 6, 'flat', 3, NULL, 'physical', 1),
+('eff_ignite', '点燃', '每回合2点火焰伤害', 'dot', 0, 1, 5, 3, 'flat', 2, NULL, 'fire', 1),
+('eff_sw_pain', '暗言术:痛', '每回合3点暗影伤害', 'dot', 0, 0, 1, 4, 'flat', 3, NULL, 'shadow', 1),
+('eff_poison', '中毒', '每回合2点自然伤害', 'dot', 0, 1, 5, 5, 'flat', 2, NULL, 'nature', 1),
+('eff_serpent_sting', '毒蛇钉刺', '每回合2点自然伤害', 'dot', 0, 0, 1, 5, 'flat', 2, NULL, 'nature', 1),
+('eff_corruption', '腐蚀术', '每回合2点暗影伤害', 'dot', 0, 0, 1, 6, 'flat', 2, NULL, 'shadow', 1),
+('eff_agony', '痛苦诅咒', '每回合1-4点递增伤害', 'dot', 0, 0, 1, 5, 'flat', 2, NULL, 'shadow', 1),
+('eff_immolate', '献祭', '每回合3点火焰伤害', 'dot', 0, 0, 1, 5, 'flat', 3, NULL, 'fire', 1),
+('eff_moonfire', '月火术', '每回合2点自然伤害', 'dot', 0, 0, 1, 4, 'flat', 2, NULL, 'nature', 1),
+('eff_flame_shock', '烈焰震击', '每回合2点火焰伤害', 'dot', 0, 0, 1, 4, 'flat', 2, NULL, 'fire', 1);
 
 -- ═══════════════════════════════════════════════════════════
 -- 技能数据 (扩展版)
 -- ═══════════════════════════════════════════════════════════
 
 -- ═══════════════════════════════════════════════════════════
--- 技能数据 (小数值设计：伤害5~40, 消耗3~20)
+-- 技能数据 (回合制战斗优化版)
 -- ═══════════════════════════════════════════════════════════
+-- 设计原则:
+-- 1. 所有技能适配自动战斗，无需玩家操作
+-- 2. 冷却时间以"回合"计算
+-- 3. 资源消耗平衡，保证技能循环
+-- 4. 强力技能必须有冷却
 
--- 战士技能 (怒气消耗5~25)
+-- ═══════════════════════════════════════════════════════════
+-- 战士技能 (怒气系统: 上限100, 攻击+5, 受伤+怒气)
+-- ═══════════════════════════════════════════════════════════
 INSERT OR REPLACE INTO skills (id, name, description, class_id, type, target_type, damage_type, base_value, scaling_stat, scaling_ratio, resource_cost, cooldown, level_required, effect_id, effect_chance) VALUES
-('heroic_strike', '英勇打击', '一次强力的武器攻击。', 'warrior', 'attack', 'enemy', 'physical', 8, 'strength', 0.5, 5, 0, 1, NULL, 1.0),
-('charge', '冲锋', '冲向敌人，造成伤害并眩晕。', 'warrior', 'attack', 'enemy', 'physical', 5, 'strength', 0.3, 8, 3, 1, 'eff_stun', 1.0),
-('rend', '撕裂', '造成流血效果。', 'warrior', 'dot', 'enemy', 'physical', 2, 'strength', 0.15, 6, 0, 2, 'eff_rend', 1.0),
-('thunder_clap', '雷霆一击', '对所有敌人造成伤害并减速。', 'warrior', 'attack', 'enemy_all', 'physical', 6, 'strength', 0.3, 12, 2, 4, 'eff_slow', 0.8),
-('sunder_armor', '破甲攻击', '降低敌人防御力。', 'warrior', 'debuff', 'enemy', 'physical', 4, 'strength', 0.2, 8, 0, 6, 'eff_sunder_armor', 1.0),
-('execute', '斩杀', '对低血量敌人造成大量伤害。', 'warrior', 'attack', 'enemy_lowest_hp', 'physical', 20, 'strength', 0.8, 18, 0, 8, NULL, 1.0),
-('shield_wall', '盾墙', '大幅减少受到的伤害。', 'warrior', 'buff', 'self', NULL, 0, NULL, 0, 25, 10, 10, 'eff_shield_wall', 1.0),
-('battle_shout', '战斗怒吼', '提升全队攻击力。', 'warrior', 'buff', 'ally_all', NULL, 0, NULL, 0, 10, 5, 3, 'eff_battle_shout', 1.0);
+('heroic_strike', '英勇打击', '强力的武器攻击。', 'warrior', 'attack', 'enemy', 'physical', 8, 'strength', 0.5, 10, 0, 1, NULL, 1.0),
+('charge', '冲锋', '冲向敌人造成伤害并眩晕1回合。', 'warrior', 'attack', 'enemy', 'physical', 5, 'strength', 0.3, 0, 4, 1, 'eff_stun', 1.0),
+('rend', '撕裂', '造成流血，持续3回合。', 'warrior', 'dot', 'enemy', 'physical', 2, 'strength', 0.15, 8, 0, 2, 'eff_rend', 1.0),
+('thunder_clap', '雷霆一击', '对所有敌人造成伤害并减速。', 'warrior', 'attack', 'enemy_all', 'physical', 6, 'strength', 0.3, 15, 3, 4, 'eff_slow', 0.8),
+('sunder_armor', '破甲攻击', '降低敌人防御20%，可叠加。', 'warrior', 'debuff', 'enemy', 'physical', 4, 'strength', 0.2, 12, 0, 6, 'eff_sunder_armor', 1.0),
+('execute', '斩杀', '对HP<30%的敌人造成巨额伤害。', 'warrior', 'attack', 'enemy_lowest_hp', 'physical', 25, 'strength', 1.0, 20, 3, 8, NULL, 1.0),
+('shield_wall', '盾墙', '3回合内受到伤害降低50%。', 'warrior', 'buff', 'self', NULL, 0, NULL, 0, 30, 10, 10, 'eff_shield_wall', 1.0),
+('battle_shout', '战斗怒吼', '全队攻击力提升10%，持续5回合。', 'warrior', 'buff', 'ally_all', NULL, 0, NULL, 0, 15, 6, 3, 'eff_battle_shout', 1.0);
 
--- 法师技能 (法力消耗4~18)
+-- ═══════════════════════════════════════════════════════════
+-- 法师技能 (法力系统: 基础40, 每回合+精神×0.5%)
+-- ═══════════════════════════════════════════════════════════
 INSERT OR REPLACE INTO skills (id, name, description, class_id, type, target_type, damage_type, base_value, scaling_stat, scaling_ratio, resource_cost, cooldown, level_required, effect_id, effect_chance) VALUES
-('fireball', '火球术', '发射火球，有几率点燃敌人。', 'mage', 'attack', 'enemy', 'fire', 10, 'intellect', 0.5, 6, 0, 1, 'eff_ignite', 0.3),
-('frostbolt', '寒冰箭', '发射寒冰箭，减缓敌人。', 'mage', 'attack', 'enemy', 'frost', 8, 'intellect', 0.4, 5, 0, 1, 'eff_frostbite', 0.5),
-('arcane_missiles', '奥术飞弹', '发射多道奥术飞弹。', 'mage', 'attack', 'enemy', 'magic', 12, 'intellect', 0.6, 8, 2, 4, NULL, 1.0),
-('flamestrike', '烈焰风暴', '对所有敌人造成火焰伤害。', 'mage', 'attack', 'enemy_all', 'fire', 10, 'intellect', 0.4, 12, 3, 6, 'eff_ignite', 0.2),
-('pyroblast', '炎爆术', '施放巨大的火球。', 'mage', 'attack', 'enemy', 'fire', 25, 'intellect', 1.0, 18, 5, 8, 'eff_ignite', 0.8),
-('ice_barrier', '寒冰护体', '创造吸收伤害的护盾。', 'mage', 'shield', 'self', NULL, 15, 'intellect', 0.5, 14, 8, 10, 'eff_ice_barrier', 1.0),
-('arcane_intellect', '奥术智慧', '提升智力。', 'mage', 'buff', 'ally', NULL, 0, NULL, 0, 8, 0, 2, 'eff_arcane_intellect', 1.0);
+('fireball', '火球术', '发射火球，30%几率点燃敌人。', 'mage', 'attack', 'enemy', 'fire', 10, 'intellect', 0.5, 5, 0, 1, 'eff_ignite', 0.3),
+('frostbolt', '寒冰箭', '发射寒冰箭，50%几率减速敌人。', 'mage', 'attack', 'enemy', 'frost', 8, 'intellect', 0.4, 4, 0, 1, 'eff_frostbite', 0.5),
+('arcane_missiles', '奥术飞弹', '发射3道奥术飞弹。', 'mage', 'attack', 'enemy', 'magic', 12, 'intellect', 0.6, 7, 2, 4, NULL, 1.0),
+('flamestrike', '烈焰风暴', '对所有敌人造成火焰伤害。', 'mage', 'attack', 'enemy_all', 'fire', 8, 'intellect', 0.4, 10, 3, 6, 'eff_ignite', 0.2),
+('pyroblast', '炎爆术', '蓄力后释放巨大火球。', 'mage', 'attack', 'enemy', 'fire', 22, 'intellect', 0.9, 15, 4, 8, 'eff_ignite', 0.8),
+('ice_barrier', '寒冰护体', '创造可吸收15点伤害的护盾。', 'mage', 'shield', 'self', NULL, 15, 'intellect', 0.5, 12, 6, 10, 'eff_ice_barrier', 1.0),
+('arcane_intellect', '奥术智慧', '提升目标智力10%，持续整场战斗。', 'mage', 'buff', 'ally', NULL, 0, NULL, 0, 6, 0, 2, 'eff_arcane_intellect', 1.0),
+('blizzard', '暴风雪', '对所有敌人造成冰霜伤害并减速。', 'mage', 'attack', 'enemy_all', 'frost', 6, 'intellect', 0.3, 12, 4, 12, 'eff_frostbite', 0.6);
 
--- 盗贼技能 (能量消耗15~40)
+-- ═══════════════════════════════════════════════════════════
+-- 盗贼技能 (能量系统: 上限100, 每回合+20)
+-- 调整: 降低能量消耗，添加冷却平衡
+-- ═══════════════════════════════════════════════════════════
 INSERT OR REPLACE INTO skills (id, name, description, class_id, type, target_type, damage_type, base_value, scaling_stat, scaling_ratio, resource_cost, cooldown, level_required, effect_id, effect_chance) VALUES
-('sinister_strike', '邪恶攻击', '快速的攻击。', 'rogue', 'attack', 'enemy', 'physical', 6, 'agility', 0.4, 20, 0, 1, NULL, 1.0),
-('backstab', '背刺', '从背后攻击造成大量伤害。', 'rogue', 'attack', 'enemy', 'physical', 12, 'agility', 0.6, 35, 0, 1, NULL, 1.0),
-('deadly_poison', '致命毒药', '使敌人中毒。', 'rogue', 'dot', 'enemy', 'nature', 2, 'agility', 0.1, 25, 0, 3, 'eff_poison', 1.0),
-('eviscerate', '剔骨', '造成大量伤害。', 'rogue', 'attack', 'enemy', 'physical', 18, 'agility', 0.7, 40, 0, 4, NULL, 1.0),
-('kidney_shot', '肾击', '眩晕敌人。', 'rogue', 'control', 'enemy', 'physical', 4, 'agility', 0.2, 30, 4, 6, 'eff_stun', 1.0),
-('blade_flurry', '剑刃乱舞', '攻击力大幅提升。', 'rogue', 'buff', 'self', NULL, 0, NULL, 0, 35, 8, 8, 'eff_blade_flurry', 1.0),
-('vanish', '消失', '进入潜行状态。', 'rogue', 'buff', 'self', NULL, 0, NULL, 0, 50, 10, 10, 'eff_stealth', 1.0);
+('sinister_strike', '邪恶攻击', '快速攻击，积累连击点。', 'rogue', 'attack', 'enemy', 'physical', 6, 'agility', 0.4, 15, 0, 1, NULL, 1.0),
+('ambush', '伏击', '对HP>80%的敌人伤害翻倍。', 'rogue', 'attack', 'enemy', 'physical', 10, 'agility', 0.5, 25, 2, 1, NULL, 1.0),
+('deadly_poison', '致命毒药', '使敌人中毒，持续5回合。', 'rogue', 'dot', 'enemy', 'nature', 2, 'agility', 0.1, 20, 0, 3, 'eff_poison', 1.0),
+('eviscerate', '剔骨', '消耗连击点造成大量伤害。', 'rogue', 'attack', 'enemy', 'physical', 15, 'agility', 0.6, 30, 2, 4, NULL, 1.0),
+('kidney_shot', '肾击', '眩晕敌人1回合。', 'rogue', 'control', 'enemy', 'physical', 4, 'agility', 0.2, 25, 4, 6, 'eff_stun', 1.0),
+('blade_flurry', '剑刃乱舞', '4回合内攻击力提升20%。', 'rogue', 'buff', 'self', NULL, 0, NULL, 0, 30, 6, 8, 'eff_blade_flurry', 1.0),
+('evasion', '闪避', '3回合内闪避率提升50%。', 'rogue', 'buff', 'self', NULL, 0, NULL, 0, 35, 8, 10, 'eff_evasion', 1.0),
+('rupture', '割裂', '造成强力流血，持续6回合。', 'rogue', 'dot', 'enemy', 'physical', 3, 'agility', 0.2, 35, 0, 12, 'eff_rupture', 1.0);
 
--- 牧师技能 (法力消耗4~12)
+-- ═══════════════════════════════════════════════════════════
+-- 牧师技能 (法力系统: 基础35, 每回合+精神×0.8%)
+-- ═══════════════════════════════════════════════════════════
 INSERT OR REPLACE INTO skills (id, name, description, class_id, type, target_type, damage_type, base_value, scaling_stat, scaling_ratio, resource_cost, cooldown, level_required, effect_id, effect_chance) VALUES
 ('smite', '惩击', '用神圣能量攻击敌人。', 'priest', 'attack', 'enemy', 'holy', 7, 'intellect', 0.4, 4, 0, 1, NULL, 1.0),
-('shadow_word_pain', '暗言术:痛', '对敌人施加持续伤害。', 'priest', 'dot', 'enemy', 'shadow', 2, 'intellect', 0.15, 5, 0, 1, 'eff_sw_pain', 1.0),
-('lesser_heal', '次级治疗术', '恢复生命值。', 'priest', 'heal', 'ally_lowest_hp', 'holy', 8, 'spirit', 0.4, 5, 0, 1, NULL, 1.0),
-('renew', '恢复', '持续恢复生命。', 'priest', 'hot', 'ally_lowest_hp', 'holy', 3, 'spirit', 0.2, 6, 0, 2, 'eff_renew', 1.0),
-('heal', '治疗术', '恢复大量生命值。', 'priest', 'heal', 'ally_lowest_hp', 'holy', 15, 'spirit', 0.6, 10, 0, 4, NULL, 1.0),
-('inner_fire', '心灵之火', '提升防御力。', 'priest', 'buff', 'self', NULL, 0, NULL, 0, 8, 0, 4, 'eff_inner_fire', 1.0),
-('power_word_shield', '真言术:盾', '创造吸收伤害的护盾。', 'priest', 'shield', 'ally_lowest_hp', 'holy', 12, 'spirit', 0.5, 10, 4, 6, 'eff_pw_shield', 1.0),
-('flash_heal', '快速治疗', '快速恢复生命值。', 'priest', 'heal', 'ally_lowest_hp', 'holy', 12, 'spirit', 0.5, 8, 0, 8, NULL, 1.0),
-('silence', '沉默', '使敌人无法施法。', 'priest', 'control', 'enemy', 'shadow', 0, NULL, 0, 10, 6, 10, 'eff_silence', 1.0);
+('shadow_word_pain', '暗言术:痛', '对敌人施加暗影DOT，持续4回合。', 'priest', 'dot', 'enemy', 'shadow', 3, 'intellect', 0.15, 4, 0, 1, 'eff_sw_pain', 1.0),
+('lesser_heal', '次级治疗术', '恢复少量生命值。', 'priest', 'heal', 'ally_lowest_hp', 'holy', 8, 'spirit', 0.4, 4, 0, 1, NULL, 1.0),
+('renew', '恢复', '持续恢复生命，持续4回合。', 'priest', 'hot', 'ally_lowest_hp', 'holy', 3, 'spirit', 0.2, 5, 0, 2, 'eff_renew', 1.0),
+('heal', '治疗术', '恢复大量生命值。', 'priest', 'heal', 'ally_lowest_hp', 'holy', 15, 'spirit', 0.6, 8, 0, 4, NULL, 1.0),
+('inner_fire', '心灵之火', '提升自身防御力15%，持续整场战斗。', 'priest', 'buff', 'self', NULL, 0, NULL, 0, 6, 0, 4, 'eff_inner_fire', 1.0),
+('power_word_shield', '真言术:盾', '为血量最低队友创造吸收12点伤害的护盾。', 'priest', 'shield', 'ally_lowest_hp', 'holy', 12, 'spirit', 0.5, 8, 4, 6, 'eff_pw_shield', 1.0),
+('flash_heal', '快速治疗', '快速恢复中等生命值。', 'priest', 'heal', 'ally_lowest_hp', 'holy', 12, 'spirit', 0.5, 6, 0, 8, NULL, 1.0),
+('prayer_of_healing', '治疗祷言', '恢复全队生命值。', 'priest', 'heal', 'ally_all', 'holy', 6, 'spirit', 0.3, 12, 4, 12, NULL, 1.0);
 
--- 通用技能
+-- ═══════════════════════════════════════════════════════════
+-- 圣骑士技能 (法力系统: 基础20, 混合输出/治疗/坦克)
+-- ═══════════════════════════════════════════════════════════
 INSERT OR REPLACE INTO skills (id, name, description, class_id, type, target_type, damage_type, base_value, scaling_stat, scaling_ratio, resource_cost, cooldown, level_required, effect_id, effect_chance) VALUES
-('basic_attack', '普通攻击', '基础的物理攻击。', NULL, 'attack', 'enemy', 'physical', 0, 'strength', 0.5, 0, 0, 1, NULL, 1.0);
+('crusader_strike', '十字军打击', '神圣武器攻击。', 'paladin', 'attack', 'enemy', 'physical', 8, 'strength', 0.5, 3, 0, 1, NULL, 1.0),
+('judgement', '审判', '释放神圣审判造成伤害。', 'paladin', 'attack', 'enemy', 'holy', 10, 'strength', 0.4, 4, 2, 1, NULL, 1.0),
+('holy_light', '圣光术', '恢复生命值。', 'paladin', 'heal', 'ally_lowest_hp', 'holy', 12, 'intellect', 0.5, 5, 0, 2, NULL, 1.0),
+('blessing_of_might', '力量祝福', '提升全队攻击力，持续整场战斗。', 'paladin', 'buff', 'ally_all', NULL, 0, NULL, 0, 4, 0, 3, 'eff_blessing_might', 1.0),
+('consecration', '奉献', '在脚下创造神圣区域，每回合伤害敌人。', 'paladin', 'dot', 'enemy_all', 'holy', 4, 'strength', 0.2, 6, 3, 6, 'eff_consecration', 1.0),
+('divine_shield', '圣盾术', '2回合内免疫所有伤害。', 'paladin', 'buff', 'self', NULL, 0, NULL, 0, 8, 10, 10, 'eff_divine_shield', 1.0),
+('lay_on_hands', '圣疗术', '完全恢复目标生命值。', 'paladin', 'heal', 'ally_lowest_hp', 'holy', 100, NULL, 0, 10, 15, 14, NULL, 1.0),
+('hammer_of_justice', '制裁之锤', '眩晕敌人2回合。', 'paladin', 'control', 'enemy', 'holy', 5, 'strength', 0.3, 5, 5, 8, 'eff_stun', 1.0);
+
+-- ═══════════════════════════════════════════════════════════
+-- 猎人技能 (法力系统: 基础18, 远程物理+宠物)
+-- ═══════════════════════════════════════════════════════════
+INSERT OR REPLACE INTO skills (id, name, description, class_id, type, target_type, damage_type, base_value, scaling_stat, scaling_ratio, resource_cost, cooldown, level_required, effect_id, effect_chance) VALUES
+('arcane_shot', '奥术射击', '发射附魔箭矢。', 'hunter', 'attack', 'enemy', 'magic', 8, 'agility', 0.5, 3, 0, 1, NULL, 1.0),
+('serpent_sting', '毒蛇钉刺', '使敌人中毒，持续5回合。', 'hunter', 'dot', 'enemy', 'nature', 2, 'agility', 0.15, 4, 0, 1, 'eff_serpent_sting', 1.0),
+('multi_shot', '多重射击', '对所有敌人射击。', 'hunter', 'attack', 'enemy_all', 'physical', 6, 'agility', 0.3, 5, 2, 4, NULL, 1.0),
+('aimed_shot', '瞄准射击', '精准射击造成高伤害。', 'hunter', 'attack', 'enemy', 'physical', 15, 'agility', 0.7, 6, 3, 6, NULL, 1.0),
+('concussive_shot', '震荡射击', '减速敌人3回合。', 'hunter', 'debuff', 'enemy', 'physical', 4, 'agility', 0.2, 3, 2, 3, 'eff_slow', 1.0),
+('rapid_fire', '急速射击', '4回合内攻击速度提升30%。', 'hunter', 'buff', 'self', NULL, 0, NULL, 0, 5, 6, 10, 'eff_rapid_fire', 1.0),
+('feign_death', '假死', '脱离战斗1回合，期间不会被攻击。', 'hunter', 'buff', 'self', NULL, 0, NULL, 0, 4, 8, 8, 'eff_feign_death', 1.0),
+('bestial_wrath', '狂野怒火', '宠物伤害提升50%，持续3回合。', 'hunter', 'buff', 'self', NULL, 0, NULL, 0, 6, 8, 12, 'eff_bestial_wrath', 1.0);
+
+-- ═══════════════════════════════════════════════════════════
+-- 术士技能 (法力系统: 基础38, DOT+吸血+召唤)
+-- ═══════════════════════════════════════════════════════════
+INSERT OR REPLACE INTO skills (id, name, description, class_id, type, target_type, damage_type, base_value, scaling_stat, scaling_ratio, resource_cost, cooldown, level_required, effect_id, effect_chance) VALUES
+('shadow_bolt', '暗影箭', '发射暗影能量。', 'warlock', 'attack', 'enemy', 'shadow', 10, 'intellect', 0.5, 4, 0, 1, NULL, 1.0),
+('corruption', '腐蚀术', '使敌人腐蚀，持续6回合。', 'warlock', 'dot', 'enemy', 'shadow', 2, 'intellect', 0.15, 4, 0, 1, 'eff_corruption', 1.0),
+('curse_of_agony', '痛苦诅咒', '造成逐渐增强的痛苦，持续5回合。', 'warlock', 'dot', 'enemy', 'shadow', 3, 'intellect', 0.2, 5, 0, 2, 'eff_agony', 1.0),
+('drain_life', '吸取生命', '吸取敌人生命，治疗自己。', 'warlock', 'attack', 'enemy', 'shadow', 8, 'intellect', 0.4, 6, 2, 4, 'eff_drain_life', 1.0),
+('fear', '恐惧', '使敌人恐惧2回合，无法行动。', 'warlock', 'control', 'enemy', 'shadow', 0, NULL, 0, 6, 5, 6, 'eff_fear', 1.0),
+('immolate', '献祭', '燃烧敌人，造成火焰DOT。', 'warlock', 'dot', 'enemy', 'fire', 5, 'intellect', 0.3, 5, 0, 3, 'eff_immolate', 1.0),
+('hellfire', '地狱烈焰', '对所有敌人造成火焰伤害，自身也受伤。', 'warlock', 'attack', 'enemy_all', 'fire', 10, 'intellect', 0.4, 8, 4, 10, NULL, 1.0),
+('soul_link', '灵魂链接', '与宠物分担30%伤害，持续整场战斗。', 'warlock', 'buff', 'self', NULL, 0, NULL, 0, 6, 0, 8, 'eff_soul_link', 1.0);
+
+-- ═══════════════════════════════════════════════════════════
+-- 德鲁伊技能 (法力系统: 基础30, 变形+治疗+DOT)
+-- ═══════════════════════════════════════════════════════════
+INSERT OR REPLACE INTO skills (id, name, description, class_id, type, target_type, damage_type, base_value, scaling_stat, scaling_ratio, resource_cost, cooldown, level_required, effect_id, effect_chance) VALUES
+('wrath', '愤怒', '用自然之力攻击敌人。', 'druid', 'attack', 'enemy', 'nature', 9, 'intellect', 0.5, 4, 0, 1, NULL, 1.0),
+('moonfire', '月火术', '造成即时伤害和DOT。', 'druid', 'dot', 'enemy', 'nature', 5, 'intellect', 0.25, 4, 0, 1, 'eff_moonfire', 1.0),
+('rejuvenation', '回春术', '持续恢复生命，持续4回合。', 'druid', 'hot', 'ally_lowest_hp', 'nature', 4, 'spirit', 0.25, 5, 0, 2, 'eff_rejuvenation', 1.0),
+('regrowth', '愈合', '即时治疗并附带HOT效果。', 'druid', 'heal', 'ally_lowest_hp', 'nature', 10, 'spirit', 0.5, 7, 0, 4, 'eff_regrowth', 1.0),
+('entangling_roots', '纠缠根须', '使敌人无法行动2回合。', 'druid', 'control', 'enemy', 'nature', 0, NULL, 0, 5, 4, 6, 'eff_root', 1.0),
+('swipe', '横扫', '对所有敌人造成物理伤害。', 'druid', 'attack', 'enemy_all', 'physical', 6, 'strength', 0.3, 5, 2, 5, NULL, 1.0),
+('barkskin', '树皮术', '3回合内受到伤害降低25%。', 'druid', 'buff', 'self', NULL, 0, NULL, 0, 4, 5, 8, 'eff_barkskin', 1.0),
+('tranquility', '宁静', '持续3回合治疗全队。', 'druid', 'heal', 'ally_all', 'nature', 5, 'spirit', 0.3, 15, 10, 12, 'eff_tranquility', 1.0);
+
+-- ═══════════════════════════════════════════════════════════
+-- 萨满技能 (法力系统: 基础32, 元素+图腾+治疗)
+-- ═══════════════════════════════════════════════════════════
+INSERT OR REPLACE INTO skills (id, name, description, class_id, type, target_type, damage_type, base_value, scaling_stat, scaling_ratio, resource_cost, cooldown, level_required, effect_id, effect_chance) VALUES
+('lightning_bolt', '闪电箭', '召唤闪电攻击敌人。', 'shaman', 'attack', 'enemy', 'nature', 10, 'intellect', 0.5, 4, 0, 1, NULL, 1.0),
+('earth_shock', '地震术', '造成自然伤害并打断施法。', 'shaman', 'attack', 'enemy', 'nature', 7, 'intellect', 0.35, 4, 2, 1, 'eff_interrupt', 0.8),
+('flame_shock', '烈焰震击', '造成火焰伤害和DOT。', 'shaman', 'dot', 'enemy', 'fire', 5, 'intellect', 0.25, 4, 0, 2, 'eff_flame_shock', 1.0),
+('healing_wave', '治疗波', '恢复生命值。', 'shaman', 'heal', 'ally_lowest_hp', 'nature', 12, 'spirit', 0.5, 6, 0, 2, NULL, 1.0),
+('chain_lightning', '闪电链', '闪电跳跃攻击多个敌人。', 'shaman', 'attack', 'enemy_all', 'nature', 6, 'intellect', 0.3, 7, 3, 6, NULL, 1.0),
+('windfury_weapon', '风怒武器', '攻击时有几率额外攻击，持续整场战斗。', 'shaman', 'buff', 'self', NULL, 0, NULL, 0, 5, 0, 4, 'eff_windfury', 1.0),
+('purge', '净化', '驱散敌人的增益效果。', 'shaman', 'dispel', 'enemy', NULL, 0, NULL, 0, 4, 2, 8, NULL, 1.0),
+('bloodlust', '嗜血', '全队攻击速度提升30%，持续4回合。', 'shaman', 'buff', 'ally_all', NULL, 0, NULL, 0, 10, 12, 12, 'eff_bloodlust', 1.0);
+
+-- ═══════════════════════════════════════════════════════════
+-- 通用技能
+-- ═══════════════════════════════════════════════════════════
+INSERT OR REPLACE INTO skills (id, name, description, class_id, type, target_type, damage_type, base_value, scaling_stat, scaling_ratio, resource_cost, cooldown, level_required, effect_id, effect_chance) VALUES
+('basic_attack', '普通攻击', '基础物理攻击。', NULL, 'attack', 'enemy', 'physical', 0, 'strength', 0.5, 0, 0, 1, NULL, 1.0);
 
 -- ═══════════════════════════════════════════════════════════
 -- 被动技能数据 (每3级技能选择时可能出现)
@@ -257,6 +382,11 @@ INSERT OR REPLACE INTO passive_skills (id, name, description, class_id, rarity, 
 ('passive_mana_flow', '法力涌流', '法力回复+20%', 'mage', 'common', 1, 'stat_mod_pct', 20, 'mana_regen', 5, 0.2),
 ('passive_energy_flow', '能量循环', '能量恢复+10%', 'rogue', 'common', 1, 'stat_mod_pct', 10, 'energy_regen', 5, 0.2),
 ('passive_holy_light', '圣光祝福', '治疗效果+10%', 'priest', 'common', 1, 'stat_mod_pct', 10, 'healing_done', 5, 0.2),
+('passive_righteousness', '正义之心', '神圣伤害+10%', 'paladin', 'common', 1, 'stat_mod_pct', 10, 'holy_damage', 5, 0.2),
+('passive_steady_aim', '稳固射击', '远程攻击+12%', 'hunter', 'common', 1, 'stat_mod_pct', 12, 'ranged_damage', 5, 0.2),
+('passive_fel_power', '邪能掌握', '暗影伤害+10%', 'warlock', 'common', 1, 'stat_mod_pct', 10, 'shadow_damage', 5, 0.2),
+('passive_nature_bond', '自然契约', '自然伤害+10%', 'druid', 'common', 1, 'stat_mod_pct', 10, 'nature_damage', 5, 0.2),
+('passive_elemental_focus', '元素专注', '法术暴击+5%', 'shaman', 'common', 1, 'stat_mod_pct', 5, 'spell_crit', 5, 0.2),
 
 -- ═══════════════════════════════════════════════════════════
 -- 进阶层被动 (Tier 2)
@@ -271,6 +401,11 @@ INSERT OR REPLACE INTO passive_skills (id, name, description, class_id, rarity, 
 ('passive_block_mastery', '格挡专精', '格挡几率+8%', 'warrior', 'rare', 2, 'stat_mod_pct', 8, 'block_rate', 5, 0.2),
 ('passive_assassin', '刺客本能', '对HP>80%敌人伤害+15%', 'rogue', 'rare', 2, 'conditional_damage', 15, 'enemy_hp_high', 5, 0.2),
 ('passive_healing_aura', '治愈光环', '队友每回合恢复1HP', 'priest', 'rare', 2, 'team_regen', 1, 'hp', 5, 0.2),
+('passive_holy_shield', '神圣护盾', '格挡时反弹3点伤害', 'paladin', 'rare', 2, 'block_reflect', 3, NULL, 5, 0.2),
+('passive_pet_bond', '宠物羁绊', '宠物伤害+20%', 'hunter', 'rare', 2, 'stat_mod_pct', 20, 'pet_damage', 5, 0.2),
+('passive_soul_siphon', '灵魂虹吸', 'DOT伤害+15%', 'warlock', 'rare', 2, 'stat_mod_pct', 15, 'dot_damage', 5, 0.2),
+('passive_natural_regen', '自然再生', '战斗中每回合恢复2%HP', 'druid', 'rare', 2, 'regen_pct', 2, 'hp', 5, 0.2),
+('passive_totemic_focus', '图腾专注', '图腾效果+15%', 'shaman', 'rare', 2, 'stat_mod_pct', 15, 'totem_effect', 5, 0.2),
 
 -- ═══════════════════════════════════════════════════════════
 -- 大师层被动 (Tier 3)
@@ -283,6 +418,12 @@ INSERT OR REPLACE INTO passive_skills (id, name, description, class_id, rarity, 
 ('passive_double_strike', '二连击', '普通攻击15%几率攻击两次', 'warrior', 'epic', 3, 'proc_chance', 15, 'double_attack', 5, 0.2),
 ('passive_spell_echo', '法术回响', '技能15%几率不消耗法力', 'mage', 'epic', 3, 'proc_chance', 15, 'free_cast', 5, 0.2),
 ('passive_shadow_dance', '暗影之舞', '暴击后下次攻击必暴击', 'rogue', 'epic', 3, 'proc_chain', 100, 'guaranteed_crit', 3, 0.3),
+('passive_divine_favor', '神恩术', '治疗技能25%几率暴击', 'paladin', 'epic', 3, 'proc_chance', 25, 'heal_crit', 5, 0.2),
+('passive_spirit_bond', '灵魂纽带', '治疗宠物时自己也恢复50%', 'hunter', 'epic', 3, 'heal_split', 50, NULL, 5, 0.2),
+('passive_shadow_mastery', '暗影掌控', '暗影技能15%几率重置冷却', 'warlock', 'epic', 3, 'proc_chance', 15, 'reset_cooldown', 5, 0.2),
+('passive_omen_of_clarity', '清晰预兆', '攻击15%几率下次技能免费', 'druid', 'epic', 3, 'proc_chance', 15, 'free_cast', 5, 0.2),
+('passive_elemental_mastery', '元素掌握', '下次法术必暴击(每10回合)', 'shaman', 'epic', 3, 'cooldown_proc', 100, 'guaranteed_crit', 3, 0.3),
+('passive_holy_guardian', '神圣守护', 'HP<20%时自动触发圣盾(每战1次)', 'priest', 'epic', 3, 'death_prevention', 1, NULL, 3, 0.5),
 ('passive_guardian_angel', '守护天使', '治疗暴击率+15%', 'priest', 'epic', 3, 'stat_mod_pct', 15, 'heal_crit_rate', 5, 0.2);
 
 -- ═══════════════════════════════════════════════════════════
