@@ -3,7 +3,19 @@
    ═══════════════════════════════════════════════════════════ */
 
 :root {
-  /* 配色方案 */
+  /* 配色方案 - 终端风格 */
+  --terminal-bg: #0a0a0a;
+  --terminal-green: #00ff00;
+  --terminal-green-dim: #00cc00;
+  --terminal-gray: #666666;
+  --terminal-white: #ffffff;
+  --terminal-yellow: #ffff00;
+  --terminal-gold: #ffd700;
+  --terminal-red: #ff4444;
+  --terminal-cyan: #00ffff;
+  --terminal-purple: #ff00ff;
+  
+  /* 旧变量名保持兼容 */
   --bg-color: #0a0a0a;
   --text-primary: #00ff00;
   --text-secondary: #00cc00;
