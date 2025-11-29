@@ -98,7 +98,7 @@ func (r *CharacterRepository) GetByUserID(userID int) ([]*models.Character, erro
 	}
 	defer rows.Close()
 
-	var characters []*models.Character
+	characters := make([]*models.Character, 0) // 确保返回空数组而不是null
 	for rows.Next() {
 		char := &models.Character{}
 		var isActive, isDead int
@@ -144,7 +144,7 @@ func (r *CharacterRepository) GetActiveByUserID(userID int) ([]*models.Character
 	}
 	defer rows.Close()
 
-	var characters []*models.Character
+	characters := make([]*models.Character, 0) // 确保返回空数组而不是null
 	for rows.Next() {
 		char := &models.Character{}
 		var isActive, isDead int

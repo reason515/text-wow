@@ -100,20 +100,20 @@ type Team struct {
 
 // Race 种族配置
 type Race struct {
-	ID                string  `json:"id"`
-	Name              string  `json:"name"`
-	Faction           string  `json:"faction"`
-	Description       string  `json:"description"`
-	BaseStrengthBonus int     `json:"baseStrengthBonus"`
-	BaseAgilityBonus  int     `json:"baseAgilityBonus"`
-	BaseIntellectBonus int    `json:"baseIntellectBonus"`
-	BaseStaminaBonus  int     `json:"baseStaminaBonus"`
-	BaseSpiritBonus   int     `json:"baseSpiritBonus"`
-	StrengthPctBonus  float64 `json:"strengthPctBonus"`
-	AgilityPctBonus   float64 `json:"agilityPctBonus"`
-	IntellectPctBonus float64 `json:"intellectPctBonus"`
-	StaminaPctBonus   float64 `json:"staminaPctBonus"`
-	SpiritPctBonus    float64 `json:"spiritPctBonus"`
+	ID            string  `json:"id"`
+	Name          string  `json:"name"`
+	Faction       string  `json:"faction"`
+	Description   string  `json:"description"`
+	StrengthBase  int     `json:"strengthBase"`
+	AgilityBase   int     `json:"agilityBase"`
+	IntellectBase int     `json:"intellectBase"`
+	StaminaBase   int     `json:"staminaBase"`
+	SpiritBase    int     `json:"spiritBase"`
+	StrengthPct   float64 `json:"strengthPct"`
+	AgilityPct    float64 `json:"agilityPct"`
+	IntellectPct  float64 `json:"intellectPct"`
+	StaminaPct    float64 `json:"staminaPct"`
+	SpiritPct     float64 `json:"spiritPct"`
 }
 
 // Class 职业配置

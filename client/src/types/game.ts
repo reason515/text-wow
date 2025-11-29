@@ -92,11 +92,16 @@ export interface Race {
   name: string
   faction: string
   description: string
-  baseStrengthBonus: number
-  baseAgilityBonus: number
-  baseIntellectBonus: number
-  baseStaminaBonus: number
-  baseSpiritBonus: number
+  strengthBase: number
+  agilityBase: number
+  intellectBase: number
+  staminaBase: number
+  spiritBase: number
+  strengthPct: number
+  agilityPct: number
+  intellectPct: number
+  staminaPct: number
+  spiritPct: number
 }
 
 export interface Class {
@@ -176,4 +181,74 @@ export interface APIResponse<T = any> {
   message?: string
   data?: T
   error?: string
+}
+
+// ═══════════════════════════════════════════════════════════
+// 职业颜色映射 (魔兽世界经典配色)
+// ═══════════════════════════════════════════════════════════
+
+export const CLASS_COLORS: Record<string, string> = {
+  warrior: '#C79C6E',   // 战士 - 棕褐色
+  paladin: '#F58CBA',   // 圣骑士 - 粉色
+  hunter: '#ABD473',    // 猎人 - 草绿色
+  rogue: '#FFF569',     // 盗贼 - 黄色
+  priest: '#FFFFFF',    // 牧师 - 白色
+  mage: '#69CCF0',      // 法师 - 天蓝色
+  warlock: '#9482C9',   // 术士 - 紫色
+  druid: '#FF7D0A',     // 德鲁伊 - 橙色
+  shaman: '#0070DE',    // 萨满 - 蓝色
+}
+
+export const CLASS_NAMES: Record<string, string> = {
+  warrior: '战士',
+  paladin: '圣骑士',
+  hunter: '猎人',
+  rogue: '盗贼',
+  priest: '牧师',
+  mage: '法师',
+  warlock: '术士',
+  druid: '德鲁伊',
+  shaman: '萨满',
+}
+
+// 获取职业CSS类名
+export function getClassColorClass(classId: string): string {
+  return `class-${classId}`
+}
+
+// 获取职业颜色值
+export function getClassColor(classId: string): string {
+  return CLASS_COLORS[classId] || '#33ff33'
+}
+
+// ═══════════════════════════════════════════════════════════
+// 物品品质颜色
+// ═══════════════════════════════════════════════════════════
+
+export const QUALITY_COLORS: Record<string, string> = {
+  common: '#9d9d9d',    // 普通 - 灰色
+  uncommon: '#1eff00',  // 优秀 - 绿色
+  rare: '#0070dd',      // 稀有 - 蓝色
+  epic: '#a335ee',      // 史诗 - 紫色
+  legendary: '#ff8000', // 传说 - 橙色
+  mythic: '#e6cc80',    // 神话 - 金色
+}
+
+export const QUALITY_NAMES: Record<string, string> = {
+  common: '普通',
+  uncommon: '优秀',
+  rare: '稀有',
+  epic: '史诗',
+  legendary: '传说',
+  mythic: '神话',
+}
+
+// 获取品质CSS类名
+export function getQualityColorClass(quality: string): string {
+  return `quality-${quality}`
+}
+
+// 获取品质颜色值
+export function getQualityColor(quality: string): string {
+  return QUALITY_COLORS[quality] || '#9d9d9d'
 }

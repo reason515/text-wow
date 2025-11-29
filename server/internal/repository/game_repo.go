@@ -17,8 +17,8 @@ func NewGameRepository() *GameRepository {
 func (r *GameRepository) GetRaces() ([]models.Race, error) {
 	rows, err := database.DB.Query(`
 		SELECT id, name, faction, description,
-		       base_strength_bonus, base_agility_bonus, base_intellect_bonus, base_stamina_bonus, base_spirit_bonus,
-		       strength_pct_bonus, agility_pct_bonus, intellect_pct_bonus, stamina_pct_bonus, spirit_pct_bonus
+		       strength_base, agility_base, intellect_base, stamina_base, spirit_base,
+		       strength_pct, agility_pct, intellect_pct, stamina_pct, spirit_pct
 		FROM races ORDER BY faction, id`)
 	if err != nil {
 		return nil, err
@@ -30,8 +30,8 @@ func (r *GameRepository) GetRaces() ([]models.Race, error) {
 		race := models.Race{}
 		err := rows.Scan(
 			&race.ID, &race.Name, &race.Faction, &race.Description,
-			&race.BaseStrengthBonus, &race.BaseAgilityBonus, &race.BaseIntellectBonus, &race.BaseStaminaBonus, &race.BaseSpiritBonus,
-			&race.StrengthPctBonus, &race.AgilityPctBonus, &race.IntellectPctBonus, &race.StaminaPctBonus, &race.SpiritPctBonus,
+			&race.StrengthBase, &race.AgilityBase, &race.IntellectBase, &race.StaminaBase, &race.SpiritBase,
+			&race.StrengthPct, &race.AgilityPct, &race.IntellectPct, &race.StaminaPct, &race.SpiritPct,
 		)
 		if err != nil {
 			return nil, err
@@ -47,13 +47,13 @@ func (r *GameRepository) GetRaceByID(id string) (*models.Race, error) {
 	race := &models.Race{}
 	err := database.DB.QueryRow(`
 		SELECT id, name, faction, description,
-		       base_strength_bonus, base_agility_bonus, base_intellect_bonus, base_stamina_bonus, base_spirit_bonus,
-		       strength_pct_bonus, agility_pct_bonus, intellect_pct_bonus, stamina_pct_bonus, spirit_pct_bonus
+		       strength_base, agility_base, intellect_base, stamina_base, spirit_base,
+		       strength_pct, agility_pct, intellect_pct, stamina_pct, spirit_pct
 		FROM races WHERE id = ?`, id,
 	).Scan(
 		&race.ID, &race.Name, &race.Faction, &race.Description,
-		&race.BaseStrengthBonus, &race.BaseAgilityBonus, &race.BaseIntellectBonus, &race.BaseStaminaBonus, &race.BaseSpiritBonus,
-		&race.StrengthPctBonus, &race.AgilityPctBonus, &race.IntellectPctBonus, &race.StaminaPctBonus, &race.SpiritPctBonus,
+		&race.StrengthBase, &race.AgilityBase, &race.IntellectBase, &race.StaminaBase, &race.SpiritBase,
+		&race.StrengthPct, &race.AgilityPct, &race.IntellectPct, &race.StaminaPct, &race.SpiritPct,
 	)
 	if err != nil {
 		return nil, err

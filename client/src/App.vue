@@ -109,8 +109,7 @@ function backToGame() {
 </template>
 
 <style>
-/* 导入终端样式 */
-@import '@/styles/terminal.css';
+/* 终端样式已在 main.ts 中全局导入 */
 
 .app {
   min-height: 100vh;

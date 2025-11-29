@@ -18,10 +18,18 @@ func NewUserRepository() *UserRepository {
 
 // Create 创建用户
 func (r *UserRepository) Create(username, passwordHash, email string) (*models.User, error) {
+	// 处理空邮箱 - 存为NULL而不是空字符串
+	var emailArg interface{}
+	if email == "" {
+		emailArg = nil
+	} else {
+		emailArg = email
+	}
+
 	result, err := database.DB.Exec(`
 		INSERT INTO users (username, password_hash, email, created_at) 
 		VALUES (?, ?, ?, ?)`,
-		username, passwordHash, email, time.Now(),
+		username, passwordHash, emailArg, time.Now(),
 	)
 	if err != nil {
 		return nil, err

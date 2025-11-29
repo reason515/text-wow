@@ -5,9 +5,29 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Text WoW - 放置类文字RPG</title>
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Silkscreen&family=VT323&display=swap" rel="stylesheet">
+    <style>
+      /* Zpix 中文像素字体 */
+      @font-face {
+        font-family: 'Zpix';
+        src: url('/fonts/zpix.ttf') format('truetype');
+        font-weight: normal;
+        font-style: normal;
+        font-display: swap;
+      }
+      /* 基础样式 - 超亮绿色 */
+      body {
+        background-color: #0a0a0a;
+        color: #55ff55;
+        font-family: 'Zpix', 'Press Start 2P', monospace;
+        font-size: 16px;
+        -webkit-font-smoothing: none;
+        text-shadow: 0 0 12px rgba(85, 255, 85, 0.7);
+      }
+    </style>
   </head>
   <body>
     <div id="app"></div>

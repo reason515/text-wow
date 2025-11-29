@@ -48,9 +48,10 @@ async function request<T>(
     return data
   } catch (error) {
     console.error('API Error:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     return {
       success: false,
-      error: 'Network error',
+      error: `网络错误: ${errorMessage}`,
     }
   }
 }

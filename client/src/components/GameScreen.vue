@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useCharacterStore } from '@/stores/character'
 import ChatPanel from '@/components/ChatPanel.vue'
+import { CLASS_COLORS, CLASS_NAMES } from '@/types/game'
 
 const emit = defineEmits<{
   logout: []
@@ -61,6 +62,18 @@ const factionColor = computed(() => {
   return selectedCharacter.value.faction === 'alliance' ? '#4a90d9' : '#c41e3a'
 })
 
+// 职业颜色
+const classColor = computed(() => {
+  if (!selectedCharacter.value) return '#33ff33'
+  return CLASS_COLORS[selectedCharacter.value.classId] || '#33ff33'
+})
+
+// 职业名称
+const className = computed(() => {
+  if (!selectedCharacter.value) return ''
+  return CLASS_NAMES[selectedCharacter.value.classId] || selectedCharacter.value.classId
+})
+
 // 加载数据
 onMounted(async () => {
   await charStore.fetchCharacters()
@@ -103,8 +116,8 @@ function createNewCharacter() {
           <h2 class="character-name">{{ selectedCharacter.name }}</h2>
         </div>
         
-        <div class="character-class">
-          Lv.{{ selectedCharacter.level }} {{ selectedCharacter.classId }}
+        <div class="character-class" :style="{ color: classColor, textShadow: `0 0 8px ${classColor}` }">
+          Lv.{{ selectedCharacter.level }} {{ className }}
         </div>
 
         <!-- 状态条 -->
@@ -238,8 +251,10 @@ function createNewCharacter() {
             selected: char.id === selectedCharacter?.id,
             dead: char.isDead 
           }"
+          :style="{ '--member-class-color': CLASS_COLORS[char.classId] || '#33ff33' }"
         >
-          <span class="member-name">{{ char.name }}</span>
+          <span class="member-name" :style="{ color: CLASS_COLORS[char.classId] }">{{ char.name }}</span>
+          <span class="member-class">{{ CLASS_NAMES[char.classId] || char.classId }}</span>
           <span class="member-level">Lv.{{ char.level }}</span>
           <div class="member-hp">
             <div class="hp-fill" :style="{ width: (char.hp / char.maxHp * 100) + '%' }"></div>
@@ -316,7 +331,7 @@ function createNewCharacter() {
 .main-content {
   flex: 1;
   display: grid;
-  grid-template-columns: 300px 1fr;
+  grid-template-columns: 320px 1fr;
   gap: 15px;
   min-height: 0;
 }
@@ -383,15 +398,18 @@ function createNewCharacter() {
 .bar-header {
   display: flex;
   justify-content: space-between;
-  font-size: 11px;
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 .bar-label {
   color: var(--terminal-gray);
+  white-space: nowrap;
 }
 
 .bar-value {
   color: var(--terminal-green);
+  white-space: nowrap;
 }
 
 .bar-track {
@@ -417,27 +435,30 @@ function createNewCharacter() {
 .attributes {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 5px;
-  padding: 0 15px 15px;
+  gap: 3px;
+  padding: 0 10px 15px;
   border-bottom: 1px solid var(--terminal-gray);
 }
 
 .attr {
   text-align: center;
-  padding: 8px 0;
+  padding: 6px 2px;
   background: rgba(0, 0, 0, 0.3);
+  white-space: nowrap;
 }
 
 .attr-label {
   display: block;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--terminal-gray);
   margin-bottom: 3px;
+  white-space: nowrap;
 }
 
 .attr-value {
   font-size: 14px;
   font-weight: bold;
+  white-space: nowrap;
 }
 
 .attr-value.str { color: #ff6b6b; }
@@ -451,15 +472,16 @@ function createNewCharacter() {
   padding: 15px;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: 6px;
 }
 
 .combat-stat {
   display: flex;
   justify-content: space-between;
-  font-size: 11px;
+  font-size: 12px;
   padding: 5px 8px;
   background: rgba(0, 0, 0, 0.3);
+  white-space: nowrap;
 }
 
 .combat-stat span:first-child {
@@ -574,8 +596,13 @@ function createNewCharacter() {
 }
 
 .member-name {
-  color: var(--terminal-green);
   font-size: 12px;
+  text-shadow: 0 0 5px currentColor;
+}
+
+.member-class {
+  color: var(--terminal-gray);
+  font-size: 10px;
 }
 
 .member-level {

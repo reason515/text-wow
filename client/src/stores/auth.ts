@@ -33,11 +33,12 @@ export const useAuthStore = defineStore('auth', () => {
         user.value = response.data.user
         return true
       } else {
-        error.value = response.error || 'Registration failed'
+        error.value = response.error || '注册失败'
         return false
       }
     } catch (e) {
-      error.value = 'Network error'
+      const errorMsg = e instanceof Error ? e.message : '未知错误'
+      error.value = `请求异常: ${errorMsg}`
       return false
     } finally {
       loading.value = false
@@ -57,11 +58,12 @@ export const useAuthStore = defineStore('auth', () => {
         user.value = response.data.user
         return true
       } else {
-        error.value = response.error || 'Login failed'
+        error.value = response.error || '登录失败'
         return false
       }
     } catch (e) {
-      error.value = 'Network error'
+      const errorMsg = e instanceof Error ? e.message : '未知错误'
+      error.value = `请求异常: ${errorMsg}`
       return false
     } finally {
       loading.value = false

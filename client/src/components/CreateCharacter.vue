@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useCharacterStore } from '@/stores/character'
 import { useAuthStore } from '@/stores/auth'
 import type { Race, Class } from '@/types/game'
+import { CLASS_COLORS, getClassColorClass } from '@/types/game'
 
 const emit = defineEmits<{
   created: []
@@ -174,11 +175,11 @@ onMounted(async () => {
           <div class="race-name">{{ race.name }}</div>
           <div class="race-desc">{{ race.description }}</div>
           <div class="race-bonuses">
-            <span v-if="race.baseStrengthBonus" class="bonus str">+{{ race.baseStrengthBonus }} 力量</span>
-            <span v-if="race.baseAgilityBonus" class="bonus agi">+{{ race.baseAgilityBonus }} 敏捷</span>
-            <span v-if="race.baseIntellectBonus" class="bonus int">+{{ race.baseIntellectBonus }} 智力</span>
-            <span v-if="race.baseStaminaBonus" class="bonus sta">+{{ race.baseStaminaBonus }} 耐力</span>
-            <span v-if="race.baseSpiritBonus" class="bonus spi">+{{ race.baseSpiritBonus }} 精神</span>
+            <span v-if="race.strengthBase" class="bonus str">+{{ race.strengthBase }} 力量</span>
+            <span v-if="race.agilityBase" class="bonus agi">+{{ race.agilityBase }} 敏捷</span>
+            <span v-if="race.intellectBase" class="bonus int">+{{ race.intellectBase }} 智力</span>
+            <span v-if="race.staminaBase" class="bonus sta">+{{ race.staminaBase }} 耐力</span>
+            <span v-if="race.spiritBase" class="bonus spi">+{{ race.spiritBase }} 精神</span>
           </div>
         </div>
       </div>
@@ -194,12 +195,13 @@ onMounted(async () => {
           v-for="cls in charStore.classes" 
           :key="cls.id"
           class="class-card"
-          :class="{ selected: selectedClass?.id === cls.id }"
+          :class="[{ selected: selectedClass?.id === cls.id }, getClassColorClass(cls.id)]"
+          :style="{ '--class-color': CLASS_COLORS[cls.id] || '#33ff33' }"
           @click="selectClass(cls)"
         >
           <div class="class-header">
             <span class="class-role">{{ roleIcons[cls.combatRole] || '⚔️' }}</span>
-            <span class="class-name">{{ cls.name }}</span>
+            <span class="class-name" :style="{ color: CLASS_COLORS[cls.id] }">{{ cls.name }}</span>
             <span class="class-resource">{{ resourceIcons[cls.resourceType] || '💙' }}</span>
           </div>
           <div class="class-desc">{{ cls.description }}</div>
@@ -220,7 +222,11 @@ onMounted(async () => {
           {{ selectedFaction === 'alliance' ? '联盟' : '部落' }}
         </div>
         <div class="preview-info">
-          {{ selectedRace?.name }} · {{ selectedClass?.name }}
+          <span>{{ selectedRace?.name }}</span>
+          <span class="preview-sep">·</span>
+          <span :style="{ color: CLASS_COLORS[selectedClass?.id || ''], textShadow: `0 0 8px ${CLASS_COLORS[selectedClass?.id || '']}` }">
+            {{ selectedClass?.name }}
+          </span>
         </div>
       </div>
 
@@ -372,18 +378,28 @@ h2 {
 }
 
 .race-card:hover,
-.class-card:hover,
-.race-card.selected,
-.class-card.selected {
+.race-card.selected {
   border-color: var(--terminal-green);
   background: rgba(0, 255, 0, 0.05);
 }
 
-.race-name,
-.class-name {
+.class-card:hover,
+.class-card.selected {
+  border-color: var(--class-color, var(--terminal-green));
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 0 15px color-mix(in srgb, var(--class-color, #33ff33) 30%, transparent);
+}
+
+.race-name {
   color: var(--terminal-green);
   font-size: 16px;
   margin-bottom: 8px;
+}
+
+.class-name {
+  font-size: 16px;
+  margin-bottom: 8px;
+  text-shadow: 0 0 8px currentColor;
 }
 
 .race-desc,
@@ -462,6 +478,11 @@ h2 {
 .preview-info {
   color: var(--terminal-green);
   font-size: 18px;
+}
+
+.preview-sep {
+  color: var(--terminal-gray);
+  margin: 0 8px;
 }
 
 .name-form {

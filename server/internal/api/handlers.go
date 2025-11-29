@@ -120,9 +120,11 @@ func (h *Handler) Register(c *gin.Context) {
 	// 创建用户
 	user, err := h.userRepo.Create(req.Username, passwordHash, req.Email)
 	if err != nil {
+		// 输出错误日志以便调试
+		println("Error creating user:", err.Error())
 		c.JSON(http.StatusInternalServerError, models.APIResponse{
 			Success: false,
-			Error:   "failed to create user",
+			Error:   "failed to create user: " + err.Error(),
 		})
 		return
 	}
@@ -345,11 +347,11 @@ func (h *Handler) CreateCharacter(c *gin.Context) {
 	}
 
 	// 计算基础属性 = 职业基础 + 种族加成
-	char.Strength = class.BaseStrength + race.BaseStrengthBonus
-	char.Agility = class.BaseAgility + race.BaseAgilityBonus
-	char.Intellect = class.BaseIntellect + race.BaseIntellectBonus
-	char.Stamina = class.BaseStamina + race.BaseStaminaBonus
-	char.Spirit = class.BaseSpirit + race.BaseSpiritBonus
+	char.Strength = class.BaseStrength + race.StrengthBase
+	char.Agility = class.BaseAgility + race.AgilityBase
+	char.Intellect = class.BaseIntellect + race.IntellectBase
+	char.Stamina = class.BaseStamina + race.StaminaBase
+	char.Spirit = class.BaseSpirit + race.SpiritBase
 
 	// 计算HP和资源
 	char.MaxHP = class.BaseHP + char.Stamina*2
