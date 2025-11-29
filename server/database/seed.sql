@@ -107,43 +107,53 @@ INSERT OR REPLACE INTO races (id, name, faction, description,
 INSERT OR REPLACE INTO classes (id, name, description, role, primary_stat, 
     resource_type, base_hp, base_resource, hp_per_level, resource_per_level, 
     resource_regen, resource_regen_pct,
-    base_strength, base_agility, base_intellect, base_stamina, base_spirit) VALUES
--- 战士: 怒气系统 (初始0，通过攻击/受击获得)
+    base_strength, base_agility, base_intellect, base_stamina, base_spirit,
+    base_threat_modifier, combat_role, is_ranged) VALUES
+-- 战士: 怒气系统 (初始0，通过攻击/受击获得) - 主力坦克
 ('warrior', '战士', '近战格斗专家，可以承受大量伤害。', 'tank', 'strength',
     'rage', 35, 0, 3, 0, 0, 0,  -- HP35起步，每级+3
-    12, 8, 5, 10, 6),
--- 盗贼: 能量系统 (固定100上限，快速恢复)
+    12, 8, 5, 10, 6,
+    1.3, 'tank', 0),  -- 高仇恨，坦克，近战
+-- 盗贼: 能量系统 (固定100上限，快速恢复) - 近战DPS低仇恨
 ('rogue', '盗贼', '潜行刺客，擅长连击和爆发伤害。', 'dps', 'agility',
     'energy', 25, 100, 2, 0, 20, 0,  -- HP25起步，每级+2
-    8, 12, 5, 7, 6),
--- 法师: 法力系统 (高法力，基于精神恢复)
+    8, 12, 5, 7, 6,
+    0.7, 'dps', 0),  -- 低仇恨，DPS，近战
+-- 法师: 法力系统 (高法力，基于精神恢复) - 远程DPS
 ('mage', '法师', '强大的奥术施法者，擅长范围伤害。', 'dps', 'intellect',
     'mana', 20, 40, 2, 2, 0, 0.5,  -- HP20起步，MP40起步
-    4, 5, 14, 5, 10),
--- 牧师: 法力系统 (高法力，高精神恢复)
+    4, 5, 14, 5, 10,
+    0.8, 'dps', 1),  -- 中低仇恨，DPS，远程
+-- 牧师: 法力系统 (高法力，高精神恢复) - 主力治疗
 ('priest', '牧师', '治疗者和暗影施法者。', 'healer', 'intellect',
     'mana', 22, 35, 2, 2, 0, 0.8,  -- HP22起步
-    4, 5, 12, 6, 14),
--- 术士: 法力系统
+    4, 5, 12, 6, 14,
+    0.6, 'healer', 1),  -- 最低仇恨，治疗，远程
+-- 术士: 法力系统 - 远程DPS（宠物分担仇恨）
 ('warlock', '术士', '黑暗魔法师，召唤恶魔作战。', 'dps', 'intellect',
     'mana', 24, 38, 2, 2, 0, 0.5,
-    5, 5, 13, 6, 9),
--- 德鲁伊: 法力系统
-('druid', '德鲁伊', '自然的守护者，可变形为多种形态。', 'dps', 'intellect',
+    5, 5, 13, 6, 9,
+    0.8, 'dps', 1),  -- 中低仇恨，DPS，远程
+-- 德鲁伊: 法力系统 - 混合职业（熊形态为坦克）
+('druid', '德鲁伊', '自然的守护者，可变形为多种形态。', 'hybrid', 'intellect',
     'mana', 28, 30, 2, 1, 0, 0.6,
-    8, 8, 10, 8, 10),
--- 萨满: 法力系统
-('shaman', '萨满', '元素的操控者，可治疗和增益。', 'dps', 'intellect',
+    8, 8, 10, 8, 10,
+    1.0, 'hybrid', 0),  -- 默认中仇恨，熊形态×1.2，近战
+-- 萨满: 法力系统 - 混合职业
+('shaman', '萨满', '元素的操控者，可治疗和增益。', 'hybrid', 'intellect',
     'mana', 28, 32, 2, 1, 0, 0.6,
-    9, 7, 11, 8, 10),
--- 圣骑士: 法力系统 (较低法力)
+    9, 7, 11, 8, 10,
+    0.9, 'hybrid', 1),  -- 中仇恨，混合，远程
+-- 圣骑士: 法力系统 (较低法力) - 副坦/治疗
 ('paladin', '圣骑士', '神圣战士，可以治疗和保护盟友。', 'tank', 'strength',
     'mana', 32, 20, 3, 1, 0, 0.4,
-    10, 6, 8, 10, 10),
--- 猎人: 法力系统 (较低法力)
+    10, 6, 8, 10, 10,
+    1.2, 'tank', 0),  -- 高仇恨，坦克，近战
+-- 猎人: 法力系统 (较低法力) - 远程DPS（宠物分担仇恨）
 ('hunter', '猎人', '远程物理攻击者，与宠物并肩作战。', 'dps', 'agility',
     'mana', 26, 18, 2, 1, 0, 0.3,
-    6, 12, 6, 8, 8);
+    6, 12, 6, 8, 8,
+    0.8, 'dps', 1);  -- 中低仇恨，DPS，远程
 
 -- ═══════════════════════════════════════════════════════════
 -- 效果配置 (Buff/Debuff) - 每场战斗开始时清空
@@ -220,7 +230,23 @@ INSERT OR REPLACE INTO effects (id, name, description, type, is_buff, is_stackab
 ('eff_agony', '痛苦诅咒', '每回合1-4点递增伤害', 'dot', 0, 0, 1, 5, 'flat', 2, NULL, 'shadow', 1),
 ('eff_immolate', '献祭', '每回合3点火焰伤害', 'dot', 0, 0, 1, 5, 'flat', 3, NULL, 'fire', 1),
 ('eff_moonfire', '月火术', '每回合2点自然伤害', 'dot', 0, 0, 1, 4, 'flat', 2, NULL, 'nature', 1),
-('eff_flame_shock', '烈焰震击', '每回合2点火焰伤害', 'dot', 0, 0, 1, 4, 'flat', 2, NULL, 'fire', 1);
+('eff_flame_shock', '烈焰震击', '每回合2点火焰伤害', 'dot', 0, 0, 1, 4, 'flat', 2, NULL, 'fire', 1),
+
+-- ═══════════════════════════════════════════════════════════
+-- 仇恨管理相关效果
+-- ═══════════════════════════════════════════════════════════
+-- 仇恨降低效果
+('eff_threat_reduce', '仇恨降低', '仇恨值降低50%', 'threat_mod', 1, 0, 1, 1, 'percent', -50, 'threat', NULL, 0),
+('eff_fade', '渐隐', '仇恨生成降低50%', 'stat_mod', 1, 0, 1, 3, 'percent', -50, 'threat_gen', NULL, 0),
+('eff_misdirection', '误导', '将仇恨转移给坦克', 'threat_transfer', 1, 0, 1, 3, NULL, NULL, NULL, NULL, 0),
+('eff_soulshatter', '灵魂碎裂', '仇恨值降低50%', 'threat_mod', 1, 0, 1, 1, 'percent', -50, 'threat', NULL, 0),
+-- 仇恨清除效果
+('eff_vanish', '消失', '清除所有仇恨并进入潜行', 'stealth', 1, 0, 1, 1, NULL, NULL, NULL, NULL, 0),
+('eff_invisibility', '隐形', '逐渐隐形并清除仇恨', 'stealth', 1, 0, 1, 2, NULL, NULL, NULL, NULL, 0),
+('eff_ice_block', '寒冰屏障', '免疫伤害并暂停仇恨', 'invulnerable', 1, 0, 1, 2, NULL, NULL, NULL, NULL, 0),
+-- 仇恨增加效果 (坦克)
+('eff_demo_shout', '挫志', '攻击力降低10%', 'stat_mod', 0, 0, 1, 5, 'percent', -10, 'attack', NULL, 1),
+('eff_holy_shield', '神圣之盾', '格挡时造成神圣伤害并产生仇恨', 'stat_mod', 1, 0, 1, 4, 'percent', 30, 'block_rate', 'holy', 0);
 
 -- ═══════════════════════════════════════════════════════════
 -- 技能数据 (扩展版)
@@ -359,6 +385,44 @@ INSERT OR REPLACE INTO skills (id, name, description, class_id, type, target_typ
 -- ═══════════════════════════════════════════════════════════
 INSERT OR REPLACE INTO skills (id, name, description, class_id, type, target_type, damage_type, base_value, scaling_stat, scaling_ratio, resource_cost, cooldown, level_required, effect_id, effect_chance) VALUES
 ('basic_attack', '普通攻击', '基础物理攻击。', NULL, 'attack', 'enemy', 'physical', 0, 'strength', 0.5, 0, 0, 1, NULL, 1.0);
+
+-- ═══════════════════════════════════════════════════════════
+-- 仇恨管理技能 (嘲讽/仇恨清除)
+-- ═══════════════════════════════════════════════════════════
+INSERT OR REPLACE INTO skills (id, name, description, class_id, type, target_type, damage_type, base_value, scaling_stat, scaling_ratio, resource_cost, cooldown, level_required, effect_id, effect_chance, threat_modifier, threat_type) VALUES
+-- 战士仇恨技能
+('taunt', '嘲讽', '强制敌人攻击自己，并获得额外仇恨。', 'warrior', 'taunt', 'enemy', NULL, 0, NULL, 0, 5, 4, 3, 'eff_taunt', 1.0, 0, 'taunt'),
+('challenging_shout', '挑战怒吼', '嘲讽所有敌人。', 'warrior', 'taunt', 'enemy_all', NULL, 0, NULL, 0, 25, 8, 10, 'eff_taunt', 1.0, 0, 'taunt'),
+('shield_slam', '盾牌猛击', '用盾牌猛击敌人，造成高仇恨。', 'warrior', 'attack', 'enemy', 'physical', 10, 'strength', 0.4, 15, 0, 6, NULL, 1.0, 2.0, 'high'),
+('revenge', '复仇', '格挡后反击并产生额外仇恨。', 'warrior', 'attack', 'enemy', 'physical', 8, 'strength', 0.3, 5, 0, 4, NULL, 1.0, 1.5, 'high'),
+('demoralizing_shout', '挫志怒吼', '降低所有敌人攻击力10%，产生仇恨。', 'warrior', 'debuff', 'enemy_all', NULL, 0, NULL, 0, 10, 3, 5, 'eff_demo_shout', 1.0, 1.5, 'high'),
+
+-- 圣骑士仇恨技能
+('righteous_defense', '正义防御', '嘲讽攻击队友的敌人。', 'paladin', 'taunt', 'enemy', NULL, 0, NULL, 0, 4, 4, 4, 'eff_taunt', 1.0, 0, 'taunt'),
+('holy_shield', '神圣之盾', '格挡时造成神圣伤害并产生仇恨。', 'paladin', 'buff', 'self', NULL, 0, NULL, 0, 5, 4, 8, 'eff_holy_shield', 1.0, 1.5, 'high'),
+('avengers_shield', '复仇者之盾', '投掷盾牌造成伤害并产生高仇恨。', 'paladin', 'attack', 'enemy', 'holy', 12, 'strength', 0.5, 6, 3, 10, NULL, 1.0, 2.0, 'high'),
+
+-- 德鲁伊(熊形态)仇恨技能
+('growl', '低吼', '嘲讽单个敌人。', 'druid', 'taunt', 'enemy', NULL, 0, NULL, 0, 5, 4, 6, 'eff_taunt', 1.0, 0, 'taunt'),
+('swipe', '挥击', '对所有敌人造成伤害并产生仇恨。', 'druid', 'attack', 'enemy_all', 'physical', 5, 'strength', 0.25, 6, 0, 8, NULL, 1.0, 1.5, 'high'),
+('maul', '槌击', '强力攻击产生高仇恨。', 'druid', 'attack', 'enemy', 'physical', 10, 'strength', 0.5, 8, 0, 6, NULL, 1.0, 1.8, 'high'),
+
+-- 盗贼仇恨清除技能
+('feint', '佯攻', '清除50%仇恨。', 'rogue', 'threat', 'self', NULL, 0, NULL, 0, 20, 4, 8, 'eff_threat_reduce', 1.0, 0, 'reduce'),
+('vanish', '消失', '进入潜行并清除所有仇恨。', 'rogue', 'threat', 'self', NULL, 0, NULL, 0, 50, 10, 12, 'eff_vanish', 1.0, 0, 'clear'),
+
+-- 法师仇恨清除技能
+('invisibility', '隐形术', '逐渐隐形，清除所有仇恨。', 'mage', 'threat', 'self', NULL, 0, NULL, 0, 15, 10, 14, 'eff_invisibility', 1.0, 0, 'clear'),
+('ice_block', '寒冰屏障', '免疫所有伤害并暂停仇恨生成。', 'mage', 'buff', 'self', NULL, 0, NULL, 0, 15, 8, 10, 'eff_ice_block', 1.0, 0, 'reduce'),
+
+-- 牧师仇恨管理技能
+('fade', '渐隐术', '3回合内仇恨生成降低50%。', 'priest', 'threat', 'self', NULL, 0, NULL, 0, 5, 6, 6, 'eff_fade', 1.0, 0, 'reduce'),
+
+-- 猎人仇恨管理技能
+('misdirection', '误导', '将仇恨转移给坦克，持续3回合。', 'hunter', 'threat', 'ally_tank', NULL, 0, NULL, 0, 5, 6, 10, 'eff_misdirection', 1.0, 0, 'reduce'),
+
+-- 术士仇恨管理技能
+('soulshatter', '灵魂碎裂', '清除50%仇恨。', 'warlock', 'threat', 'self', NULL, 0, NULL, 0, 6, 8, 10, 'eff_soulshatter', 1.0, 0, 'reduce');
 
 -- ═══════════════════════════════════════════════════════════
 -- 被动技能数据 (每3级技能选择时可能出现)
@@ -877,4 +941,49 @@ INSERT OR REPLACE INTO drop_config (id, monster_type, base_drop_rate, quality_we
 -- 11-30级区: 0.3%
 -- 31-50级区: 0.1%
 -- 51-60级区: 0%
+
+-- ═══════════════════════════════════════════════════════════
+-- 装备词缀数据
+-- ═══════════════════════════════════════════════════════════
+
+-- 前缀 (攻击/属性向)
+INSERT OR REPLACE INTO affixes (id, name, type, slot_type, rarity, effect_type, effect_stat, min_value, max_value, value_type, description, level_required) VALUES
+-- 基础攻击前缀
+('affix_sharp', '锋利的', 'prefix', 'weapon', 'common', 'stat_mod', 'attack', 2, 5, 'flat', '攻击力 +{value}', 1),
+('affix_fiery', '炽热的', 'prefix', 'weapon', 'common', 'damage_mod', 'fire_damage', 1, 4, 'flat', '火焰伤害 +{value}', 1),
+('affix_frozen', '冰霜的', 'prefix', 'weapon', 'common', 'damage_mod', 'frost_damage', 1, 4, 'flat', '冰霜伤害 +{value}', 1),
+('affix_charged', '雷击的', 'prefix', 'weapon', 'common', 'damage_mod', 'lightning_damage', 1, 4, 'flat', '雷电伤害 +{value}', 1),
+('affix_holy', '神圣的', 'prefix', 'weapon', 'uncommon', 'damage_mod', 'holy_damage', 2, 5, 'flat', '神圣伤害 +{value}', 10),
+('affix_vampiric', '吸血鬼的', 'prefix', 'weapon', 'rare', 'stat_mod', 'lifesteal', 2, 5, 'percent', '生命偷取 +{value}%', 20),
+('affix_devastating', '毁灭的', 'prefix', 'weapon', 'epic', 'stat_mod', 'attack', 15, 25, 'percent', '攻击力 +{value}%', 30),
+-- 防御前缀
+('affix_sturdy', '坚固的', 'prefix', 'armor', 'common', 'stat_mod', 'defense', 2, 5, 'flat', '防御力 +{value}', 1),
+('affix_vital', '活力的', 'prefix', 'armor', 'common', 'stat_mod', 'max_hp', 5, 15, 'flat', '生命值 +{value}', 1),
+('affix_scholarly', '智者的', 'prefix', 'armor', 'uncommon', 'stat_mod', 'intellect', 2, 4, 'flat', '智力 +{value}', 10),
+('affix_unyielding', '不屈的', 'prefix', 'armor', 'rare', 'stat_mod', 'damage_reduction', 3, 8, 'percent', '受伤减免 +{value}%', 20),
+-- 仇恨相关前缀 (坦克)
+('affix_guardian', '守护者的', 'prefix', 'weapon', 'rare', 'stat_mod', 'threat_gen', 20, 25, 'percent', '仇恨生成 +{value}%, 嘲讽CD -1', 15),
+('affix_imposing', '威压的', 'prefix', 'armor', 'uncommon', 'stat_mod', 'threat_gen', 10, 15, 'percent', '仇恨生成 +{value}%', 10),
+-- 仇恨相关前缀 (DPS)
+('affix_stealthy', '隐秘的', 'prefix', 'weapon', 'uncommon', 'stat_mod', 'threat_gen', -15, -20, 'percent', '仇恨生成 {value}%', 10),
+('affix_shadow', '暗影的', 'prefix', 'armor', 'rare', 'stat_mod', 'crit_threat', -25, -30, 'percent', '暴击仇恨 {value}%', 20);
+
+-- 后缀 (特殊效果向)
+INSERT OR REPLACE INTO affixes (id, name, type, slot_type, rarity, effect_type, effect_stat, min_value, max_value, value_type, description, level_required) VALUES
+('affix_of_power', 'of 力量', 'suffix', 'all', 'common', 'stat_mod', 'strength', 1, 3, 'flat', '力量 +{value}', 1),
+('affix_of_agility', 'of 敏捷', 'suffix', 'all', 'common', 'stat_mod', 'agility', 1, 3, 'flat', '敏捷 +{value}', 1),
+('affix_of_intellect', 'of 智力', 'suffix', 'all', 'common', 'stat_mod', 'intellect', 1, 3, 'flat', '智力 +{value}', 1),
+('affix_of_stamina', 'of 耐力', 'suffix', 'all', 'common', 'stat_mod', 'stamina', 1, 3, 'flat', '耐力 +{value}', 1),
+('affix_of_spirit', 'of 精神', 'suffix', 'all', 'common', 'stat_mod', 'spirit', 1, 3, 'flat', '精神 +{value}', 1),
+('affix_of_tiger', 'of 猛虎', 'suffix', 'all', 'uncommon', 'stat_mod', 'attack,agility', 3, 5, 'flat', '攻击力和敏捷 +{value}', 15),
+('affix_of_bear', 'of 巨熊', 'suffix', 'all', 'uncommon', 'stat_mod', 'stamina,defense', 3, 6, 'flat', '耐力和防御 +{value}', 15),
+('affix_of_crit', 'of 暴击', 'suffix', 'weapon', 'rare', 'stat_mod', 'crit_rate', 3, 8, 'percent', '暴击率 +{value}%', 20),
+('affix_of_haste', 'of 迅捷', 'suffix', 'weapon', 'rare', 'stat_mod', 'attack_speed', 8, 15, 'percent', '攻击速度 +{value}%', 20),
+('affix_of_slay', 'of 屠戮', 'suffix', 'weapon', 'epic', 'stat_mod', 'crit_damage', 20, 35, 'percent', '暴击伤害 +{value}%', 30),
+-- 仇恨相关后缀 (坦克)
+('affix_of_threat', 'of 威胁', 'suffix', 'armor', 'uncommon', 'stat_mod', 'threat_gen', 10, 15, 'percent', '仇恨生成 +{value}%', 10),
+('affix_of_guardian', 'of 守护', 'suffix', 'shield', 'uncommon', 'stat_mod', 'threat_gen,block', 8, 12, 'percent', '仇恨 +{value}%, 格挡 +5%', 15),
+-- 仇恨相关后缀 (DPS/治疗)
+('affix_of_stealth', 'of 隐匿', 'suffix', 'armor', 'uncommon', 'stat_mod', 'threat_gen', -10, -15, 'percent', '仇恨生成 {value}%', 10),
+('affix_of_fade', 'of 消散', 'suffix', 'armor', 'rare', 'stat_mod', 'threat_decay', 15, 20, 'percent', '仇恨衰减 +{value}%', 20);
 

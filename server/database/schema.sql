@@ -143,7 +143,11 @@ CREATE TABLE IF NOT EXISTS classes (
     base_agility INTEGER DEFAULT 10,
     base_intellect INTEGER DEFAULT 10,
     base_stamina INTEGER DEFAULT 10,
-    base_spirit INTEGER DEFAULT 10
+    base_spirit INTEGER DEFAULT 10,
+    -- 仇恨系统字段
+    base_threat_modifier REAL DEFAULT 1.0, -- 基础仇恨系数
+    combat_role VARCHAR(16) DEFAULT 'dps', -- 战斗定位: tank/healer/dps/hybrid
+    is_ranged INTEGER DEFAULT 0            -- 是否远程: 1是 0否 (影响OT阈值)
 );
 
 -- 技能配置表 (扩展版)
@@ -165,6 +169,9 @@ CREATE TABLE IF NOT EXISTS skills (
     effect_id VARCHAR(32),            -- 附加效果ID
     effect_chance REAL DEFAULT 1.0,   -- 效果触发概率
     tags TEXT,                        -- 标签(JSON数组)
+    -- 仇恨系统字段
+    threat_modifier REAL DEFAULT 1.0, -- 仇恨系数 (2.0=双倍仇恨, 0.5=半仇恨)
+    threat_type VARCHAR(16) DEFAULT 'normal', -- 仇恨类型: normal/high/taunt/reduce/clear
     FOREIGN KEY (class_id) REFERENCES classes(id),
     FOREIGN KEY (effect_id) REFERENCES effects(id)
 );
@@ -226,6 +233,59 @@ CREATE TABLE IF NOT EXISTS items (
 
 CREATE INDEX IF NOT EXISTS idx_items_type ON items(type);
 CREATE INDEX IF NOT EXISTS idx_items_quality ON items(quality);
+
+-- 装备词缀表
+CREATE TABLE IF NOT EXISTS affixes (
+    id VARCHAR(32) PRIMARY KEY,
+    name VARCHAR(32) NOT NULL,
+    type VARCHAR(16) NOT NULL,            -- prefix/suffix
+    slot_type VARCHAR(16) DEFAULT 'all',  -- weapon/armor/accessory/all
+    rarity VARCHAR(16) NOT NULL DEFAULT 'common',
+    effect_type VARCHAR(32) NOT NULL,
+    effect_stat VARCHAR(32),
+    min_value REAL NOT NULL,
+    max_value REAL NOT NULL,
+    value_type VARCHAR(16) NOT NULL,      -- flat/percent
+    description TEXT,
+    level_required INTEGER DEFAULT 1
+);
+
+CREATE INDEX IF NOT EXISTS idx_affixes_type ON affixes(type);
+CREATE INDEX IF NOT EXISTS idx_affixes_rarity ON affixes(rarity);
+CREATE INDEX IF NOT EXISTS idx_affixes_slot ON affixes(slot_type);
+
+-- 装备实例表 (玩家获得的装备)
+CREATE TABLE IF NOT EXISTS equipment_instance (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    item_id VARCHAR(32) NOT NULL,
+    owner_id INTEGER NOT NULL,
+    character_id INTEGER,                  -- NULL表示在背包中
+    slot VARCHAR(16),
+    quality VARCHAR(16) NOT NULL DEFAULT 'common',
+    enhance_level INTEGER DEFAULT 0,       -- 强化等级 0-25
+    evolution_stage INTEGER DEFAULT 1,     -- 进化阶段 1-5
+    evolution_path VARCHAR(32),            -- 进化路线
+    prefix_id VARCHAR(32),                 -- 前缀词缀ID
+    prefix_value REAL,                     -- 前缀数值
+    suffix_id VARCHAR(32),                 -- 后缀词缀ID
+    suffix_value REAL,                     -- 后缀数值
+    bonus_affix_1 VARCHAR(32),             -- 额外词缀1 (紫色+)
+    bonus_affix_1_value REAL,
+    bonus_affix_2 VARCHAR(32),             -- 额外词缀2 (橙色+)
+    bonus_affix_2_value REAL,
+    legendary_effect_id VARCHAR(32),       -- 传说效果ID
+    acquired_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    is_locked INTEGER DEFAULT 0,           -- 防误分解
+    FOREIGN KEY (item_id) REFERENCES items(id),
+    FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE SET NULL,
+    FOREIGN KEY (prefix_id) REFERENCES affixes(id),
+    FOREIGN KEY (suffix_id) REFERENCES affixes(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_equipment_owner ON equipment_instance(owner_id);
+CREATE INDEX IF NOT EXISTS idx_equipment_character ON equipment_instance(character_id);
+CREATE INDEX IF NOT EXISTS idx_equipment_quality ON equipment_instance(quality);
 
 -- 区域配置表
 CREATE TABLE IF NOT EXISTS zones (
@@ -1032,4 +1092,20 @@ CREATE TABLE IF NOT EXISTS character_battle_stats (
 );
 
 CREATE INDEX IF NOT EXISTS idx_char_stats_date ON character_battle_stats(character_id, stat_date DESC);
+
+-- 战斗仇恨日志 (仇恨系统分析)
+CREATE TABLE IF NOT EXISTS battle_threat_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    battle_id VARCHAR(64) NOT NULL,
+    turn INTEGER NOT NULL,             -- 回合数
+    enemy_id VARCHAR(32) NOT NULL,     -- 敌人单位ID
+    threat_snapshot TEXT NOT NULL,     -- 仇恨快照 (JSON: {current_target, threat_list[]})
+    target_changed INTEGER DEFAULT 0,  -- 是否切换目标: 1是 0否
+    ot_occurred INTEGER DEFAULT 0,     -- 是否发生OT: 1是 0否
+    taunt_used INTEGER DEFAULT 0,      -- 是否使用嘲讽: 1是 0否
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_threat_log_battle ON battle_threat_log(battle_id);
+CREATE INDEX IF NOT EXISTS idx_threat_log_enemy ON battle_threat_log(battle_id, enemy_id);
 
