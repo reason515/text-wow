@@ -1109,3 +1109,57 @@ CREATE TABLE IF NOT EXISTS battle_threat_log (
 CREATE INDEX IF NOT EXISTS idx_threat_log_battle ON battle_threat_log(battle_id);
 CREATE INDEX IF NOT EXISTS idx_threat_log_enemy ON battle_threat_log(battle_id, enemy_id);
 
+-- ═══════════════════════════════════════════════════════════
+-- 聊天系统表
+-- ═══════════════════════════════════════════════════════════
+
+-- 聊天消息表
+CREATE TABLE IF NOT EXISTS chat_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    channel VARCHAR(16) NOT NULL,          -- world/zone/trade/lfg/whisper/system/battlefield
+    faction VARCHAR(16),                   -- alliance/horde (公共频道用)
+    zone_id VARCHAR(32),                   -- 区域ID (zone频道用)
+    sender_id INTEGER NOT NULL,
+    sender_name VARCHAR(32) NOT NULL,
+    sender_class VARCHAR(32),
+    receiver_id INTEGER,                   -- 私聊目标用户ID
+    content TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (sender_id) REFERENCES users(id),
+    FOREIGN KEY (receiver_id) REFERENCES users(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_chat_channel ON chat_messages(channel, faction);
+CREATE INDEX IF NOT EXISTS idx_chat_zone ON chat_messages(zone_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_chat_whisper ON chat_messages(sender_id, receiver_id);
+CREATE INDEX IF NOT EXISTS idx_chat_time ON chat_messages(created_at DESC);
+
+-- 屏蔽列表
+CREATE TABLE IF NOT EXISTS chat_blocks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    blocked_id INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (blocked_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE(user_id, blocked_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_blocks_user ON chat_blocks(user_id);
+
+-- 在线状态表
+CREATE TABLE IF NOT EXISTS user_online_status (
+    user_id INTEGER PRIMARY KEY,
+    character_id INTEGER,
+    character_name VARCHAR(32),
+    faction VARCHAR(16),
+    zone_id VARCHAR(32),
+    last_active DATETIME DEFAULT CURRENT_TIMESTAMP,
+    is_online INTEGER DEFAULT 0,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (character_id) REFERENCES characters(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_online_faction ON user_online_status(faction, is_online);
+CREATE INDEX IF NOT EXISTS idx_online_zone ON user_online_status(zone_id, is_online);
+

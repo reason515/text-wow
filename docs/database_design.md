@@ -4260,3 +4260,185 @@ CREATE INDEX IF NOT EXISTS idx_threat_log_battle ON battle_threat_log(battle_id)
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
+---
+
+## 💬 阵营聊天系统
+
+> 📌 **核心设计**: 联盟和部落各自独立的聊天频道，跨阵营无法直接交流
+
+### 系统概览
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          聊天系统概览                                        │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│   联盟频道                              部落频道                             │
+│   ┌─────────────────────┐              ┌─────────────────────┐             │
+│   │ [世界] 人类勇士说:   │              │ [世界] 兽人战士说:   │             │
+│   │   为了联盟！         │              │   为了部落！         │             │
+│   │                     │              │                     │             │
+│   │ [区域] 矮人猎人:     │              │ [区域] 牛头人德鲁伊: │             │
+│   │   有人组队吗？       │              │   这里有精英怪       │             │
+│   │                     │              │                     │             │
+│   │ [私聊] 来自暗夜精灵  │              │ [私聊] 来自巨魔       │             │
+│   └─────────────────────┘              └─────────────────────┘             │
+│                    ╲                    ╱                                   │
+│                     ╲                  ╱                                    │
+│                      ╲   ❌ 不互通   ╱                                     │
+│                       ╲            ╱                                        │
+│                        ╲          ╱                                         │
+│                         遭遇战时可见                                         │
+│                         (乱码显示)                                           │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 频道类型
+
+| 频道 | 代码 | 范围 | 颜色 | 说明 |
+|-----|------|------|-----|------|
+| **世界频道** | world | 全阵营 | 🟡 金色 | 同阵营所有玩家可见 |
+| **区域频道** | zone | 同区域 | 🟠 橙色 | 当前区域内同阵营玩家 |
+| **交易频道** | trade | 全阵营 | 🟢 绿色 | 买卖装备/材料 |
+| **组队频道** | lfg | 全阵营 | 🔵 蓝色 | 找队友 |
+| **私聊** | whisper | 1对1 | 🟣 紫色 | 只能和同阵营玩家私聊 |
+| **系统消息** | system | 全服 | ⚪ 白色 | 系统公告、上下线通知 |
+| **战场频道** | battlefield | PvP遭遇 | 🔴 红色 | PvP时敌方消息(乱码化) |
+
+### 跨阵营遭遇战特殊处理
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      PvP遭遇时的聊天显示                                     │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│   联盟玩家视角:                                                              │
+│   ┌─────────────────────────────────────────────────────────┐              │
+│   │ [战斗] 兽人战士(部落) 对你使用了 [英勇打击]               │              │
+│   │ [战场] <部落玩家> 说: "Kek zug zug!"  ← 乱码化            │              │
+│   │ [战场] 你说: "为了联盟！"                                 │              │
+│   └─────────────────────────────────────────────────────────┘              │
+│                                                                             │
+│   部落玩家视角:                                                              │
+│   ┌─────────────────────────────────────────────────────────┐              │
+│   │ [战斗] 你对 人类战士(联盟) 使用了 [英勇打击]              │              │
+│   │ [战场] 你说: "Lok'tar ogar!"                             │              │
+│   │ [战场] <联盟玩家> 说: "Bur gull..."  ← 乱码化             │              │
+│   └─────────────────────────────────────────────────────────┘              │
+│                                                                             │
+│   乱码规则: 将消息转换为对方阵营的"语言"                                      │
+│   联盟→部落: 使用兽人语音节替换                                              │
+│   部落→联盟: 使用通用语音节替换                                              │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 数据库表设计
+
+#### chat_messages - 聊天消息表
+
+| 字段 | 类型 | 约束 | 说明 |
+|-----|------|-----|------|
+| id | INTEGER | PRIMARY KEY | 消息ID |
+| channel | VARCHAR(16) | NOT NULL | 频道类型 |
+| faction | VARCHAR(16) | | 阵营 (world/zone/trade/lfg用) |
+| zone_id | VARCHAR(32) | | 区域ID (zone频道用) |
+| sender_id | INTEGER | NOT NULL FK | 发送者用户ID |
+| sender_name | VARCHAR(32) | NOT NULL | 发送者角色名 |
+| sender_class | VARCHAR(32) | | 发送者职业 |
+| receiver_id | INTEGER | FK | 接收者ID (私聊用) |
+| content | TEXT | NOT NULL | 消息内容 |
+| created_at | DATETIME | DEFAULT NOW | 发送时间 |
+
+```sql
+CREATE TABLE IF NOT EXISTS chat_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    channel VARCHAR(16) NOT NULL,
+    faction VARCHAR(16),
+    zone_id VARCHAR(32),
+    sender_id INTEGER NOT NULL,
+    sender_name VARCHAR(32) NOT NULL,
+    sender_class VARCHAR(32),
+    receiver_id INTEGER,
+    content TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (sender_id) REFERENCES users(id),
+    FOREIGN KEY (receiver_id) REFERENCES users(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_chat_channel ON chat_messages(channel, faction);
+CREATE INDEX IF NOT EXISTS idx_chat_zone ON chat_messages(zone_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_chat_whisper ON chat_messages(sender_id, receiver_id);
+CREATE INDEX IF NOT EXISTS idx_chat_time ON chat_messages(created_at DESC);
+```
+
+#### chat_blocks - 屏蔽列表
+
+| 字段 | 类型 | 约束 | 说明 |
+|-----|------|-----|------|
+| id | INTEGER | PRIMARY KEY | ID |
+| user_id | INTEGER | NOT NULL FK | 用户ID |
+| blocked_id | INTEGER | NOT NULL FK | 被屏蔽用户ID |
+| created_at | DATETIME | DEFAULT NOW | 屏蔽时间 |
+
+```sql
+CREATE TABLE IF NOT EXISTS chat_blocks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    blocked_id INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (blocked_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE(user_id, blocked_id)
+);
+```
+
+#### user_online_status - 在线状态表
+
+| 字段 | 类型 | 约束 | 说明 |
+|-----|------|-----|------|
+| user_id | INTEGER | PRIMARY KEY | 用户ID |
+| character_name | VARCHAR(32) | | 当前角色名 |
+| faction | VARCHAR(16) | | 阵营 |
+| zone_id | VARCHAR(32) | | 当前区域 |
+| last_active | DATETIME | | 最后活跃时间 |
+| is_online | INTEGER | DEFAULT 0 | 是否在线 |
+
+```sql
+CREATE TABLE IF NOT EXISTS user_online_status (
+    user_id INTEGER PRIMARY KEY,
+    character_name VARCHAR(32),
+    faction VARCHAR(16),
+    zone_id VARCHAR(32),
+    last_active DATETIME DEFAULT CURRENT_TIMESTAMP,
+    is_online INTEGER DEFAULT 0,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_online_faction ON user_online_status(faction, is_online);
+CREATE INDEX IF NOT EXISTS idx_online_zone ON user_online_status(zone_id, is_online);
+```
+
+### 命令系统
+
+| 命令 | 说明 | 示例 |
+|-----|------|------|
+| `/s 消息` | 发送到世界频道 | `/s 有人组队吗？` |
+| `/z 消息` | 发送到区域频道 | `/z 这里有精英怪` |
+| `/t 消息` | 发送到交易频道 | `/t 收购铜矿石` |
+| `/lfg 消息` | 发送到组队频道 | `/lfg 找T和奶` |
+| `/w 玩家 消息` | 私聊 | `/w 破晓 你好` |
+| `/r 消息` | 回复上一个私聊 | `/r 好的` |
+| `/block 玩家` | 屏蔽玩家 | `/block 讨厌鬼` |
+| `/unblock 玩家` | 取消屏蔽 | `/unblock 讨厌鬼` |
+
+### 内容安全
+
+| 规则 | 设置 | 说明 |
+|-----|------|------|
+| 敏感词过滤 | 替换为 *** | 自动过滤不当内容 |
+| 刷屏检测 | 间隔 > 3秒 | 同一消息重复发送限制 |
+| 消息长度 | 最多200字符 | 防止超长消息 |
+| 频率限制 | 每分钟20条 | 防止刷屏 |
+

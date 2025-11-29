@@ -31,6 +31,7 @@ func main() {
 
 	// 创建API处理器
 	h := api.NewHandler()
+	chatHandler := api.NewChatHandler()
 
 	// API 路由
 	apiGroup := r.Group("/api")
@@ -73,18 +74,34 @@ func main() {
 
 			// 小队
 			protected.GET("/team", h.GetTeam)
+
+			// 聊天
+			chat := protected.Group("/chat")
+			{
+				chat.GET("/messages", chatHandler.GetMessages)
+				chat.POST("/send", chatHandler.SendMessage)
+				chat.GET("/online", chatHandler.GetOnlineUsers)
+				chat.POST("/block", chatHandler.BlockUser)
+				chat.POST("/unblock", chatHandler.UnblockUser)
+				chat.POST("/online", chatHandler.SetOnline)
+				chat.POST("/offline", chatHandler.SetOffline)
+				chat.POST("/heartbeat", chatHandler.Heartbeat)
+			}
 		}
 	}
 
 	log.Println("🎮 Text WoW Server starting on :8080")
 	log.Println("📌 API Documentation:")
-	log.Println("   POST /api/auth/register - 用户注册")
-	log.Println("   POST /api/auth/login    - 用户登录")
-	log.Println("   GET  /api/races         - 获取种族列表")
-	log.Println("   GET  /api/classes       - 获取职业列表")
-	log.Println("   GET  /api/characters    - 获取角色列表 (需认证)")
-	log.Println("   POST /api/characters    - 创建角色 (需认证)")
-	log.Println("   GET  /api/team          - 获取小队 (需认证)")
+	log.Println("   POST /api/auth/register  - 用户注册")
+	log.Println("   POST /api/auth/login     - 用户登录")
+	log.Println("   GET  /api/races          - 获取种族列表")
+	log.Println("   GET  /api/classes        - 获取职业列表")
+	log.Println("   GET  /api/characters     - 获取角色列表 (需认证)")
+	log.Println("   POST /api/characters     - 创建角色 (需认证)")
+	log.Println("   GET  /api/team           - 获取小队 (需认证)")
+	log.Println("   GET  /api/chat/messages  - 获取聊天消息 (需认证)")
+	log.Println("   POST /api/chat/send      - 发送消息 (需认证)")
+	log.Println("   GET  /api/chat/online    - 获取在线玩家 (需认证)")
 	
 	if err := r.Run(":8080"); err != nil {
 		log.Fatalf("❌ Failed to start server: %v", err)

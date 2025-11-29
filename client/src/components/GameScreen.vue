@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useCharacterStore } from '@/stores/character'
+import ChatPanel from '@/components/ChatPanel.vue'
 
 const emit = defineEmits<{
   logout: []
@@ -221,6 +222,9 @@ function createNewCharacter() {
         </div>
       </div>
     </div>
+
+    <!-- 聊天面板 -->
+    <ChatPanel />
 
     <!-- 小队列表 -->
     <div class="team-bar" v-if="charStore.characters.length > 0">
