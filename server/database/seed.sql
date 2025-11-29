@@ -738,3 +738,108 @@ INSERT OR REPLACE INTO game_formulas (id, category, name, formula, description, 
  '获得1000经验,3人参战: 每人333经验', 43);
 
 
+-- ═══════════════════════════════════════════════════════════
+-- 装备词缀数据
+-- ═══════════════════════════════════════════════════════════
+
+-- 前缀词缀 (攻击/属性向)
+INSERT OR REPLACE INTO affixes (id, name, type, slot_type, rarity, effect_type, effect_stat, min_value, max_value, value_type, description, level_required) VALUES
+-- 武器前缀 - 普通
+('affix_sharp', '锋利的', 'prefix', 'weapon', 'common', 'stat_bonus', 'attack', 2, 5, 'flat', '攻击力 +{value}', 1),
+('affix_fiery', '炽热的', 'prefix', 'weapon', 'common', 'elemental_damage', 'fire', 1, 4, 'flat', '火焰伤害 +{value}', 1),
+('affix_frozen', '冰霜的', 'prefix', 'weapon', 'common', 'elemental_damage', 'frost', 1, 4, 'flat', '冰霜伤害 +{value}', 1),
+('affix_charged', '雷击的', 'prefix', 'weapon', 'common', 'elemental_damage', 'lightning', 1, 4, 'flat', '雷电伤害 +{value}', 1),
+-- 武器前缀 - 精良
+('affix_holy', '神圣的', 'prefix', 'weapon', 'uncommon', 'elemental_damage', 'holy', 2, 5, 'flat', '神圣伤害 +{value}', 10),
+('affix_shadow', '暗影的', 'prefix', 'weapon', 'uncommon', 'elemental_damage', 'shadow', 2, 5, 'flat', '暗影伤害 +{value}', 10),
+('affix_brutal', '残暴的', 'prefix', 'weapon', 'uncommon', 'stat_bonus', 'attack', 4, 8, 'flat', '攻击力 +{value}', 15),
+-- 武器前缀 - 稀有
+('affix_vampiric', '吸血鬼的', 'prefix', 'weapon', 'rare', 'lifesteal', NULL, 2, 5, 'percent', '生命偷取 {value}%', 20),
+('affix_berserker', '狂战士的', 'prefix', 'weapon', 'rare', 'stat_bonus_pct', 'attack', 8, 15, 'percent', '攻击力 +{value}%', 25),
+-- 武器前缀 - 史诗
+('affix_devastating', '毁灭的', 'prefix', 'weapon', 'epic', 'stat_bonus_pct', 'attack', 15, 25, 'percent', '攻击力 +{value}%', 35),
+('affix_annihilating', '湮灭的', 'prefix', 'weapon', 'epic', 'stat_bonus_pct', 'damage', 12, 20, 'percent', '伤害 +{value}%', 40),
+
+-- 防具前缀 - 普通
+('affix_sturdy', '坚固的', 'prefix', 'armor', 'common', 'stat_bonus', 'defense', 2, 5, 'flat', '防御力 +{value}', 1),
+('affix_vital', '活力的', 'prefix', 'armor', 'common', 'stat_bonus', 'max_hp', 5, 15, 'flat', '生命值 +{value}', 1),
+('affix_fortified', '强化的', 'prefix', 'armor', 'common', 'stat_bonus', 'armor', 3, 8, 'flat', '护甲 +{value}', 1),
+-- 防具前缀 - 精良
+('affix_scholarly', '智者的', 'prefix', 'armor', 'uncommon', 'stat_bonus', 'intellect', 2, 4, 'flat', '智力 +{value}', 10),
+('affix_resilient', '坚韧的', 'prefix', 'armor', 'uncommon', 'stat_bonus_pct', 'max_hp', 5, 10, 'percent', '生命值 +{value}%', 15),
+-- 防具前缀 - 稀有
+('affix_unyielding', '不屈的', 'prefix', 'armor', 'rare', 'damage_reduction', NULL, 3, 8, 'percent', '受伤减免 {value}%', 25),
+('affix_guardian', '守护的', 'prefix', 'armor', 'rare', 'stat_bonus_pct', 'defense', 10, 18, 'percent', '防御力 +{value}%', 30),
+-- 防具前缀 - 史诗
+('affix_indomitable', '不可阻挡的', 'prefix', 'armor', 'epic', 'damage_reduction', NULL, 8, 15, 'percent', '受伤减免 {value}%', 40),
+
+-- 后缀词缀 (特殊效果向)
+-- 通用后缀 - 普通
+('affix_of_strength', 'of 力量', 'suffix', 'all', 'common', 'stat_bonus', 'strength', 1, 3, 'flat', '力量 +{value}', 1),
+('affix_of_agility', 'of 敏捷', 'suffix', 'all', 'common', 'stat_bonus', 'agility', 1, 3, 'flat', '敏捷 +{value}', 1),
+('affix_of_intellect', 'of 智力', 'suffix', 'all', 'common', 'stat_bonus', 'intellect', 1, 3, 'flat', '智力 +{value}', 1),
+('affix_of_stamina', 'of 耐力', 'suffix', 'all', 'common', 'stat_bonus', 'stamina', 1, 3, 'flat', '耐力 +{value}', 1),
+('affix_of_spirit', 'of 精神', 'suffix', 'all', 'common', 'stat_bonus', 'spirit', 1, 3, 'flat', '精神 +{value}', 1),
+
+-- 武器后缀 - 精良
+('affix_of_haste', 'of 迅捷', 'suffix', 'weapon', 'uncommon', 'stat_bonus_pct', 'attack_speed', 5, 15, 'percent', '攻击速度 +{value}%', 10),
+('affix_of_piercing', 'of 穿刺', 'suffix', 'weapon', 'uncommon', 'armor_penetration', NULL, 5, 15, 'percent', '无视 {value}% 护甲', 15),
+-- 武器后缀 - 稀有
+('affix_of_crit', 'of 暴击', 'suffix', 'weapon', 'rare', 'stat_bonus_pct', 'crit_rate', 3, 8, 'percent', '暴击率 +{value}%', 20),
+('affix_of_lethality', 'of 致命', 'suffix', 'weapon', 'rare', 'stat_bonus_pct', 'crit_damage', 10, 25, 'percent', '暴击伤害 +{value}%', 25),
+('affix_of_leech', 'of 吸血', 'suffix', 'weapon', 'rare', 'lifesteal', NULL, 2, 4, 'percent', '伤害的 {value}% 转化为生命', 30),
+-- 武器后缀 - 史诗
+('affix_of_slaying', 'of 斩杀', 'suffix', 'weapon', 'epic', 'execute_damage', NULL, 15, 30, 'percent', '对低血量敌人伤害 +{value}%', 40),
+('affix_of_fury', 'of 狂怒', 'suffix', 'weapon', 'epic', 'berserk', NULL, 20, 35, 'percent', 'HP<30%时伤害 +{value}%', 45),
+
+-- 防具后缀 - 精良
+('affix_of_blocking', 'of 守护', 'suffix', 'armor', 'uncommon', 'stat_bonus_pct', 'block_rate', 5, 10, 'percent', '格挡率 +{value}%', 10),
+('affix_of_evasion', 'of 闪避', 'suffix', 'armor', 'uncommon', 'stat_bonus_pct', 'dodge_rate', 3, 8, 'percent', '闪避率 +{value}%', 15),
+-- 防具后缀 - 稀有
+('affix_of_thorns', 'of 反射', 'suffix', 'armor', 'rare', 'reflect_damage', NULL, 5, 15, 'percent', '反弹 {value}% 受到的伤害', 25),
+('affix_of_regen', 'of 再生', 'suffix', 'armor', 'rare', 'hp_regen', NULL, 1, 3, 'flat', '每回合恢复 {value} HP', 20),
+('affix_of_wisdom', 'of 智慧', 'suffix', 'armor', 'rare', 'stat_bonus_pct', 'mana_regen', 10, 20, 'percent', '法力恢复 +{value}%', 20),
+-- 防具后缀 - 史诗
+('affix_of_immortality', 'of 不朽', 'suffix', 'armor', 'epic', 'hp_regen_pct', NULL, 2, 5, 'percent', '每回合恢复 {value}% HP', 40),
+('affix_of_retribution', 'of 惩戒', 'suffix', 'armor', 'epic', 'reflect_damage', NULL, 15, 30, 'percent', '反弹 {value}% 受到的伤害', 45);
+
+-- ═══════════════════════════════════════════════════════════
+-- 进化路线数据
+-- ═══════════════════════════════════════════════════════════
+
+INSERT OR REPLACE INTO evolution_paths (id, name, element, description, slot_type, stat_bonus_type, stat_bonus_value, special_effect, material_required) VALUES
+-- 武器进化路线
+('evo_fire', '烈焰', 'fire', '以火焰之力锻造', 'weapon', 'fire_damage_pct', 50, '攻击有几率灼烧敌人', '{"fire_essence": 5, "evolution_stone": 3}'),
+('evo_frost', '霜寒', 'frost', '以冰霜之力锻造', 'weapon', 'frost_damage_pct', 50, '攻击有几率减速敌人', '{"frost_essence": 5, "evolution_stone": 3}'),
+('evo_lightning', '雷霆', 'lightning', '以雷电之力锻造', 'weapon', 'lightning_damage_pct', 40, '伤害可连锁跳跃', '{"lightning_essence": 5, "evolution_stone": 3}'),
+('evo_holy', '神圣', 'holy', '以圣光之力锻造', 'weapon', 'holy_damage_pct', 40, '攻击时回复生命', '{"holy_essence": 5, "evolution_stone": 3}'),
+('evo_shadow', '暗影', 'shadow', '以暗影之力锻造', 'weapon', 'shadow_damage_pct', 50, '伤害转化为生命', '{"shadow_essence": 5, "evolution_stone": 3}'),
+('evo_nature', '自然', 'nature', '以自然之力锻造', 'weapon', 'nature_damage_pct', 40, '持续恢复生命', '{"nature_essence": 5, "evolution_stone": 3}'),
+('evo_physical', '物理', 'physical', '以纯粹力量锻造', 'weapon', 'physical_damage_pct', 30, '无视部分护甲', '{"steel_ingot": 10, "evolution_stone": 3}'),
+
+-- 防具进化路线
+('evo_guardian', '守护', 'guardian', '守护之道', 'armor', 'defense_pct', 30, '受伤减免提升', '{"iron_core": 5, "evolution_stone": 3}'),
+('evo_thorns', '荆棘', 'thorns', '荆棘之道', 'armor', 'reflect_pct', 25, '被攻击时反弹伤害', '{"thorn_vine": 5, "evolution_stone": 3}'),
+('evo_agile', '迅捷', 'agile', '迅捷之道', 'armor', 'dodge_pct', 20, '闪避后获得加速', '{"swift_feather": 5, "evolution_stone": 3}'),
+('evo_vitality', '再生', 'vitality', '生命之道', 'armor', 'hp_regen_pct', 50, '每回合恢复生命', '{"life_crystal": 5, "evolution_stone": 3}');
+
+-- ═══════════════════════════════════════════════════════════
+-- 传说效果数据
+-- ═══════════════════════════════════════════════════════════
+
+INSERT OR REPLACE INTO legendary_effects (id, name, description, slot_type, evolution_path, trigger_type, trigger_chance, effect_type, effect_value, cooldown) VALUES
+-- 武器传说效果
+('legend_inferno', '地狱烈焰', '攻击使敌人灼烧3回合，每回合3点火焰伤害', 'weapon', 'evo_fire', 'on_hit', 1.0, 'apply_dot', 3, 0),
+('legend_frostmourne', '霜之哀伤', '击杀敌人后冰冻周围敌人1回合', 'weapon', 'evo_frost', 'on_kill', 1.0, 'aoe_freeze', 1, 0),
+('legend_thunderfury', '雷霆之怒', '攻击时20%几率触发闪电链，最多跳跃3个目标', 'weapon', 'evo_lightning', 'on_hit', 0.2, 'chain_lightning', 3, 0),
+('legend_ashbringer', '灰烬使者', '攻击时恢复自身5%最大生命值', 'weapon', 'evo_holy', 'on_hit', 1.0, 'heal_pct', 5, 0),
+('legend_shadowmourne', '暗影之殇', '暴击时吸取敌人10%当前生命值', 'weapon', 'evo_shadow', 'on_crit', 1.0, 'drain_hp_pct', 10, 0),
+('legend_earthshatter', '大地粉碎', '攻击叠加自然标记，5层后引爆造成额外伤害', 'weapon', 'evo_nature', 'on_hit', 1.0, 'stack_explode', 5, 0),
+('legend_gorehowl', '血吼', '对精英和Boss伤害+50%', 'weapon', 'evo_physical', 'passive', 1.0, 'elite_damage_pct', 50, 0),
+
+-- 防具传说效果
+('legend_immortal', '不灭意志', '首次致死伤害免疫 (每场战斗1次)', 'armor', 'evo_guardian', 'on_fatal', 1.0, 'prevent_death', 1, 0),
+('legend_retribution', '复仇之刺', '反弹50%受到的物理伤害', 'armor', 'evo_thorns', 'on_damaged', 1.0, 'reflect_pct', 50, 0),
+('legend_shadowstep', '暗影步', '闪避成功后下次攻击必定暴击', 'armor', 'evo_agile', 'on_dodge', 1.0, 'guaranteed_crit', 1, 0),
+('legend_lifesource', '生命之泉', 'HP低于30%时每回合恢复10%最大生命', 'armor', 'evo_vitality', 'passive', 1.0, 'low_hp_regen', 10, 0);
+

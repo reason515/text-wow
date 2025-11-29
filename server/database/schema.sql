@@ -656,37 +656,92 @@ CREATE TABLE IF NOT EXISTS abyss_progress (
 
 CREATE INDEX IF NOT EXISTS idx_abyss_highest ON abyss_progress(highest_floor DESC);
 
--- 装备强化表
-CREATE TABLE IF NOT EXISTS equipment_enhance (
-    equipment_id INTEGER PRIMARY KEY,
-    enhance_level INTEGER DEFAULT 0,       -- 强化等级 0-15
-    refine_level INTEGER DEFAULT 0,        -- 精炼等级 0-10
-    enchant_id VARCHAR(32),                -- 附魔ID
-    gem_slot_1 VARCHAR(32),                -- 宝石槽1
-    gem_slot_2 VARCHAR(32),                -- 宝石槽2
-    gem_slot_3 VARCHAR(32),                -- 宝石槽3
-    FOREIGN KEY (equipment_id) REFERENCES equipment(id) ON DELETE CASCADE
+-- ═══════════════════════════════════════════════════════════
+-- 装备系统：词缀 + 进化链
+-- ═══════════════════════════════════════════════════════════
+
+-- 装备实例表 (玩家获得的每件装备)
+CREATE TABLE IF NOT EXISTS equipment_instance (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    item_id VARCHAR(32) NOT NULL,          -- 基础物品ID
+    owner_id INTEGER NOT NULL,             -- 拥有者用户ID
+    character_id INTEGER,                  -- 装备者角色ID (NULL=背包中)
+    slot VARCHAR(16),                      -- 装备槽位
+    quality VARCHAR(16) NOT NULL DEFAULT 'common', -- common/uncommon/rare/epic/legendary/mythic
+    enhance_level INTEGER DEFAULT 0,       -- 强化等级 0-25
+    evolution_stage INTEGER DEFAULT 1,     -- 进化阶段 1-5
+    evolution_path VARCHAR(32),            -- 进化路线: fire/frost/lightning/holy/shadow/nature/physical
+    prefix_id VARCHAR(32),                 -- 前缀词缀ID
+    prefix_value REAL,                     -- 前缀数值
+    suffix_id VARCHAR(32),                 -- 后缀词缀ID
+    suffix_value REAL,                     -- 后缀数值
+    bonus_affix_1 VARCHAR(32),             -- 额外词缀1 (紫色+)
+    bonus_affix_1_value REAL,
+    bonus_affix_2 VARCHAR(32),             -- 额外词缀2 (橙色+)
+    bonus_affix_2_value REAL,
+    legendary_effect_id VARCHAR(32),       -- 传说效果ID (红色品质)
+    acquired_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    is_locked INTEGER DEFAULT 0,           -- 是否锁定
+    FOREIGN KEY (item_id) REFERENCES items(id),
+    FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE SET NULL,
+    FOREIGN KEY (prefix_id) REFERENCES affixes(id),
+    FOREIGN KEY (suffix_id) REFERENCES affixes(id),
+    FOREIGN KEY (bonus_affix_1) REFERENCES affixes(id),
+    FOREIGN KEY (bonus_affix_2) REFERENCES affixes(id),
+    FOREIGN KEY (legendary_effect_id) REFERENCES legendary_effects(id)
 );
 
--- 附魔配置表
-CREATE TABLE IF NOT EXISTS enchants (
+CREATE INDEX IF NOT EXISTS idx_equipment_owner ON equipment_instance(owner_id);
+CREATE INDEX IF NOT EXISTS idx_equipment_character ON equipment_instance(character_id);
+CREATE INDEX IF NOT EXISTS idx_equipment_quality ON equipment_instance(quality);
+
+-- 词缀配置表
+CREATE TABLE IF NOT EXISTS affixes (
     id VARCHAR(32) PRIMARY KEY,
-    name VARCHAR(32) NOT NULL,
+    name VARCHAR(32) NOT NULL,             -- 词缀名称
+    type VARCHAR(16) NOT NULL,             -- prefix/suffix
+    slot_type VARCHAR(16) DEFAULT 'all',   -- weapon/armor/accessory/all
+    rarity VARCHAR(16) NOT NULL DEFAULT 'common', -- common/uncommon/rare/epic
+    effect_type VARCHAR(32) NOT NULL,      -- 效果类型
+    effect_stat VARCHAR(32),               -- 影响的属性
+    min_value REAL NOT NULL,               -- 最小数值
+    max_value REAL NOT NULL,               -- 最大数值
+    value_type VARCHAR(16) NOT NULL DEFAULT 'flat', -- flat/percent
+    description TEXT,                      -- 描述模板
+    level_required INTEGER DEFAULT 1       -- 最低出现等级
+);
+
+CREATE INDEX IF NOT EXISTS idx_affixes_type ON affixes(type);
+CREATE INDEX IF NOT EXISTS idx_affixes_rarity ON affixes(rarity);
+CREATE INDEX IF NOT EXISTS idx_affixes_slot ON affixes(slot_type);
+
+-- 进化路线配置表
+CREATE TABLE IF NOT EXISTS evolution_paths (
+    id VARCHAR(32) PRIMARY KEY,
+    name VARCHAR(32) NOT NULL,             -- 路线名称
+    element VARCHAR(16) NOT NULL,          -- 元素类型
     description TEXT,
-    slot_type VARCHAR(16),                 -- 适用槽位
-    effect_type VARCHAR(32) NOT NULL,
-    effect_value REAL NOT NULL,
-    quality VARCHAR(16)
+    slot_type VARCHAR(16) NOT NULL,        -- weapon/armor
+    stat_bonus_type VARCHAR(32),           -- 属性加成类型
+    stat_bonus_value REAL,                 -- 属性加成数值
+    special_effect TEXT,                   -- 特殊效果描述
+    material_required TEXT                 -- 所需材料 (JSON)
 );
 
--- 宝石配置表
-CREATE TABLE IF NOT EXISTS gems (
+-- 传说效果表
+CREATE TABLE IF NOT EXISTS legendary_effects (
     id VARCHAR(32) PRIMARY KEY,
-    name VARCHAR(32) NOT NULL,
-    color VARCHAR(16) NOT NULL,            -- red/blue/yellow/green/purple
-    stat_type VARCHAR(32) NOT NULL,
-    stat_value INTEGER NOT NULL,
-    quality VARCHAR(16)
+    name VARCHAR(32) NOT NULL,             -- 效果名称
+    description TEXT NOT NULL,             -- 效果描述
+    slot_type VARCHAR(16) NOT NULL,        -- weapon/armor/accessory
+    evolution_path VARCHAR(32),            -- 关联进化路线
+    trigger_type VARCHAR(32),              -- on_hit/on_kill/on_damaged/passive
+    trigger_chance REAL DEFAULT 1.0,       -- 触发概率
+    effect_type VARCHAR(32) NOT NULL,      -- 效果类型
+    effect_value REAL,                     -- 效果数值
+    cooldown INTEGER DEFAULT 0,            -- 冷却回合
+    FOREIGN KEY (evolution_path) REFERENCES evolution_paths(id)
 );
 
 -- 成就配置表
