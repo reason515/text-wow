@@ -3533,3 +3533,463 @@ CREATE INDEX idx_honor_shop_rank ON honor_shop(rank_required);
 
 > 💡 这个机制激励玩家提升战力和优化策略来争夺地图控制权，同时保持竞争的持续性
 
+---
+
+## 🐌 游戏节奏与体力系统
+
+> 📌 **设计理念**: 慢节奏沉浸式体验，让玩家有时间探索和享受游戏深度
+
+### 节奏设计原则
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          慢节奏游戏设计                                       │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│   ❌ 快餐式体验                          ✅ 沉浸式体验                        │
+│   ├─ 3天满级，1周毕业                    ├─ 数周探索，数月精通                 │
+│   ├─ 秒杀怪物，无脑挂机                  ├─ 每场战斗都有意义                   │
+│   ├─ 数值膨胀，装备快速淘汰              ├─ 装备长期有价值，培养值得            │
+│   └─ 内容消耗殆尽                        └─ 持续发现新东西                    │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 节奏控制点
+
+| 方面 | 设计 | 效果 |
+|-----|------|------|
+| **战斗时长** | 每场战斗平均8-15回合 | 有足够时间展现策略 |
+| **升级曲线** | 1-30级约1周，31-60级约3周 | 中后期有深度探索空间 |
+| **体力系统** | 每场战斗消耗体力 | 防止无限刷，鼓励策略优化 |
+| **探索节奏** | 新区域需要解锁条件 | 有目标感和成就感 |
+| **装备成长** | 好装备值得培养数周 | 减少装备焦虑 |
+
+### 体力系统
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           体力系统                                           │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│   体力上限: 100 点                                                           │
+│   恢复速度: 1 点 / 10 分钟 (每天144点)                                        │
+│                                                                             │
+│   消耗:                                                                      │
+│   ├─ 普通战斗: 1 点                                                          │
+│   ├─ 精英战斗: 2 点                                                          │
+│   ├─ Boss战斗: 5 点                                                          │
+│   └─ 深渊挑战: 3 点/层                                                       │
+│                                                                             │
+│   玩家可以:                                                                  │
+│   ├─ 每天打约100-150场普通战斗                                               │
+│   ├─ 或者打20-30场Boss                                                       │
+│   └─ 需要规划每天的挂机目标                                                   │
+│                                                                             │
+│   离线收益: 体力溢出时转化为离线经验/金币 (效率50%)                            │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### user_stamina - 玩家体力表
+
+| 字段 | 类型 | 约束 | 说明 |
+|-----|------|-----|------|
+| user_id | INTEGER | PRIMARY KEY FK | 用户ID |
+| current_stamina | INTEGER | DEFAULT 100 | 当前体力 |
+| max_stamina | INTEGER | DEFAULT 100 | 最大体力 |
+| last_regen_at | DATETIME | | 上次恢复时间 |
+| overflow_exp | INTEGER | DEFAULT 0 | 溢出转化的经验 |
+| overflow_gold | INTEGER | DEFAULT 0 | 溢出转化的金币 |
+
+```sql
+CREATE TABLE IF NOT EXISTS user_stamina (
+    user_id INTEGER PRIMARY KEY,
+    current_stamina INTEGER DEFAULT 100,
+    max_stamina INTEGER DEFAULT 100,
+    last_regen_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    overflow_exp INTEGER DEFAULT 0,
+    overflow_gold INTEGER DEFAULT 0,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+```
+
+---
+
+## 🎯 作战策略系统
+
+> 📌 **设计理念**: 易于上手，深度足够，可通过数据验证效果
+
+### 策略配置概览
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          策略配置理念                                         │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│   设计原则:                                                                  │
+│   ├─ 易于上手: 新手可以用默认策略                                             │
+│   ├─ 深度足够: 高手可以精细调优                                               │
+│   ├─ 可验证性: 每个策略都能看到数据效果                                        │
+│   └─ 无绝对最优: 不同情况需要不同策略                                          │
+│                                                                             │
+│   策略组成:                                                                  │
+│   ├─ 技能优先级: 拖拽排序，决定技能使用顺序                                    │
+│   ├─ 条件规则: IF-THEN逻辑，触发特殊行为                                      │
+│   ├─ 目标选择: 攻击/治疗目标的选择策略                                        │
+│   └─ 资源管理: 资源阈值和保留技能设置                                          │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 策略配置界面示例
+
+```
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                        作战策略 - 战士                                      ║
+╠═══════════════════════════════════════════════════════════════════════════╣
+║                                                                           ║
+║  【技能优先级】拖拽排序                                                     ║
+║  ┌─────────────────────────────────────────────────────────────────────┐ ║
+║  │  1. [冲锋]        - 开场使用，眩晕敌人                               │ ║
+║  │  2. [撕裂]        - 保持DOT                                         │ ║
+║  │  3. [英勇打击]    - 主要输出                                         │ ║
+║  │  4. [战斗怒吼]    - 团队增益                                         │ ║
+║  │  5. [普通攻击]    - 保底技能                                         │ ║
+║  └─────────────────────────────────────────────────────────────────────┘ ║
+║                                                                           ║
+║  【条件规则】点击添加                                                       ║
+║  ┌─────────────────────────────────────────────────────────────────────┐ ║
+║  │  IF [自身HP] [<] [30%] THEN 优先使用 [盾墙]                          │ ║
+║  │  IF [敌人HP] [<] [20%] THEN 优先使用 [斩杀]                          │ ║
+║  │  IF [怒气] [>] [80] THEN 使用 [战斗怒吼]                              │ ║
+║  │  + 添加新规则                                                        │ ║
+║  └─────────────────────────────────────────────────────────────────────┘ ║
+║                                                                           ║
+║  【目标选择】                                                              ║
+║  ┌─────────────────────────────────────────────────────────────────────┐ ║
+║  │  攻击目标:                                                           │ ║
+║  │  ○ 血量最低的敌人 (快速击杀)                                          │ ║
+║  │  ● 血量最高的敌人 (集火坦克)                                          │ ║
+║  │  ○ 攻击力最高的敌人 (优先高威胁)                                      │ ║
+║  │  ○ 随机攻击 (分散伤害)                                               │ ║
+║  └─────────────────────────────────────────────────────────────────────┘ ║
+║                                                                           ║
+║  【资源管理】                                                              ║
+║  ┌─────────────────────────────────────────────────────────────────────┐ ║
+║  │  怒气阈值: [30] 以下时只使用普通攻击积攒怒气                          │ ║
+║  │  保留技能: [盾墙] 非紧急情况不使用                                    │ ║
+║  └─────────────────────────────────────────────────────────────────────┘ ║
+║                                                                           ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+```
+
+### 条件规则系统
+
+| 条件类型 | 可选值 | 示例 |
+|---------|-------|------|
+| **自身HP** | <, >, =, 百分比 | 自身HP < 30% |
+| **自身资源** | <, >, = | 怒气 > 80 |
+| **敌人HP** | <, >, = | 敌人HP < 20% |
+| **敌人数量** | <, >, = | 敌人数量 >= 3 |
+| **队友HP** | <, >, = | 任意队友HP < 40% |
+| **Buff状态** | 有/无 | 自身无[战斗怒吼] |
+| **回合数** | <, >, = | 回合数 = 1 (开场) |
+| **技能冷却** | 可用/冷却中 | [冲锋]可用 |
+
+### 策略模板
+
+| 模板 | 适用场景 | 特点 |
+|-----|---------|------|
+| **激进输出** | 低级区刷怪 | 优先高伤害技能 |
+| **稳健生存** | 高级区探索 | HP低时防御优先 |
+| **控制优先** | 多敌人战斗 | 优先使用控制技能 |
+| **Boss战** | 单目标 | 保留爆发，持续输出 |
+| **辅助优先** | 牧师/圣骑 | 优先治疗队友 |
+
+#### battle_strategies - 战斗策略表
+
+| 字段 | 类型 | 约束 | 说明 |
+|-----|------|-----|------|
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT | 策略ID |
+| character_id | INTEGER | NOT NULL FK | 角色ID |
+| name | VARCHAR(32) | NOT NULL | 策略名称 |
+| is_active | INTEGER | DEFAULT 0 | 是否当前使用 |
+| skill_priority | TEXT | | 技能优先级 (JSON数组) |
+| conditional_rules | TEXT | | 条件规则 (JSON数组) |
+| target_priority | VARCHAR(32) | DEFAULT 'lowest_hp' | 目标选择策略 |
+| resource_threshold | INTEGER | DEFAULT 0 | 资源阈值 |
+| reserved_skills | TEXT | | 保留技能 (JSON数组) |
+| created_at | DATETIME | DEFAULT CURRENT_TIMESTAMP | 创建时间 |
+| updated_at | DATETIME | | 更新时间 |
+
+```sql
+CREATE TABLE IF NOT EXISTS battle_strategies (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    character_id INTEGER NOT NULL,
+    name VARCHAR(32) NOT NULL,
+    is_active INTEGER DEFAULT 0,
+    skill_priority TEXT,
+    conditional_rules TEXT,
+    target_priority VARCHAR(32) DEFAULT 'lowest_hp',
+    resource_threshold INTEGER DEFAULT 0,
+    reserved_skills TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME,
+    FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_battle_strategies_character ON battle_strategies(character_id);
+CREATE INDEX idx_battle_strategies_active ON battle_strategies(character_id, is_active);
+```
+
+**target_priority 可选值:**
+- `lowest_hp` - 攻击血量最低的敌人
+- `highest_hp` - 攻击血量最高的敌人
+- `highest_attack` - 攻击攻击力最高的敌人
+- `random` - 随机攻击
+- `nearest` - 攻击最近的敌人 (预留)
+
+**conditional_rules JSON格式:**
+```json
+[
+  {
+    "condition": {"type": "self_hp", "operator": "<", "value": 30},
+    "action": {"type": "priority_skill", "skill_id": "shield_wall"}
+  },
+  {
+    "condition": {"type": "enemy_hp", "operator": "<", "value": 20},
+    "action": {"type": "priority_skill", "skill_id": "execute"}
+  }
+]
+```
+
+---
+
+## 📊 战斗数据分析系统
+
+> 📌 **核心理念**: 让玩家通过数据分析验证和优化作战策略
+
+### 统计周期
+
+| 周期 | 数据内容 | 用途 |
+|-----|---------|------|
+| **上一场** | 完整回合记录、每个技能使用、详细伤害流水 | 即时验证策略调整效果 |
+| **今日** | 汇总统计、技能效率、胜率 | 当天表现评估 |
+| **本周** | 趋势对比、进步曲线 | 中期策略优化 |
+| **本月** | 长期数据、里程碑 | 整体成长回顾 |
+| **全部** | 历史总计 | 终极成就统计 |
+
+### 多角色战斗统计示例
+
+```
+╔═══════════════════════════════════════════════════════════════════════════╗
+║  📋 上一场战斗详情                                      2024-11-29 14:32:15 ║
+╠═══════════════════════════════════════════════════════════════════════════╣
+║                                                                           ║
+║  地点: 暮色森林            敌人: 亡灵小队 (3体)          结果: ✓ 胜利      ║
+║  回合数: 12                耗时: 28秒                   获得: 85经验 24金币║
+║                                                                           ║
+║  ═══════════════════════════════════════════════════════════════════════  ║
+║  👥 我方队伍 (3/5)                                                         ║
+║  ───────────────────────────────────────────────────────────────────────  ║
+║  │ 角色         │ 职业   │ 伤害输出 │ 承受伤害 │ 治疗量 │ DPR  │ 状态     │ ║
+║  │ 破晓         │ 战士   │ 89  45%  │ 52  62%  │ -      │ 7.4  │ HP 43/95│ ║
+║  │ 寒霜         │ 法师   │ 76  38%  │ 18  21%  │ -      │ 6.3  │ HP 52/60│ ║
+║  │ 圣光         │ 牧师   │ 32  17%  │ 14  17%  │ 45     │ 2.7  │ HP 55/70│ ║
+║  ├──────────────┴────────┴──────────┴──────────┴────────┴──────┴─────────┤ ║
+║  │ 队伍合计              │ 197      │ 84       │ 45     │ 16.4 │          │ ║
+║  ───────────────────────────────────────────────────────────────────────  ║
+║                                                                           ║
+║  ═══════════════════════════════════════════════════════════════════════  ║
+║  💀 敌方队伍 (3体)                                                         ║
+║  ───────────────────────────────────────────────────────────────────────  ║
+║  │ 敌人         │ 等级   │ 伤害输出 │ 承受伤害 │ 控制时间 │ 击杀者 │ 状态  │ ║
+║  │ 骷髅战士     │ Lv.10  │ 35  42%  │ 78       │ 2回合   │ 破晓   │ R8死亡│ ║
+║  │ 骷髅法师     │ Lv.10  │ 32  38%  │ 65       │ 1回合   │ 寒霜   │ R10死亡║
+║  │ 骷髅弓手     │ Lv.9   │ 17  20%  │ 54       │ 0回合   │ 破晓   │ R12死亡║
+║  ├──────────────┴────────┴──────────┴──────────┴─────────┴────────┴───────┤ ║
+║  │ 敌方合计              │ 84       │ 197      │ 3回合   │        │        │ ║
+║  ───────────────────────────────────────────────────────────────────────  ║
+║                                                                           ║
+║  ═══════════════════════════════════════════════════════════════════════  ║
+║  📈 队伍配合分析                                                           ║
+║  ───────────────────────────────────────────────────────────────────────  ║
+║  │ 指标               │ 数值    │ 评价                                    │ ║
+║  │ 伤害分布           │ 45/38/17│ 战士主力，法师辅助，牧师补刀 ✓           │ ║
+║  │ 承伤分布           │ 62/21/17│ 战士扛伤合理 ✓                          │ ║
+║  │ 控制覆盖           │ 25%     │ 3/12回合有敌人被控 ✓                    │ ║
+║  │ 治疗效率           │ 89%     │ 过量治疗11% (良好)                       │ ║
+║  │ 集火效率           │ 78%     │ 优先击杀高威胁目标 ✓                     │ ║
+║                                                                           ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+```
+
+### 关键分析指标
+
+| 指标 | 计算方式 | 用途 |
+|-----|---------|------|
+| **DPR** | 总伤害 / 回合数 | 评估每回合输出效率 |
+| **技能效率** | 技能伤害 / 资源消耗 | 判断技能性价比 |
+| **生存率** | 存活战斗 / 总战斗 | 策略稳定性 |
+| **资源利用率** | 实际消耗 / 可用资源 | 资源管理评估 |
+| **控制贡献** | 控制回合数 / 总回合数 | 控制策略效果 |
+| **治疗效率** | 有效治疗 / 总治疗 | 过量治疗检测 |
+| **集火效率** | 目标切换次数 | 是否集中火力 |
+| **承伤分布** | 各角色承伤占比 | 坦克是否有效 |
+
+#### detailed_battle_logs - 详细战斗日志表
+
+> 📌 记录每一场战斗的完整回合数据，用于"上一场"分析
+
+| 字段 | 类型 | 约束 | 说明 |
+|-----|------|-----|------|
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT | 日志ID |
+| battle_id | VARCHAR(64) | NOT NULL | 战斗ID |
+| user_id | INTEGER | NOT NULL FK | 用户ID |
+| zone_id | VARCHAR(32) | | 区域ID |
+| battle_type | VARCHAR(16) | NOT NULL | 战斗类型: pve/pvp/abyss |
+| result | VARCHAR(16) | NOT NULL | 结果: victory/defeat/draw |
+| total_turns | INTEGER | NOT NULL | 总回合数 |
+| duration_seconds | INTEGER | | 战斗时长 |
+| player_team_data | TEXT | NOT NULL | 我方队伍数据 (JSON) |
+| enemy_team_data | TEXT | NOT NULL | 敌方队伍数据 (JSON) |
+| turn_logs | TEXT | NOT NULL | 回合日志 (JSON) |
+| exp_gained | INTEGER | DEFAULT 0 | 获得经验 |
+| gold_gained | INTEGER | DEFAULT 0 | 获得金币 |
+| items_dropped | TEXT | | 掉落物品 (JSON) |
+| created_at | DATETIME | DEFAULT CURRENT_TIMESTAMP | 战斗时间 |
+
+```sql
+CREATE TABLE IF NOT EXISTS detailed_battle_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    battle_id VARCHAR(64) NOT NULL,
+    user_id INTEGER NOT NULL,
+    zone_id VARCHAR(32),
+    battle_type VARCHAR(16) NOT NULL,
+    result VARCHAR(16) NOT NULL,
+    total_turns INTEGER NOT NULL,
+    duration_seconds INTEGER,
+    player_team_data TEXT NOT NULL,
+    enemy_team_data TEXT NOT NULL,
+    turn_logs TEXT NOT NULL,
+    exp_gained INTEGER DEFAULT 0,
+    gold_gained INTEGER DEFAULT 0,
+    items_dropped TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (zone_id) REFERENCES zones(id)
+);
+
+CREATE INDEX idx_detailed_logs_user ON detailed_battle_logs(user_id);
+CREATE INDEX idx_detailed_logs_time ON detailed_battle_logs(created_at DESC);
+CREATE INDEX idx_detailed_logs_battle ON detailed_battle_logs(battle_id);
+
+-- 只保留最近100场详细日志，定期清理
+```
+
+**player_team_data / enemy_team_data JSON格式:**
+```json
+{
+  "units": [
+    {
+      "id": "char_1",
+      "name": "破晓",
+      "class": "warrior",
+      "level": 25,
+      "initial_hp": 95,
+      "final_hp": 43,
+      "max_hp": 95,
+      "damage_dealt": 89,
+      "damage_taken": 52,
+      "healing_done": 0,
+      "healing_taken": 32,
+      "is_dead": false,
+      "skills_used": [
+        {"skill_id": "charge", "count": 2, "damage": 24, "crits": 0, "effects": ["stun"]},
+        {"skill_id": "rend", "count": 3, "damage": 33, "crits": 0, "effects": ["bleed"]},
+        {"skill_id": "heroic_strike", "count": 5, "damage": 58, "crits": 1, "effects": []}
+      ]
+    }
+  ],
+  "total_damage": 197,
+  "total_healing": 45
+}
+```
+
+**turn_logs JSON格式:**
+```json
+[
+  {
+    "turn": 1,
+    "actions": [
+      {"source": "破晓", "skill": "冲锋", "target": "骷髅法师", "damage": 12, "crit": false, "effect": "眩晕"},
+      {"source": "寒霜", "skill": "寒冰箭", "target": "骷髅战士", "damage": 15, "crit": false, "effect": "减速"},
+      {"source": "圣光", "skill": "真言术:盾", "target": "破晓", "shield": 12},
+      {"source": "骷髅战士", "skill": "攻击", "target": "破晓", "damage": 8, "absorbed": 8},
+      {"source": "骷髅法师", "status": "眩晕", "skipped": true},
+      {"source": "骷髅弓手", "skill": "射击", "target": "寒霜", "damage": 6}
+    ]
+  }
+]
+```
+
+#### character_battle_stats - 角色战斗统计表
+
+> 📌 汇总统计，用于今日/本周/本月/全部分析
+
+| 字段 | 类型 | 约束 | 说明 |
+|-----|------|-----|------|
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT | ID |
+| character_id | INTEGER | NOT NULL FK | 角色ID |
+| stat_date | DATE | NOT NULL | 统计日期 |
+| battles_total | INTEGER | DEFAULT 0 | 总战斗场次 |
+| battles_won | INTEGER | DEFAULT 0 | 胜利场次 |
+| battles_lost | INTEGER | DEFAULT 0 | 失败场次 |
+| total_damage_dealt | INTEGER | DEFAULT 0 | 总造成伤害 |
+| total_damage_taken | INTEGER | DEFAULT 0 | 总承受伤害 |
+| total_healing_done | INTEGER | DEFAULT 0 | 总治疗量 |
+| total_turns | INTEGER | DEFAULT 0 | 总回合数 |
+| deaths | INTEGER | DEFAULT 0 | 死亡次数 |
+| kills | INTEGER | DEFAULT 0 | 击杀数 |
+| crits | INTEGER | DEFAULT 0 | 暴击次数 |
+| dodges | INTEGER | DEFAULT 0 | 闪避次数 |
+| skills_used | TEXT | | 技能使用统计 (JSON) |
+
+```sql
+CREATE TABLE IF NOT EXISTS character_battle_stats (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    character_id INTEGER NOT NULL,
+    stat_date DATE NOT NULL,
+    battles_total INTEGER DEFAULT 0,
+    battles_won INTEGER DEFAULT 0,
+    battles_lost INTEGER DEFAULT 0,
+    total_damage_dealt INTEGER DEFAULT 0,
+    total_damage_taken INTEGER DEFAULT 0,
+    total_healing_done INTEGER DEFAULT 0,
+    total_turns INTEGER DEFAULT 0,
+    deaths INTEGER DEFAULT 0,
+    kills INTEGER DEFAULT 0,
+    crits INTEGER DEFAULT 0,
+    dodges INTEGER DEFAULT 0,
+    skills_used TEXT,
+    FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE,
+    UNIQUE(character_id, stat_date)
+);
+
+CREATE INDEX idx_char_stats_date ON character_battle_stats(character_id, stat_date DESC);
+```
+
+### 策略建议生成
+
+> 📌 基于数据分析自动生成优化建议
+
+| 检测项 | 条件 | 建议 |
+|-------|------|------|
+| 普攻过多 | 普攻占比 > 30% | 降低资源阈值，增加技能使用 |
+| 治疗不足 | 死亡率 > 20% | 调整治疗触发条件或增加治疗优先级 |
+| 过量治疗 | 治疗效率 < 70% | 提高治疗触发的HP阈值 |
+| 控制浪费 | 控制重叠 | 调整控制技能间隔 |
+| 爆发时机 | 大招未命中低血敌人 | 添加斩杀类条件规则 |
+| 资源浪费 | 资源溢出 > 20% | 降低资源阈值 |
+

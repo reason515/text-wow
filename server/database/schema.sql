@@ -943,3 +943,93 @@ CREATE TABLE IF NOT EXISTS honor_shop (
 
 CREATE INDEX IF NOT EXISTS idx_honor_shop_rank ON honor_shop(rank_required);
 
+-- ═══════════════════════════════════════════════════════════
+-- 体力系统
+-- ═══════════════════════════════════════════════════════════
+
+-- 玩家体力表
+CREATE TABLE IF NOT EXISTS user_stamina (
+    user_id INTEGER PRIMARY KEY,
+    current_stamina INTEGER DEFAULT 100,   -- 当前体力
+    max_stamina INTEGER DEFAULT 100,       -- 最大体力
+    last_regen_at DATETIME DEFAULT CURRENT_TIMESTAMP, -- 上次恢复时间
+    overflow_exp INTEGER DEFAULT 0,        -- 溢出转化的经验
+    overflow_gold INTEGER DEFAULT 0,       -- 溢出转化的金币
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- ═══════════════════════════════════════════════════════════
+-- 作战策略系统
+-- ═══════════════════════════════════════════════════════════
+
+-- 战斗策略表
+CREATE TABLE IF NOT EXISTS battle_strategies (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    character_id INTEGER NOT NULL,
+    name VARCHAR(32) NOT NULL,             -- 策略名称
+    is_active INTEGER DEFAULT 0,           -- 是否当前使用
+    skill_priority TEXT,                   -- 技能优先级 (JSON数组)
+    conditional_rules TEXT,                -- 条件规则 (JSON数组)
+    target_priority VARCHAR(32) DEFAULT 'lowest_hp', -- 目标选择策略
+    resource_threshold INTEGER DEFAULT 0,  -- 资源阈值
+    reserved_skills TEXT,                  -- 保留技能 (JSON数组)
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME,
+    FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_battle_strategies_character ON battle_strategies(character_id);
+CREATE INDEX IF NOT EXISTS idx_battle_strategies_active ON battle_strategies(character_id, is_active);
+
+-- ═══════════════════════════════════════════════════════════
+-- 战斗数据分析系统
+-- ═══════════════════════════════════════════════════════════
+
+-- 详细战斗日志表 (用于"上一场"分析)
+CREATE TABLE IF NOT EXISTS detailed_battle_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    battle_id VARCHAR(64) NOT NULL,        -- 战斗ID
+    user_id INTEGER NOT NULL,
+    zone_id VARCHAR(32),
+    battle_type VARCHAR(16) NOT NULL,      -- pve/pvp/abyss
+    result VARCHAR(16) NOT NULL,           -- victory/defeat/draw
+    total_turns INTEGER NOT NULL,          -- 总回合数
+    duration_seconds INTEGER,              -- 战斗时长
+    player_team_data TEXT NOT NULL,        -- 我方队伍数据 (JSON)
+    enemy_team_data TEXT NOT NULL,         -- 敌方队伍数据 (JSON)
+    turn_logs TEXT NOT NULL,               -- 回合日志 (JSON)
+    exp_gained INTEGER DEFAULT 0,
+    gold_gained INTEGER DEFAULT 0,
+    items_dropped TEXT,                    -- 掉落物品 (JSON)
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (zone_id) REFERENCES zones(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_detailed_logs_user ON detailed_battle_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_detailed_logs_time ON detailed_battle_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_detailed_logs_battle ON detailed_battle_logs(battle_id);
+
+-- 角色战斗统计表 (汇总统计)
+CREATE TABLE IF NOT EXISTS character_battle_stats (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    character_id INTEGER NOT NULL,
+    stat_date DATE NOT NULL,               -- 统计日期
+    battles_total INTEGER DEFAULT 0,       -- 总战斗场次
+    battles_won INTEGER DEFAULT 0,         -- 胜利场次
+    battles_lost INTEGER DEFAULT 0,        -- 失败场次
+    total_damage_dealt INTEGER DEFAULT 0,  -- 总造成伤害
+    total_damage_taken INTEGER DEFAULT 0,  -- 总承受伤害
+    total_healing_done INTEGER DEFAULT 0,  -- 总治疗量
+    total_turns INTEGER DEFAULT 0,         -- 总回合数
+    deaths INTEGER DEFAULT 0,              -- 死亡次数
+    kills INTEGER DEFAULT 0,               -- 击杀数
+    crits INTEGER DEFAULT 0,               -- 暴击次数
+    dodges INTEGER DEFAULT 0,              -- 闪避次数
+    skills_used TEXT,                      -- 技能使用统计 (JSON)
+    FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE,
+    UNIQUE(character_id, stat_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_char_stats_date ON character_battle_stats(character_id, stat_date DESC);
+
