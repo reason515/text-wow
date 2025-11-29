@@ -5,16 +5,23 @@ import (
 	"math/rand"
 	"sync"
 	"time"
+
+	"text-wow/game/battle"
 )
 
 // Engine 游戏引擎
 type Engine struct {
 	mu           sync.RWMutex
 	character    *Character
+	party        []*Character // 小队成员
 	currentZone  *Zone
 	currentEnemy *Monster
 	battleLogs   []BattleLog
 	isRunning    bool
+
+	// 战斗系统
+	combatEngine *battle.CombatEngine
+	lastBattleResult *battle.QuickBattleResult
 
 	// 统计
 	battleCount  int
@@ -63,7 +70,9 @@ var zones = map[string]*Zone{
 // NewEngine 创建新游戏引擎
 func NewEngine() *Engine {
 	return &Engine{
-		battleLogs: make([]BattleLog, 0),
+		battleLogs:   make([]BattleLog, 0),
+		party:        make([]*Character, 0),
+		combatEngine: battle.NewCombatEngine(),
 	}
 }
 
@@ -135,7 +144,7 @@ func (e *Engine) ToggleBattle() bool {
 	return e.isRunning
 }
 
-// BattleTick 执行一次战斗回合
+// BattleTick 执行一次战斗回合 (使用新战斗系统)
 func (e *Engine) BattleTick() *BattleResult {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -146,33 +155,44 @@ func (e *Engine) BattleTick() *BattleResult {
 
 	logs := make([]BattleLog, 0)
 
-	// 如果没有当前敌人，生成一个
+	// 如果没有当前敌人，生成一个并开始新战斗
 	if e.currentEnemy == nil || e.currentEnemy.HP <= 0 {
 		e.spawnEnemy()
 		logs = append(logs, e.battleLogs[len(e.battleLogs)-1])
-	}
+		
+		// 使用新战斗系统进行完整战斗
+		e.runNewBattleSystem()
+		
+		// 将战斗结果转换为日志
+		if e.lastBattleResult != nil {
+			for _, actionLog := range e.lastBattleResult.Logs {
+				for _, result := range actionLog.Results {
+					msg := battle.FormatActionResult(result)
+					if msg != "" {
+						color := battle.GetActionColor(result)
+						e.addLog(string(result.Type), msg, color)
+						logs = append(logs, e.battleLogs[len(e.battleLogs)-1])
+					}
+				}
+			}
 
-	// 玩家攻击
-	playerDamage := e.calculateDamage(e.character.Attack, e.currentEnemy.Defense)
-	e.currentEnemy.HP -= playerDamage
-	e.addLog("damage", fmt.Sprintf("你使用 [英勇打击] 对 %s 造成 %d 点伤害", e.currentEnemy.Name, playerDamage), "#FF6B6B")
-	logs = append(logs, e.battleLogs[len(e.battleLogs)-1])
+			// 处理战斗结果
+			if e.lastBattleResult.Victory {
+				e.onEnemyDefeated()
+				// 获取最后几条日志
+				if len(e.battleLogs) >= 3 {
+					logs = append(logs, e.battleLogs[len(e.battleLogs)-3:]...)
+				}
+			} else {
+				e.onPlayerDeath()
+				logs = append(logs, e.battleLogs[len(e.battleLogs)-1])
+			}
 
-	// 检查敌人是否死亡
-	if e.currentEnemy.HP <= 0 {
-		e.onEnemyDefeated()
-		logs = append(logs, e.battleLogs[len(e.battleLogs)-3:]...)
-	} else {
-		// 敌人攻击
-		enemyDamage := e.calculateDamage(e.currentEnemy.Attack, e.character.Defense)
-		e.character.HP -= enemyDamage
-		e.addLog("damage", fmt.Sprintf("%s 攻击你造成 %d 点伤害", e.currentEnemy.Name, enemyDamage), "#FF4444")
-		logs = append(logs, e.battleLogs[len(e.battleLogs)-1])
-
-		// 检查玩家是否死亡
-		if e.character.HP <= 0 {
-			e.onPlayerDeath()
-			logs = append(logs, e.battleLogs[len(e.battleLogs)-1])
+			// 更新角色状态
+			if len(e.lastBattleResult.PlayerStats) > 0 {
+				stats := e.lastBattleResult.PlayerStats[0]
+				e.character.HP = stats.FinalHP
+			}
 		}
 	}
 
@@ -181,6 +201,54 @@ func (e *Engine) BattleTick() *BattleResult {
 		Enemy:     e.currentEnemy,
 		Logs:      logs,
 		Status:    e.getBattleStatus(),
+	}
+}
+
+// runNewBattleSystem 运行新战斗系统
+func (e *Engine) runNewBattleSystem() {
+	if e.character == nil || e.currentEnemy == nil {
+		return
+	}
+
+	// 创建玩家战斗单位
+	playerData := &battle.CharacterData{
+		ID:              "player_1",
+		Name:            e.character.Name,
+		Level:           e.character.Level,
+		ClassID:         e.character.ClassName,
+		Strength:        10 + e.character.Level,
+		Agility:         10 + e.character.Level,
+		Intellect:       10 + e.character.Level,
+		Stamina:         10 + e.character.Level,
+		Spirit:          10 + e.character.Level,
+		CurrentHP:       e.character.HP,
+		CurrentResource: e.character.MP,
+	}
+	playerUnit := battle.CreatePlayerUnit(playerData)
+
+	// 创建怪物战斗单位
+	monsterData := &battle.MonsterData{
+		ID:      e.currentEnemy.ID,
+		Name:    e.currentEnemy.Name,
+		Level:   e.currentEnemy.Level,
+		MaxHP:   e.currentEnemy.MaxHP,
+		Attack:  e.currentEnemy.Attack,
+		Defense: e.currentEnemy.Defense,
+		ExpDrop: e.currentEnemy.ExpDrop,
+		GoldMin: e.currentEnemy.GoldMin,
+		GoldMax: e.currentEnemy.GoldMax,
+	}
+	monsterUnit := battle.CreateMonsterUnit(monsterData)
+
+	// 运行战斗
+	e.lastBattleResult = battle.RunQuickBattle(
+		[]*battle.BattleUnit{playerUnit},
+		[]*battle.BattleUnit{monsterUnit},
+	)
+
+	// 更新怪物HP状态
+	if len(e.lastBattleResult.EnemyStats) > 0 {
+		e.currentEnemy.HP = e.lastBattleResult.EnemyStats[0].FinalHP
 	}
 }
 
