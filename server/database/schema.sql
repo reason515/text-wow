@@ -744,6 +744,27 @@ CREATE TABLE IF NOT EXISTS legendary_effects (
     FOREIGN KEY (evolution_path) REFERENCES evolution_paths(id)
 );
 
+-- 掉落配置表
+CREATE TABLE IF NOT EXISTS drop_config (
+    id VARCHAR(32) PRIMARY KEY,
+    monster_type VARCHAR(16) NOT NULL,     -- normal/elite/boss/abyss_boss
+    base_drop_rate REAL NOT NULL,          -- 基础掉落率
+    quality_weights TEXT NOT NULL,         -- 品质权重 (JSON)
+    miracle_rate REAL DEFAULT 0,           -- 奇迹掉落率
+    pity_threshold INTEGER DEFAULT 40,     -- 保底触发次数
+    pity_min_quality VARCHAR(16) DEFAULT 'rare' -- 保底最低品质
+);
+
+-- 玩家保底计数表
+CREATE TABLE IF NOT EXISTS user_drop_pity (
+    user_id INTEGER PRIMARY KEY,
+    no_drop_count INTEGER DEFAULT 0,       -- 连续无掉落次数
+    last_drop_at DATETIME,                 -- 上次掉落时间
+    total_drops INTEGER DEFAULT 0,         -- 总掉落次数
+    miracle_drops INTEGER DEFAULT 0,       -- 奇迹掉落次数
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 -- 成就配置表
 CREATE TABLE IF NOT EXISTS achievements (
     id VARCHAR(32) PRIMARY KEY,

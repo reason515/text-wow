@@ -843,3 +843,38 @@ INSERT OR REPLACE INTO legendary_effects (id, name, description, slot_type, evol
 ('legend_shadowstep', '暗影步', '闪避成功后下次攻击必定暴击', 'armor', 'evo_agile', 'on_dodge', 1.0, 'guaranteed_crit', 1, 0),
 ('legend_lifesource', '生命之泉', 'HP低于30%时每回合恢复10%最大生命', 'armor', 'evo_vitality', 'passive', 1.0, 'low_hp_regen', 10, 0);
 
+-- ═══════════════════════════════════════════════════════════
+-- 装备掉落配置
+-- ═══════════════════════════════════════════════════════════
+-- quality_weights格式: {"common":30,"uncommon":35,"rare":25,"epic":8,"legendary":1.8,"mythic":0.2}
+
+INSERT OR REPLACE INTO drop_config (id, monster_type, base_drop_rate, quality_weights, miracle_rate, pity_threshold, pity_min_quality) VALUES
+-- 普通怪物: 5%掉率，正常品质分布
+('drop_normal', 'normal', 0.05, 
+ '{"common":30,"uncommon":35,"rare":25,"epic":8,"legendary":1.8,"mythic":0.2}',
+ 0, 40, 'rare'),
+
+-- 精英怪物: 15%掉率，更好的品质
+('drop_elite', 'elite', 0.15,
+ '{"common":20,"uncommon":30,"rare":30,"epic":15,"legendary":4.5,"mythic":0.5}',
+ 0, 30, 'rare'),
+
+-- Boss: 50%掉率，优质品质
+('drop_boss', 'boss', 0.50,
+ '{"common":10,"uncommon":25,"rare":35,"epic":22,"legendary":7,"mythic":1}',
+ 0, 10, 'epic'),
+
+-- 深渊Boss: 100%掉率，高品质保证
+('drop_abyss_boss', 'abyss_boss', 1.00,
+ '{"common":0,"uncommon":15,"rare":40,"epic":30,"legendary":12,"mythic":3}',
+ 0, 1, 'epic');
+
+-- ═══════════════════════════════════════════════════════════
+-- 区域奇迹掉落率配置 (按区域等级范围)
+-- ═══════════════════════════════════════════════════════════
+-- 注：奇迹掉落率在代码中根据区域等级动态计算
+-- 1-10级区: 0.5%
+-- 11-30级区: 0.3%
+-- 31-50级区: 0.1%
+-- 51-60级区: 0%
+
