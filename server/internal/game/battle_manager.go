@@ -39,6 +39,7 @@ type BattleSession struct {
 	CurrentBattleGold int        // 本场战斗获得的金币
 	CurrentBattleKills int       // 本场战斗击杀数
 	CurrentTurnIndex  int        // 回合控制：-1=玩家回合，>=0=敌人索引
+	JustEncountered   bool       // 刚遭遇敌人，需要等待1个tick再开始战斗
 }
 
 // NewBattleManager 创建战斗管理器
@@ -239,8 +240,44 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 		}
 		logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
 		
+		// 标记刚遭遇敌人，需要等待1个tick再开始战斗
+		session.JustEncountered = true
+		
 		// 更新存活敌人列表
 		aliveEnemies = session.CurrentEnemies
+		
+		// 刚遭遇敌人，这个tick只显示信息，不执行战斗
+		return &BattleTickResult{
+			Character:    char,
+			Enemy:        session.CurrentEnemy,
+			Enemies:      session.CurrentEnemies,
+			Logs:         logs,
+			IsRunning:    session.IsRunning,
+			IsResting:    session.IsResting,
+			RestUntil:    session.RestUntil,
+			SessionKills: session.SessionKills,
+			SessionGold:  session.SessionGold,
+			SessionExp:   session.SessionExp,
+			BattleCount:  session.BattleCount,
+		}, nil
+	}
+	
+	// 如果刚遭遇敌人，这个tick只显示信息，不执行战斗
+	if session.JustEncountered {
+		session.JustEncountered = false // 清除标志，下一个tick开始战斗
+		return &BattleTickResult{
+			Character:    char,
+			Enemy:        session.CurrentEnemy,
+			Enemies:      session.CurrentEnemies,
+			Logs:         logs,
+			IsRunning:    session.IsRunning,
+			IsResting:    session.IsResting,
+			RestUntil:    session.RestUntil,
+			SessionKills: session.SessionKills,
+			SessionGold:  session.SessionGold,
+			SessionExp:   session.SessionExp,
+			BattleCount:  session.BattleCount,
+		}, nil
 	}
 
 	// 回合制逻辑：CurrentTurnIndex == -1 表示玩家回合，>=0 表示敌人索引
@@ -265,6 +302,8 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 
 			// 检查目标是否死亡
 			if target.HP <= 0 {
+				// 确保HP归零
+				target.HP = 0
 				// 敌人死亡
 				expGain := target.ExpReward
 				goldGain := target.GoldMin + rand.Intn(target.GoldMax-target.GoldMin+1)
@@ -351,6 +390,13 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 
 	// 如果所有敌人都被击败，处理战斗结束
 	if len(aliveEnemies) == 0 && len(session.CurrentEnemies) > 0 {
+		// 确保所有敌人的HP都归零
+		for _, enemy := range session.CurrentEnemies {
+			if enemy != nil && enemy.HP <= 0 {
+				enemy.HP = 0
+			}
+		}
+		
 		// 战斗胜利总结
 		if session.CurrentBattleKills > 0 {
 			summaryMsg := fmt.Sprintf("━━━ 战斗总结 ━━━ 击杀: %d | 经验: %d | 金币: %d", 
@@ -381,9 +427,35 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 		session.CurrentBattleKills = 0
 		session.CurrentTurnIndex = -1
 
-		// 清除敌人
+		// 先返回一次带有HP=0的敌人状态，让前端更新显示
+		// 创建敌人副本，确保HP为0
+		defeatedEnemies := make([]*models.Monster, len(session.CurrentEnemies))
+		for i, enemy := range session.CurrentEnemies {
+			if enemy != nil {
+				defeatedEnemy := *enemy
+				defeatedEnemy.HP = 0
+				defeatedEnemies[i] = &defeatedEnemy
+			}
+		}
+
+		// 清除敌人（在返回结果之后）
 		session.CurrentEnemies = nil
 		session.CurrentEnemy = nil
+
+		// 返回带有HP=0的敌人状态
+		return &BattleTickResult{
+			Character:    char,
+			Enemy:        nil,
+			Enemies:      defeatedEnemies, // 返回HP=0的敌人副本
+			Logs:         logs,
+			IsRunning:    session.IsRunning,
+			IsResting:    session.IsResting,
+			RestUntil:    session.RestUntil,
+			SessionKills: session.SessionKills,
+			SessionGold:  session.SessionGold,
+			SessionExp:   session.SessionExp,
+			BattleCount:  session.BattleCount,
+		}, nil
 	}
 
 	// 保存角色数据更新
