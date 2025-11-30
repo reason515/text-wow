@@ -1,202 +1,148 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { get, post } from '@/api/client'
-import type { Character, BattleLog, Monster, Zone, BattleStatus as BattleStatusType } from '@/types/game'
+import type { Character, BattleLog, BattleStatus, Monster, Zone, BattleResult } from '../types/game'
 
-// 战斗回合结果
-interface BattleTickResult {
-  character: Character
-  enemy?: Monster
-  logs: BattleLog[]
-  isRunning: boolean
-  sessionKills: number
-  sessionGold: number
-  sessionExp: number
-  battleCount: number
-}
+const API_BASE = '/api'
 
 export const useGameStore = defineStore('game', () => {
   // 状态
+  const character = ref<Character | null>(null)
   const battleLogs = ref<BattleLog[]>([])
-  const battleStatus = ref<BattleStatusType>({
-    isRunning: false,
-    battleCount: 0,
-    totalKills: 0,
-    totalExp: 0,
-    totalGold: 0,
-    team: []
+  const battleStatus = ref<BattleStatus>({
+    is_running: false,
+    current_zone: '',
+    current_enemy: null,
+    battle_count: 0,
+    session_kills: 0,
+    session_gold: 0,
+    session_exp: 0
   })
   const zones = ref<Zone[]>([])
-  const currentZone = ref<Zone | null>(null)
-  const currentEnemy = ref<Monster | null>(null)
   const isLoading = ref(false)
   const battleInterval = ref<number | null>(null)
 
   // 计算属性
-  const isRunning = computed(() => battleStatus.value.isRunning)
+  const hasCharacter = computed(() => character.value !== null)
+  const isRunning = computed(() => battleStatus.value.is_running)
+  const currentEnemy = computed(() => battleStatus.value.current_enemy)
 
-  // ═══════════════════════════════════════════════════════════
   // API 调用
-  // ═══════════════════════════════════════════════════════════
-
-  // 获取战斗状态
-  async function fetchBattleStatus() {
-    const res = await get<BattleStatusType>('/battle/status')
-    if (res.success && res.data) {
-      battleStatus.value = res.data
-      currentEnemy.value = res.data.currentMonster || null
-    }
-  }
-
-  // 获取战斗日志
-  async function fetchBattleLogs() {
-    const res = await get<{ logs: BattleLog[] }>('/battle/logs')
-    if (res.success && res.data) {
-      battleLogs.value = res.data.logs || []
-    }
-  }
-
-  // 获取区域列表
-  async function fetchZones() {
-    const res = await get<Zone[]>('/zones')
-    if (res.success && res.data) {
-      zones.value = res.data
-    }
-  }
-
-  // 开始战斗
-  async function startBattle() {
+  async function createCharacter(name: string, race: string, className: string) {
     isLoading.value = true
     try {
-      const res = await post<{ isRunning: boolean }>('/battle/start')
-      if (res.success && res.data) {
-        battleStatus.value.isRunning = res.data.isRunning
-        if (res.data.isRunning) {
-          startBattleLoop()
-        }
-      }
+      const res = await fetch(`${API_BASE}/character`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, race, class: className })
+      })
+      character.value = await res.json()
+      await fetchBattleLogs()
+      await fetchZones()
     } finally {
       isLoading.value = false
     }
   }
 
-  // 停止战斗
-  async function stopBattle() {
-    isLoading.value = true
+  async function fetchCharacter() {
     try {
-      const res = await post<{ isRunning: boolean }>('/battle/stop')
-      if (res.success) {
-        battleStatus.value.isRunning = false
+      const res = await fetch(`${API_BASE}/character`)
+      if (res.ok) {
+        character.value = await res.json()
+      }
+    } catch (e) {
+      console.error('Failed to fetch character:', e)
+    }
+  }
+
+  async function fetchBattleLogs() {
+    try {
+      const res = await fetch(`${API_BASE}/battle/logs`)
+      const data = await res.json()
+      battleLogs.value = data.logs || []
+    } catch (e) {
+      console.error('Failed to fetch logs:', e)
+    }
+  }
+
+  async function fetchBattleStatus() {
+    try {
+      const res = await fetch(`${API_BASE}/battle/status`)
+      battleStatus.value = await res.json()
+    } catch (e) {
+      console.error('Failed to fetch status:', e)
+    }
+  }
+
+  async function fetchZones() {
+    try {
+      const res = await fetch(`${API_BASE}/zones`)
+      const data = await res.json()
+      zones.value = data.zones || []
+    } catch (e) {
+      console.error('Failed to fetch zones:', e)
+    }
+  }
+
+  async function toggleBattle() {
+    try {
+      const res = await fetch(`${API_BASE}/battle/toggle`, { method: 'POST' })
+      const data = await res.json()
+      battleStatus.value.is_running = data.running
+
+      if (data.running) {
+        startBattleLoop()
+      } else {
         stopBattleLoop()
       }
-    } finally {
-      isLoading.value = false
+    } catch (e) {
+      console.error('Failed to toggle battle:', e)
     }
   }
 
-  // 切换战斗状态
-  async function toggleBattle() {
-    isLoading.value = true
-    try {
-      console.log('[ToggleBattle] Calling...')
-      const res = await post<{ isRunning: boolean }>('/battle/toggle')
-      console.log('[ToggleBattle] Response:', res)
-      
-      if (res.success && res.data) {
-        battleStatus.value.isRunning = res.data.isRunning
-        console.log('[ToggleBattle] isRunning:', res.data.isRunning)
-        
-        if (res.data.isRunning) {
-          startBattleLoop()
-          console.log('[ToggleBattle] Started battle loop')
-        } else {
-          stopBattleLoop()
-          console.log('[ToggleBattle] Stopped battle loop')
-        }
-      } else {
-        console.warn('[ToggleBattle] Failed or no data:', res)
-      }
-    } finally {
-      isLoading.value = false
-    }
-  }
-
-  // 执行战斗回合
   async function battleTick() {
     try {
-      const res = await post<BattleTickResult>('/battle/tick')
-      console.log('[BattleTick] Response:', res)
+      const res = await fetch(`${API_BASE}/battle/tick`, { method: 'POST' })
+      const result: BattleResult = await res.json()
       
-      if (res.success && res.data) {
-        const result = res.data
-        console.log('[BattleTick] Result:', result)
+      if (result) {
+        character.value = result.character
+        battleStatus.value = result.status
         
-        // 更新状态
-        battleStatus.value.isRunning = result.isRunning
-        battleStatus.value.battleCount = result.battleCount
-        battleStatus.value.totalKills = result.sessionKills
-        battleStatus.value.totalExp = result.sessionExp
-        battleStatus.value.totalGold = result.sessionGold
-        
-        // 更新当前敌人
-        currentEnemy.value = result.enemy || null
-
         // 添加新日志
         if (result.logs && result.logs.length > 0) {
-          console.log('[BattleTick] Adding logs:', result.logs.length)
-          for (const log of result.logs) {
-            addLog(log)
+          battleLogs.value.push(...result.logs)
+          // 保持日志数量
+          if (battleLogs.value.length > 100) {
+            battleLogs.value = battleLogs.value.slice(-100)
           }
-        }
 
-        // 如果战斗停止，停止循环
-        if (!result.isRunning) {
-          stopBattleLoop()
         }
-
-        return result.character
-      } else {
-        console.warn('[BattleTick] No data or not successful:', res)
       }
     } catch (e) {
       console.error('Battle tick failed:', e)
-      stopBattleLoop()
     }
-    return null
   }
 
-  // 切换区域
   async function changeZone(zoneId: string) {
-    isLoading.value = true
     try {
-      const res = await post<{ status: BattleStatusType; logs: BattleLog[] }>('/battle/zone', { zoneId })
-      if (res.success && res.data) {
-        if (res.data.status) {
-          battleStatus.value = res.data.status
-        }
-        if (res.data.logs) {
-          for (const log of res.data.logs) {
-            addLog(log)
-          }
-        }
-        // 更新当前区域
-        currentZone.value = zones.value.find(z => z.id === zoneId) || null
-        return true
+      const res = await fetch(`${API_BASE}/zone/change`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ zone_id: zoneId })
+      })
+      if (res.ok) {
+        await fetchBattleStatus()
+        await fetchBattleLogs()
       }
-      return false
-    } finally {
-      isLoading.value = false
+    } catch (e) {
+      console.error('Failed to change zone:', e)
     }
   }
-
-  // ═══════════════════════════════════════════════════════════
-  // 战斗循环
-  // ═══════════════════════════════════════════════════════════
 
   function startBattleLoop() {
     if (battleInterval.value) return
     battleInterval.value = window.setInterval(() => {
-      if (battleStatus.value.isRunning) {
+      if (battleStatus.value.is_running) {
         battleTick()
       }
     }, 1500) // 每1.5秒一个回合
@@ -209,69 +155,46 @@ export const useGameStore = defineStore('game', () => {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // 日志管理
-  // ═══════════════════════════════════════════════════════════
-
-  function addLog(log: BattleLog) {
+  // 添加本地日志（不发送到服务器）
+  function addLocalLog(type: BattleLog['type'], message: string, color: string = '#00FF00') {
+    const log: BattleLog = {
+      time: new Date().toLocaleTimeString('zh-CN', { hour12: false }),
+      type,
+      message,
+      color
+    }
     battleLogs.value.push(log)
-    // 保持日志数量
-    if (battleLogs.value.length > 100) {
-      battleLogs.value = battleLogs.value.slice(-100)
-    }
-  }
-
-  function clearLogs() {
-    battleLogs.value = []
-  }
-
-  // ═══════════════════════════════════════════════════════════
-  // 初始化
-  // ═══════════════════════════════════════════════════════════
-
-  async function init() {
-    await Promise.all([
-      fetchZones(),
-      fetchBattleStatus(),
-      fetchBattleLogs()
-    ])
-
-    // 如果战斗正在运行，启动循环
-    if (battleStatus.value.isRunning) {
-      startBattleLoop()
-    }
-  }
-
-  // 清理
-  function cleanup() {
-    stopBattleLoop()
   }
 
   return {
     // 状态
+    character,
     battleLogs,
     battleStatus,
     zones,
-    currentZone,
-    currentEnemy,
     isLoading,
     // 计算属性
+    hasCharacter,
     isRunning,
+    currentEnemy,
     // 方法
-    fetchBattleStatus,
+    createCharacter,
+    fetchCharacter,
     fetchBattleLogs,
+    fetchBattleStatus,
     fetchZones,
-    startBattle,
-    stopBattle,
     toggleBattle,
     battleTick,
     changeZone,
-    addLog,
-    clearLogs,
-    init,
-    cleanup,
+    addLocalLog,
     startBattleLoop,
     stopBattleLoop
   }
 })
+
+
+
+
+
+
 
