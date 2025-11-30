@@ -164,6 +164,7 @@ export interface BattleLog {
 export interface BattleStatus {
   isRunning: boolean
   currentMonster?: Monster
+  currentEnemies?: Monster[]  // 多个敌人支持
   currentZoneId?: string
   team?: Character[]
   battleCount: number
@@ -171,6 +172,14 @@ export interface BattleStatus {
   totalExp: number
   totalGold: number
   sessionStart?: string
+}
+
+export interface BattleResult {
+  character?: Character
+  enemy?: Monster
+  enemies?: Monster[]  // 多个敌人支持
+  logs?: BattleLog[]
+  status?: BattleStatus
 }
 
 // ═══════════════════════════════════════════════════════════

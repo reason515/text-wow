@@ -87,6 +87,14 @@ const enemyHpPercent = computed(() => {
   return (hp / maxHp) * 100
 })
 
+// 计算每个敌人的HP百分比
+function getEnemyHpPercent(enemy: any): number {
+  if (!enemy) return 0
+  const maxHp = enemy.maxHp || enemy.max_hp || enemy.hp || 100
+  const hp = enemy.hp || 0
+  return maxHp > 0 ? (hp / maxHp) * 100 : 0
+}
+
 // 获取资源类型名称
 const resourceTypeName = computed(() => {
   if (!game.character) return 'MP'
@@ -282,23 +290,30 @@ function formatLogMessage(log: any): string {
 
         <!-- 中间战斗日志区域 -->
         <div class="game-content">
-          <div class="terminal-content" ref="logContainer">
-            <!-- 当前敌人信息 -->
-            <div v-if="game.currentEnemy" class="enemy-info">
+          <!-- 敌人信息面板（固定在顶部） -->
+          <div v-if="game.currentEnemies && game.currentEnemies.length > 0" class="enemies-panel">
+            <div 
+              v-for="(enemy, index) in game.currentEnemies" 
+              :key="index"
+              class="enemy-info"
+              :class="{ 'enemy-dead': (enemy as any)?.hp <= 0 }"
+            >
               <span class="enemy-name">
-                ⚔ {{ (game.currentEnemy as any)?.name || '未知敌人' }} (Lv.{{ (game.currentEnemy as any)?.level || 1 }})
+                ⚔ {{ (enemy as any)?.name || '未知敌人' }} (Lv.{{ (enemy as any)?.level || 1 }})
               </span>
               <div class="enemy-hp">
-                <span style="color: #888">HP:</span>
+                <span class="enemy-hp-label">HP:</span>
                 <div class="enemy-bar">
-                  <div class="enemy-bar-fill" :style="{ width: enemyHpPercent + '%' }"></div>
+                  <div class="enemy-bar-fill" :style="{ width: getEnemyHpPercent(enemy) + '%' }"></div>
                 </div>
-                <span style="color: #ff4444">
-                  {{ (game.currentEnemy as any)?.hp || 0 }}/{{ (game.currentEnemy as any)?.maxHp || (game.currentEnemy as any)?.max_hp || 100 }}
+                <span class="enemy-hp-value">
+                  {{ (enemy as any)?.hp || 0 }}/{{ (enemy as any)?.maxHp || (enemy as any)?.max_hp || (enemy as any)?.hp || 100 }}
                 </span>
               </div>
             </div>
-
+          </div>
+          
+          <div class="terminal-content" ref="logContainer">
             <!-- 战斗日志 -->
             <div class="battle-log">
               <div 
@@ -580,6 +595,19 @@ function formatLogMessage(log: any): string {
   overflow: hidden;
 }
 
+/* 敌人信息面板（固定在顶部，横向排列） */
+.enemies-panel {
+  border-bottom: 2px solid var(--border-color);
+  background: rgba(0, 0, 0, 0.5);
+  padding: 8px 12px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
 .terminal-content {
   flex: 1;
   min-height: 0;
@@ -613,5 +641,62 @@ function formatLogMessage(log: any): string {
   color: var(--terminal-green);
   font-size: 16px;
   margin: 10px 0;
+}
+
+/* 敌人信息样式覆盖（横向排列） */
+.enemy-info {
+  border: 1px solid var(--text-dim);
+  padding: 6px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 160px;
+  flex: 1;
+  max-width: 280px;
+  background: rgba(50, 0, 0, 0.3);
+  transition: opacity 0.3s;
+}
+
+.enemy-info.enemy-dead {
+  opacity: 0.5;
+  border-color: var(--text-gray);
+}
+
+.enemy-info .enemy-name {
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-red);
+  font-weight: bold;
+}
+
+.enemy-info .enemy-hp {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+}
+
+.enemy-info .enemy-hp-label {
+  color: var(--text-gray);
+  font-size: 10px;
+  min-width: 24px;
+}
+
+.enemy-info .enemy-bar {
+  flex: 1;
+  min-width: 60px;
+  height: 10px;
+  background: var(--bg-color);
+  border: 1px solid var(--text-red);
+}
+
+.enemy-info .enemy-hp-value {
+  color: #ff4444;
+  font-size: 10px;
+  white-space: nowrap;
+  min-width: 50px;
+  text-align: right;
 }
 </style>

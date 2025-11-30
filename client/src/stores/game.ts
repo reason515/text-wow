@@ -15,6 +15,8 @@ export const useGameStore = defineStore('game', () => {
     currentZoneId: '',
     current_enemy: null,
     currentMonster: null,
+    current_enemies: null,
+    currentEnemies: null,
     battle_count: 0,
     battleCount: 0,
     session_kills: 0,
@@ -32,6 +34,10 @@ export const useGameStore = defineStore('game', () => {
   const hasCharacter = computed(() => character.value !== null)
   const isRunning = computed(() => battleStatus.value?.is_running ?? false)
   const currentEnemy = computed(() => battleStatus.value?.current_enemy ?? null)
+  const currentEnemies = computed(() => {
+    const enemies = battleStatus.value?.current_enemies ?? battleStatus.value?.currentEnemies ?? null
+    return enemies && Array.isArray(enemies) ? enemies : (enemies ? [enemies] : [])
+  })
 
   // API 调用
   async function createCharacter(name: string, race: string, className: string) {
@@ -85,6 +91,8 @@ export const useGameStore = defineStore('game', () => {
           currentZoneId: data.currentZoneId ?? data.current_zone ?? '',
           current_enemy: data.currentMonster ?? data.current_enemy ?? null,
           currentMonster: data.currentMonster ?? data.current_enemy ?? null,
+          current_enemies: data.currentEnemies ?? data.current_enemies ?? null,
+          currentEnemies: data.currentEnemies ?? data.current_enemies ?? null,
           battle_count: data.battleCount ?? data.battle_count ?? 0,
           battleCount: data.battleCount ?? data.battle_count ?? 0,
           session_kills: data.totalKills ?? data.session_kills ?? 0,
@@ -245,6 +253,8 @@ export const useGameStore = defineStore('game', () => {
             currentZoneId: status.currentZoneId ?? status.current_zone ?? battleStatus.value.currentZoneId,
             current_enemy: status.currentMonster ?? status.current_enemy ?? battleStatus.value.current_enemy,
             currentMonster: status.currentMonster ?? status.current_enemy ?? battleStatus.value.currentMonster,
+            current_enemies: status.currentEnemies ?? status.current_enemies ?? battleStatus.value.current_enemies,
+            currentEnemies: status.currentEnemies ?? status.current_enemies ?? battleStatus.value.currentEnemies,
             battle_count: status.battleCount ?? status.battle_count ?? battleStatus.value.battle_count,
             battleCount: status.battleCount ?? status.battle_count ?? battleStatus.value.battleCount,
             session_kills: status.totalKills ?? status.session_kills ?? battleStatus.value.session_kills,
@@ -255,6 +265,12 @@ export const useGameStore = defineStore('game', () => {
             totalExp: status.totalExp ?? status.session_exp ?? battleStatus.value.totalExp,
             ...status // 保留其他字段
           }
+        }
+        
+        // 如果 result 中有 enemies 字段，也更新
+        if (result.enemies) {
+          battleStatus.value.current_enemies = result.enemies
+          battleStatus.value.currentEnemies = result.enemies
         }
         
         // 添加新日志
@@ -346,6 +362,7 @@ export const useGameStore = defineStore('game', () => {
     hasCharacter,
     isRunning,
     currentEnemy,
+    currentEnemies,
     // 方法
     createCharacter,
     fetchCharacter,
