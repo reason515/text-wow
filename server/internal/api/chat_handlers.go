@@ -513,3 +513,4 @@ func GarbleMessage(content string, fromFaction string) string {
 	return strings.Join(result, " ")
 }
 
+

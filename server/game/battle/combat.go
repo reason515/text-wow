@@ -747,3 +747,4 @@ func (e *CombatEngine) RunFullBattle() *Battle {
 	return e.battle
 }
 
+
