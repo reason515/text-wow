@@ -32,6 +32,7 @@ func main() {
 	// 创建API处理器
 	h := api.NewHandler()
 	chatHandler := api.NewChatHandler()
+	battleHandler := api.NewBattleHandler()
 
 	// API 路由
 	apiGroup := r.Group("/api")
@@ -87,21 +88,37 @@ func main() {
 				chat.POST("/offline", chatHandler.SetOffline)
 				chat.POST("/heartbeat", chatHandler.Heartbeat)
 			}
+
+			// 战斗
+			battle := protected.Group("/battle")
+			{
+				battle.POST("/start", battleHandler.StartBattle)
+				battle.POST("/stop", battleHandler.StopBattle)
+				battle.POST("/toggle", battleHandler.ToggleBattle)
+				battle.POST("/tick", battleHandler.BattleTick)
+				battle.GET("/status", battleHandler.GetBattleStatus)
+				battle.GET("/logs", battleHandler.GetBattleLogs)
+				battle.POST("/zone", battleHandler.ChangeZone)
+			}
 		}
 	}
 
 	log.Println("🎮 Text WoW Server starting on :8080")
 	log.Println("📌 API Documentation:")
-	log.Println("   POST /api/auth/register  - 用户注册")
-	log.Println("   POST /api/auth/login     - 用户登录")
-	log.Println("   GET  /api/races          - 获取种族列表")
-	log.Println("   GET  /api/classes        - 获取职业列表")
-	log.Println("   GET  /api/characters     - 获取角色列表 (需认证)")
-	log.Println("   POST /api/characters     - 创建角色 (需认证)")
-	log.Println("   GET  /api/team           - 获取小队 (需认证)")
-	log.Println("   GET  /api/chat/messages  - 获取聊天消息 (需认证)")
-	log.Println("   POST /api/chat/send      - 发送消息 (需认证)")
-	log.Println("   GET  /api/chat/online    - 获取在线玩家 (需认证)")
+	log.Println("   POST /api/auth/register    - 用户注册")
+	log.Println("   POST /api/auth/login       - 用户登录")
+	log.Println("   GET  /api/races            - 获取种族列表")
+	log.Println("   GET  /api/classes          - 获取职业列表")
+	log.Println("   GET  /api/characters       - 获取角色列表 (需认证)")
+	log.Println("   POST /api/characters       - 创建角色 (需认证)")
+	log.Println("   GET  /api/team             - 获取小队 (需认证)")
+	log.Println("   POST /api/battle/start     - 开始战斗 (需认证)")
+	log.Println("   POST /api/battle/stop      - 停止战斗 (需认证)")
+	log.Println("   POST /api/battle/toggle    - 切换战斗 (需认证)")
+	log.Println("   POST /api/battle/tick      - 战斗回合 (需认证)")
+	log.Println("   GET  /api/battle/status    - 战斗状态 (需认证)")
+	log.Println("   GET  /api/battle/logs      - 战斗日志 (需认证)")
+	log.Println("   POST /api/battle/zone      - 切换区域 (需认证)")
 	
 	if err := r.Run(":8080"); err != nil {
 		log.Fatalf("❌ Failed to start server: %v", err)

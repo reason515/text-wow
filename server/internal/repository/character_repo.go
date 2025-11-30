@@ -253,6 +253,32 @@ func (r *CharacterRepository) Delete(id int) error {
 	return err
 }
 
+// UpdateAfterBattle 战斗后更新角色数据
+func (r *CharacterRepository) UpdateAfterBattle(id int, hp, resource, exp, level, expToNext, maxHP, maxResource, attack, defense, strength, agility, stamina, totalKills int) error {
+	_, err := database.DB.Exec(`
+		UPDATE characters SET 
+			hp = ?, resource = ?, exp = ?, level = ?, exp_to_next = ?,
+			max_hp = ?, max_resource = ?, attack = ?, defense = ?,
+			strength = ?, agility = ?, stamina = ?,
+			total_kills = ?, updated_at = ?
+		WHERE id = ?`,
+		hp, resource, exp, level, expToNext,
+		maxHP, maxResource, attack, defense,
+		strength, agility, stamina,
+		totalKills, time.Now(), id,
+	)
+	return err
+}
+
+// UpdateAfterDeath 死亡后更新角色数据
+func (r *CharacterRepository) UpdateAfterDeath(id int, hp, totalDeaths int) error {
+	_, err := database.DB.Exec(`
+		UPDATE characters SET hp = ?, total_deaths = ?, updated_at = ? WHERE id = ?`,
+		hp, totalDeaths, time.Now(), id,
+	)
+	return err
+}
+
 // helper function
 func boolToInt(b bool) int {
 	if b {

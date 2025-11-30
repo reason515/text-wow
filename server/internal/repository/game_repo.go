@@ -124,7 +124,8 @@ func (r *GameRepository) GetClassByID(id string) (*models.Class, error) {
 // GetZones 获取所有区域
 func (r *GameRepository) GetZones() ([]models.Zone, error) {
 	rows, err := database.DB.Query(`
-		SELECT id, name, description, min_level, max_level, COALESCE(faction, ''), exp_multi, gold_multi
+		SELECT id, name, description, min_level, max_level, COALESCE(faction, ''), 
+		       COALESCE(exp_modifier, 1.0), COALESCE(gold_modifier, 1.0)
 		FROM zones ORDER BY min_level`)
 	if err != nil {
 		return nil, err
@@ -151,7 +152,8 @@ func (r *GameRepository) GetZones() ([]models.Zone, error) {
 func (r *GameRepository) GetZoneByID(id string) (*models.Zone, error) {
 	zone := &models.Zone{}
 	err := database.DB.QueryRow(`
-		SELECT id, name, description, min_level, max_level, COALESCE(faction, ''), exp_multi, gold_multi
+		SELECT id, name, description, min_level, max_level, COALESCE(faction, ''), 
+		       COALESCE(exp_modifier, 1.0), COALESCE(gold_modifier, 1.0)
 		FROM zones WHERE id = ?`, id,
 	).Scan(
 		&zone.ID, &zone.Name, &zone.Description, &zone.MinLevel, &zone.MaxLevel,

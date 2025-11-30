@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useCharacterStore } from '@/stores/character'
+import { useGameStore } from '@/stores/game'
 import ChatPanel from '@/components/ChatPanel.vue'
 import { CLASS_COLORS, CLASS_NAMES } from '@/types/game'
 
@@ -12,6 +13,10 @@ const emit = defineEmits<{
 
 const authStore = useAuthStore()
 const charStore = useCharacterStore()
+const gameStore = useGameStore()
+
+// 日志容器引用
+const logContainer = ref<HTMLElement | null>(null)
 
 // 当前选中的角色
 const selectedCharacter = computed(() => {
@@ -74,19 +79,76 @@ const className = computed(() => {
   return CLASS_NAMES[selectedCharacter.value.classId] || selectedCharacter.value.classId
 })
 
+// 敌人HP百分比
+const enemyHpPercent = computed(() => {
+  if (!gameStore.currentEnemy) return 0
+  return (gameStore.currentEnemy.hp / gameStore.currentEnemy.maxHp) * 100
+})
+
+// 获取日志颜色
+function getLogColor(logType: string): string {
+  const colors: Record<string, string> = {
+    system: '#33ff33',
+    combat: '#ffaa00',
+    victory: '#33ff33',
+    loot: '#ffd700',
+    levelup: '#ffd700',
+    death: '#ff0000',
+    encounter: '#ffff00',
+    zone: '#00ffff'
+  }
+  return colors[logType] || '#33ff33'
+}
+
+// 格式化时间
+function formatTime(date: string | Date): string {
+  const d = typeof date === 'string' ? new Date(date) : date
+  return d.toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
+}
+
+// 自动滚动到底部
+function scrollToBottom() {
+  nextTick(() => {
+    if (logContainer.value) {
+      logContainer.value.scrollTop = logContainer.value.scrollHeight
+    }
+  })
+}
+
+// 监听日志变化，自动滚动
+watch(() => gameStore.battleLogs.length, () => {
+  scrollToBottom()
+})
+
 // 加载数据
 onMounted(async () => {
   await charStore.fetchCharacters()
+  await gameStore.init()
+  scrollToBottom()
+})
+
+onUnmounted(() => {
+  gameStore.cleanup()
 })
 
 // 处理登出
 function handleLogout() {
+  gameStore.cleanup()
   emit('logout')
 }
 
 // 创建新角色
 function createNewCharacter() {
   emit('create-character')
+}
+
+// 切换战斗
+async function handleToggleBattle() {
+  await gameStore.toggleBattle()
+  // 刷新角色数据
+  if (!gameStore.isRunning) {
+    await charStore.fetchCharacters()
+  }
 }
 </script>
 
@@ -98,6 +160,15 @@ function createNewCharacter() {
         <span class="username">{{ authStore.username }}</span>
         <span class="separator">|</span>
         <span class="gold">💰 {{ authStore.user?.gold || 0 }} G</span>
+      </div>
+      <div class="battle-stats" v-if="gameStore.battleStatus.battleCount > 0">
+        <span>战斗: {{ gameStore.battleStatus.battleCount }}</span>
+        <span class="separator">|</span>
+        <span>击杀: {{ gameStore.battleStatus.totalKills }}</span>
+        <span class="separator">|</span>
+        <span class="exp">+{{ gameStore.battleStatus.totalExp }} EXP</span>
+        <span class="separator">|</span>
+        <span class="gold-gain">+{{ gameStore.battleStatus.totalGold }} G</span>
       </div>
       <div class="actions">
         <button class="text-btn" @click="createNewCharacter">新建角色</button>
@@ -208,20 +279,48 @@ function createNewCharacter() {
       <div class="battle-panel">
         <div class="panel-header">
           <h2>战斗日志</h2>
+          <span class="battle-indicator" :class="{ running: gameStore.isRunning }">
+            {{ gameStore.isRunning ? '⚔️ 战斗中' : '⏸️ 已暂停' }}
+          </span>
+        </div>
+
+        <!-- 当前敌人 -->
+        <div class="enemy-bar" v-if="gameStore.currentEnemy">
+          <div class="enemy-info">
+            <span class="enemy-name">{{ gameStore.currentEnemy.name }}</span>
+            <span class="enemy-level">Lv.{{ gameStore.currentEnemy.level }}</span>
+          </div>
+          <div class="enemy-hp-track">
+            <div class="enemy-hp-fill" :style="{ width: enemyHpPercent + '%' }"></div>
+          </div>
+          <div class="enemy-hp-text">{{ gameStore.currentEnemy.hp }}/{{ gameStore.currentEnemy.maxHp }}</div>
         </div>
         
-        <div class="battle-log">
-          <div class="log-placeholder">
+        <div class="battle-log" ref="logContainer">
+          <div 
+            v-for="(log, index) in gameStore.battleLogs" 
+            :key="index"
+            class="log-entry"
+            :style="{ color: getLogColor(log.logType) }"
+          >
+            <span class="log-time">[{{ formatTime(log.createdAt) }}]</span>
+            <span class="log-message">{{ log.message }}</span>
+          </div>
+          
+          <div v-if="gameStore.battleLogs.length === 0" class="log-placeholder">
             <p>🎮 欢迎来到艾泽拉斯！</p>
-            <p>战斗系统正在开发中...</p>
-            <p>敬请期待！</p>
+            <p>点击「开始挂机」按钮开始自动战斗</p>
           </div>
         </div>
 
         <!-- 控制按钮 -->
         <div class="control-bar">
-          <button class="cmd-btn" disabled>
-            [▶] 开始挂机
+          <button 
+            class="cmd-btn primary" 
+            @click="handleToggleBattle"
+            :disabled="!selectedCharacter || gameStore.isLoading"
+          >
+            {{ gameStore.isRunning ? '[⏹] 停止挂机' : '[▶] 开始挂机' }}
           </button>
           <button class="cmd-btn" disabled>
             [S] 策略
@@ -304,6 +403,22 @@ function createNewCharacter() {
   font-size: 13px;
 }
 
+.battle-stats {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--terminal-gray);
+}
+
+.battle-stats .exp {
+  color: #9b59b6;
+}
+
+.battle-stats .gold-gain {
+  color: var(--terminal-gold);
+}
+
 .actions {
   display: flex;
   gap: 15px;
@@ -350,6 +465,7 @@ function createNewCharacter() {
   border-bottom: 1px solid var(--terminal-gray);
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 10px;
 }
 
@@ -359,6 +475,21 @@ function createNewCharacter() {
   margin: 0;
   text-transform: uppercase;
   letter-spacing: 2px;
+}
+
+.battle-indicator {
+  font-size: 11px;
+  color: var(--terminal-gray);
+}
+
+.battle-indicator.running {
+  color: var(--terminal-green);
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 
 /* 角色面板 */
@@ -502,12 +633,66 @@ function createNewCharacter() {
   margin-top: auto;
 }
 
+/* 敌人状态条 */
+.enemy-bar {
+  padding: 10px 15px;
+  border-bottom: 1px solid var(--terminal-gray);
+  background: rgba(255, 0, 0, 0.05);
+}
+
+.enemy-info {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 5px;
+}
+
+.enemy-name {
+  color: var(--terminal-red);
+  font-size: 13px;
+}
+
+.enemy-level {
+  color: var(--terminal-gray);
+  font-size: 11px;
+}
+
+.enemy-hp-track {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  margin-bottom: 3px;
+}
+
+.enemy-hp-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #8b0000, #c41e3a);
+  transition: width 0.3s ease;
+}
+
+.enemy-hp-text {
+  font-size: 10px;
+  color: var(--terminal-gray);
+  text-align: right;
+}
+
 /* 战斗面板 */
 .battle-log {
   flex: 1;
   padding: 15px;
   overflow-y: auto;
   min-height: 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.log-entry {
+  margin-bottom: 4px;
+  word-break: break-word;
+}
+
+.log-time {
+  color: var(--terminal-gray);
+  margin-right: 8px;
+  font-size: 11px;
 }
 
 .log-placeholder {
@@ -540,9 +725,20 @@ function createNewCharacter() {
   transition: all 0.3s;
 }
 
+.cmd-btn.primary {
+  border-color: var(--terminal-green);
+  color: var(--terminal-green);
+}
+
 .cmd-btn:not(:disabled):hover {
   border-color: var(--terminal-green);
   color: var(--terminal-green);
+  background: rgba(0, 255, 0, 0.1);
+}
+
+.cmd-btn.primary:not(:disabled):hover {
+  background: var(--terminal-green);
+  color: var(--terminal-bg);
 }
 
 .cmd-btn:disabled {

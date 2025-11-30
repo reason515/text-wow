@@ -191,14 +191,15 @@ type BattleLog struct {
 
 // BattleStatus 战斗状态
 type BattleStatus struct {
-	IsRunning      bool        `json:"isRunning"`
-	CurrentMonster *Monster    `json:"currentMonster,omitempty"`
-	Team           []*Character `json:"team"`
-	BattleCount    int         `json:"battleCount"`
-	TotalKills     int         `json:"totalKills"`
-	TotalExp       int         `json:"totalExp"`
-	TotalGold      int         `json:"totalGold"`
-	SessionStart   *time.Time  `json:"sessionStart,omitempty"`
+	IsRunning      bool         `json:"isRunning"`
+	CurrentMonster *Monster     `json:"currentMonster,omitempty"`
+	CurrentZoneID  string       `json:"currentZoneId,omitempty"`
+	Team           []*Character `json:"team,omitempty"`
+	BattleCount    int          `json:"battleCount"`
+	TotalKills     int          `json:"totalKills"`
+	TotalExp       int          `json:"totalExp"`
+	TotalGold      int          `json:"totalGold"`
+	SessionStart   *time.Time   `json:"sessionStart,omitempty"`
 }
 
 // ═══════════════════════════════════════════════════════════

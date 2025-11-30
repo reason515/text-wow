@@ -164,7 +164,8 @@ export interface BattleLog {
 export interface BattleStatus {
   isRunning: boolean
   currentMonster?: Monster
-  team: Character[]
+  currentZoneId?: string
+  team?: Character[]
   battleCount: number
   totalKills: number
   totalExp: number
