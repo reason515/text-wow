@@ -73,13 +73,18 @@ func (r *CharacterRepository) GetByID(id int) (*models.Character, error) {
 		return nil, err
 	}
 
-	char.IsActive = isActive == 1
-	char.IsDead = isDead == 1
-	if reviveAt.Valid {
-		char.ReviveAt = &reviveAt.Time
-	}
+		char.IsActive = isActive == 1
+		char.IsDead = isDead == 1
+		if reviveAt.Valid {
+			char.ReviveAt = &reviveAt.Time
+		}
 
-	return char, nil
+		// 确保战士的怒气上限为100
+		if char.ResourceType == "rage" {
+			char.MaxResource = 100
+		}
+
+		return char, nil
 }
 
 // GetByUserID 获取用户的所有角色
@@ -166,6 +171,11 @@ func (r *CharacterRepository) GetActiveByUserID(userID int) ([]*models.Character
 		char.IsDead = isDead == 1
 		if reviveAt.Valid {
 			char.ReviveAt = &reviveAt.Time
+		}
+
+		// 确保战士的怒气上限为100
+		if char.ResourceType == "rage" {
+			char.MaxResource = 100
 		}
 
 		characters = append(characters, char)

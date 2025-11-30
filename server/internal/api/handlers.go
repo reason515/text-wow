@@ -356,8 +356,15 @@ func (h *Handler) CreateCharacter(c *gin.Context) {
 	// 计算HP和资源
 	char.MaxHP = class.BaseHP + char.Stamina*2
 	char.HP = char.MaxHP
-	char.MaxResource = class.BaseResource
-	char.Resource = char.MaxResource
+	
+	// 战士的怒气最大值固定为100，初始值为0
+	if class.ResourceType == "rage" {
+		char.MaxResource = 100
+		char.Resource = 0
+	} else {
+		char.MaxResource = class.BaseResource
+		char.Resource = char.MaxResource
+	}
 
 	// 计算攻击和防御
 	char.Attack = char.Strength / 2

@@ -178,6 +178,11 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 
 	// 使用第一个角色进行战斗
 	char := characters[0]
+	
+	// 确保战士的怒气上限为100（每次tick都检查，防止被覆盖）
+	if char.ResourceType == "rage" {
+		char.MaxResource = 100
+	}
 
 	// 如果正在休息，处理休息
 	if session.IsResting && session.RestUntil != nil {
@@ -240,6 +245,12 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 		session.CurrentBattleKills = 0
 		session.CurrentTurnIndex = -1 // 玩家回合
 		
+		// 战斗开始时，确保战士的怒气为0，最大怒气为100
+		if char.ResourceType == "rage" {
+			char.Resource = 0
+			char.MaxResource = 100
+		}
+		
 		err := m.spawnEnemies(session, char.Level)
 		if err != nil {
 			return nil, err
@@ -291,14 +302,47 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 		// 玩家回合：攻击第一个存活的敌人
 		if len(aliveEnemies) > 0 {
 			target := aliveEnemies[0]
+			
+			// 确定使用的技能和消耗
+			skillName, skillCost := m.getSkillForAttack(char)
+			
+			// 如果是战士，检查怒气是否足够使用技能
+			if char.ResourceType == "rage" {
+				if skillCost > 0 && char.Resource < skillCost {
+					// 怒气不足，只能使用普通攻击
+					skillName = "普通攻击"
+					skillCost = 0
+				}
+			}
+			
 			playerDamage := m.calculateDamage(char.Attack, target.Defense)
 			isCrit := rand.Float64() < char.CritRate
 			if isCrit {
 				playerDamage = int(float64(playerDamage) * char.CritDamage)
 			}
 			target.HP -= playerDamage
+			
+			// 消耗资源（如果是战士，消耗怒气）
+			if char.ResourceType == "rage" && skillCost > 0 {
+				char.Resource -= skillCost
+				if char.Resource < 0 {
+					char.Resource = 0
+				}
+			}
+			
+			// 战士攻击获得怒气
+			if char.ResourceType == "rage" {
+				if isCrit {
+					char.Resource += 10 // 暴击获得10点怒气
+				} else {
+					char.Resource += 5 // 普通攻击获得5点怒气
+				}
+				// 确保不超过最大值
+				if char.Resource > char.MaxResource {
+					char.Resource = char.MaxResource
+				}
+			}
 
-			skillName := m.getRandomSkillName(char.ClassID)
 			if isCrit {
 				m.addLog(session, "combat", fmt.Sprintf("%s 使用 [%s] 💥暴击！对 %s 造成 %d 点伤害", char.Name, skillName, target.Name, playerDamage), "#ff6b6b")
 			} else {
@@ -333,8 +377,16 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 					// 升级属性提升
 					char.MaxHP += 15
 					char.HP = char.MaxHP
-					char.MaxResource += 8
-					char.Resource = char.MaxResource
+					
+					// 战士的怒气最大值固定为100，不随升级改变
+					if char.ResourceType == "rage" {
+						char.MaxResource = 100
+						// 升级时怒气保持不变，不重置为最大值
+					} else {
+						char.MaxResource += 8
+						char.Resource = char.MaxResource
+					}
+					
 					char.Strength += 2
 					char.Agility += 1
 					char.Stamina += 2
@@ -355,6 +407,19 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 			enemy := aliveEnemies[session.CurrentTurnIndex]
 			enemyDamage := m.calculateDamage(enemy.Attack, char.Defense)
 			char.HP -= enemyDamage
+			
+			// 战士受到伤害时获得怒气
+			if char.ResourceType == "rage" && enemyDamage > 0 {
+				// 受到伤害获得怒气: 伤害/最大HP × 50，至少1点
+				rageGain := int(float64(enemyDamage) / float64(char.MaxHP) * 50)
+				if rageGain < 1 {
+					rageGain = 1
+				}
+				char.Resource += rageGain
+				if char.Resource > char.MaxResource {
+					char.Resource = char.MaxResource
+				}
+			}
 
 			m.addLog(session, "combat", fmt.Sprintf("%s 攻击了 %s，造成 %d 点伤害", enemy.Name, char.Name, enemyDamage), "#ff4444")
 			logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
@@ -677,6 +742,30 @@ func (m *BattleManager) getRandomSkillName(classID string) string {
 	return "普通攻击"
 }
 
+// getSkillForAttack 获取攻击技能名称和消耗
+func (m *BattleManager) getSkillForAttack(char *models.Character) (string, int) {
+	// 战士技能及其怒气消耗
+	warriorSkills := []struct {
+		name string
+		cost int
+	}{
+		{"英勇打击", 10},
+		{"雷霆一击", 15},
+		{"顺劈斩", 12},
+		{"致死打击", 20},
+	}
+	
+	// 如果是战士，返回随机技能和消耗
+	if char.ResourceType == "rage" {
+		skill := warriorSkills[rand.Intn(len(warriorSkills))]
+		return skill.name, skill.cost
+	}
+	
+	// 其他职业使用普通技能，不消耗资源（或消耗法力，但这里简化处理）
+	skillName := m.getRandomSkillName(char.ClassID)
+	return skillName, 0
+}
+
 // calculateRestTime 计算休息时间（基于HP/MP损失）
 func (m *BattleManager) calculateRestTime(char *models.Character) time.Duration {
 	hpLoss := float64(char.MaxHP - char.HP)
@@ -756,17 +845,12 @@ func (m *BattleManager) processRest(session *BattleSession, char *models.Charact
 		// 根据实际经过的时间计算恢复量
 		elapsedSeconds := elapsed.Seconds()
 		hpRegenPercent := 0.02 * restSpeed * elapsedSeconds // 每秒2%
-		mpRegenPercent := 0.02 * restSpeed * elapsedSeconds
 		
 		hpRegen := int(float64(char.MaxHP) * hpRegenPercent)
-		mpRegen := int(float64(char.MaxResource) * mpRegenPercent)
 		
 		// 确保至少恢复1点（如果还没满）
 		if hpRegen < 1 && char.HP < char.MaxHP {
 			hpRegen = 1
-		}
-		if mpRegen < 1 && char.Resource < char.MaxResource {
-			mpRegen = 1
 		}
 		
 		char.HP += hpRegen
@@ -774,9 +858,19 @@ func (m *BattleManager) processRest(session *BattleSession, char *models.Charact
 			char.HP = char.MaxHP
 		}
 		
-		char.Resource += mpRegen
-		if char.Resource > char.MaxResource {
-			char.Resource = char.MaxResource
+		// 战士的怒气不在休息时恢复，只在战斗中通过攻击/受击获得
+		if char.ResourceType != "rage" {
+			mpRegenPercent := 0.02 * restSpeed * elapsedSeconds
+			mpRegen := int(float64(char.MaxResource) * mpRegenPercent)
+			
+			if mpRegen < 1 && char.Resource < char.MaxResource {
+				mpRegen = 1
+			}
+			
+			char.Resource += mpRegen
+			if char.Resource > char.MaxResource {
+				char.Resource = char.MaxResource
+			}
 		}
 		
 		// 更新上次恢复时间
@@ -791,12 +885,15 @@ func (m *BattleManager) processRest(session *BattleSession, char *models.Charact
 		}
 	} else {
 		// 休息时间到了，结束休息
-		// 确保HP/MP已满
+		// 确保HP已满
 		if char.HP < char.MaxHP {
 			char.HP = char.MaxHP
 		}
-		if char.Resource < char.MaxResource {
-			char.Resource = char.MaxResource
+		// 战士的怒气不在休息时恢复，只在战斗中通过攻击/受击获得
+		if char.ResourceType != "rage" {
+			if char.Resource < char.MaxResource {
+				char.Resource = char.MaxResource
+			}
 		}
 		session.IsResting = false
 		session.RestUntil = nil
