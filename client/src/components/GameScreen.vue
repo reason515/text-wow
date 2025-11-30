@@ -84,7 +84,7 @@ const enemyHpPercent = computed(() => {
   if (!game.currentEnemy) return 0
   const enemy = game.currentEnemy as any
   const maxHp = enemy.maxHp || enemy.max_hp || 100
-  const hp = enemy.hp || 0
+  const hp = Math.max(0, enemy.hp || 0) // 确保HP不会小于0
   return (hp / maxHp) * 100
 })
 
@@ -92,7 +92,7 @@ const enemyHpPercent = computed(() => {
 function getEnemyHpPercent(enemy: any): number {
   if (!enemy) return 0
   const maxHp = enemy.maxHp || enemy.max_hp || enemy.hp || 100
-  const hp = enemy.hp || 0
+  const hp = Math.max(0, enemy.hp || 0) // 确保HP不会小于0
   return maxHp > 0 ? (hp / maxHp) * 100 : 0
 }
 
@@ -444,7 +444,7 @@ function escapeRegex(str: string): string {
                   <div class="enemy-bar-fill" :style="{ width: getEnemyHpPercent(enemy) + '%' }"></div>
                 </div>
                 <span class="enemy-hp-value">
-                  {{ (enemy as any)?.hp || 0 }}/{{ (enemy as any)?.maxHp || (enemy as any)?.max_hp || (enemy as any)?.hp || 100 }}
+                  {{ Math.max(0, (enemy as any)?.hp || 0) }}/{{ (enemy as any)?.maxHp || (enemy as any)?.max_hp || (enemy as any)?.hp || 100 }}
                 </span>
               </div>
             </div>
