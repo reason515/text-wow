@@ -34,6 +34,8 @@ type BattleSession struct {
 	LastTick          time.Time
 	IsResting         bool       // 是否在休息
 	RestUntil         *time.Time // 休息结束时间
+	RestStartedAt     *time.Time // 休息开始时间
+	LastRestTick      *time.Time // 上次恢复处理的时间
 	RestSpeed         float64    // 恢复速度倍率
 	CurrentBattleExp  int        // 本场战斗获得的经验
 	CurrentBattleGold int        // 本场战斗获得的金币
@@ -181,7 +183,11 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 	if session.IsResting && session.RestUntil != nil {
 		initialHP := char.HP
 		initialMP := char.Resource
+		now := time.Now()
 		m.processRest(session, char)
+		
+		// 更新LastTick，用于下次计算时间差
+		session.LastTick = now
 		
 		if !session.IsResting {
 			// 休息结束
@@ -410,12 +416,13 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 		logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
 
 		// 计算并开始休息
-		initialHP := char.MaxHP
-		initialMP := char.MaxResource
-		restDuration := m.calculateRestTime(char, initialHP, initialMP)
-		restUntil := time.Now().Add(restDuration)
+		restDuration := m.calculateRestTime(char)
+		now := time.Now()
+		restUntil := now.Add(restDuration)
 		session.IsResting = true
 		session.RestUntil = &restUntil
+		session.RestStartedAt = &now
+		session.LastRestTick = &now
 		session.RestSpeed = 1.0 // 默认恢复速度
 
 		m.addLog(session, "system", fmt.Sprintf(">> 开始休息恢复 (预计 %d 秒)", int(restDuration.Seconds())+1), "#33ff33")
@@ -671,13 +678,24 @@ func (m *BattleManager) getRandomSkillName(classID string) string {
 }
 
 // calculateRestTime 计算休息时间（基于HP/MP损失）
-func (m *BattleManager) calculateRestTime(char *models.Character, initialHP, initialMP int) time.Duration {
+func (m *BattleManager) calculateRestTime(char *models.Character) time.Duration {
 	hpLoss := float64(char.MaxHP - char.HP)
 	mpLoss := float64(char.MaxResource - char.Resource)
 	
+	// 如果已经满血满蓝，不需要休息
+	if hpLoss <= 0 && mpLoss <= 0 {
+		return 0
+	}
+	
 	// 基础休息时间：每损失1% HP/MP = 0.1秒，最少1秒
-	totalLoss := (hpLoss/float64(char.MaxHP) + mpLoss/float64(char.MaxResource)) / 2.0
-	restSeconds := totalLoss * 10.0
+	// 使用HP和MP损失的平均值
+	hpLossPercent := hpLoss / float64(char.MaxHP)
+	mpLossPercent := mpLoss / float64(char.MaxResource)
+	totalLoss := (hpLossPercent + mpLossPercent) / 2.0
+	
+	// 每秒恢复2%，所以需要的时间 = 损失百分比 / 0.02
+	// 但为了更合理，我们使用：每损失1% = 0.5秒（因为每秒恢复2%，所以50%损失需要25秒）
+	restSeconds := totalLoss * 50.0
 	
 	if restSeconds < 1.0 {
 		restSeconds = 1.0
@@ -694,21 +712,62 @@ func (m *BattleManager) calculateRestTime(char *models.Character, initialHP, ini
 
 // processRest 处理休息期间的恢复
 func (m *BattleManager) processRest(session *BattleSession, char *models.Character) {
-	if !session.IsResting || session.RestUntil == nil {
+	if !session.IsResting || session.RestUntil == nil || session.RestStartedAt == nil {
+		return
+	}
+	
+	// 检查是否已经恢复满血满蓝，如果是则提前结束休息
+	if char.HP >= char.MaxHP && char.Resource >= char.MaxResource {
+		session.IsResting = false
+		session.RestUntil = nil
+		session.RestStartedAt = nil
+		session.LastRestTick = nil
 		return
 	}
 	
 	now := time.Now()
 	if now.Before(*session.RestUntil) {
-		// 计算恢复速度（每秒恢复一定百分比）
+		// 计算从上次恢复到现在经过的时间
+		var elapsed time.Duration
+		if session.LastRestTick == nil {
+			// 第一次恢复，从休息开始时间计算
+			elapsed = now.Sub(*session.RestStartedAt)
+		} else {
+			// 从上次恢复时间计算
+			elapsed = now.Sub(*session.LastRestTick)
+		}
+		
+		// 如果时间间隔太长（超过1秒），限制为1秒，避免一次性恢复过多
+		if elapsed > time.Second {
+			elapsed = time.Second
+		}
+		
+		// 如果时间间隔太短（小于0.1秒），跳过恢复，避免频繁计算
+		if elapsed < 100*time.Millisecond {
+			return
+		}
+		
+		// 计算恢复速度（每秒恢复最大值的2%）
 		restSpeed := session.RestSpeed
 		if restSpeed <= 0 {
 			restSpeed = 1.0
 		}
 		
-		// 每秒恢复最大值的2%
-		hpRegen := int(float64(char.MaxHP) * 0.02 * restSpeed)
-		mpRegen := int(float64(char.MaxResource) * 0.02 * restSpeed)
+		// 根据实际经过的时间计算恢复量
+		elapsedSeconds := elapsed.Seconds()
+		hpRegenPercent := 0.02 * restSpeed * elapsedSeconds // 每秒2%
+		mpRegenPercent := 0.02 * restSpeed * elapsedSeconds
+		
+		hpRegen := int(float64(char.MaxHP) * hpRegenPercent)
+		mpRegen := int(float64(char.MaxResource) * mpRegenPercent)
+		
+		// 确保至少恢复1点（如果还没满）
+		if hpRegen < 1 && char.HP < char.MaxHP {
+			hpRegen = 1
+		}
+		if mpRegen < 1 && char.Resource < char.MaxResource {
+			mpRegen = 1
+		}
 		
 		char.HP += hpRegen
 		if char.HP > char.MaxHP {
@@ -719,10 +778,30 @@ func (m *BattleManager) processRest(session *BattleSession, char *models.Charact
 		if char.Resource > char.MaxResource {
 			char.Resource = char.MaxResource
 		}
+		
+		// 更新上次恢复时间
+		session.LastRestTick = &now
+		
+		// 恢复后再次检查是否已满，如果满了则提前结束休息
+		if char.HP >= char.MaxHP && char.Resource >= char.MaxResource {
+			session.IsResting = false
+			session.RestUntil = nil
+			session.RestStartedAt = nil
+			session.LastRestTick = nil
+		}
 	} else {
-		// 休息结束
+		// 休息时间到了，结束休息
+		// 确保HP/MP已满
+		if char.HP < char.MaxHP {
+			char.HP = char.MaxHP
+		}
+		if char.Resource < char.MaxResource {
+			char.Resource = char.MaxResource
+		}
 		session.IsResting = false
 		session.RestUntil = nil
+		session.RestStartedAt = nil
+		session.LastRestTick = nil
 	}
 }
 
