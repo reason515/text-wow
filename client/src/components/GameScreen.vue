@@ -3,6 +3,7 @@ import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import { useGameStore } from '../stores/game'
 import { useCharacterStore } from '../stores/character'
 import { useAuthStore } from '../stores/auth'
+import { getClassColor } from '../types/game'
 import ChatPanel from './ChatPanel.vue'
 
 const emit = defineEmits<{
@@ -141,13 +142,149 @@ function formatLogTime(log: any): string {
   return new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
-// 格式化日志消息
+// 格式化日志消息，添加颜色标记
 function formatLogMessage(log: any): string {
-  if (log.message) return log.message
-  if (log.logType && log.value) {
-    return `${log.logType}: ${log.value}`
+  let message = ''
+  if (log.message) {
+    message = log.message
+  } else if (log.logType && log.value) {
+    message = `${log.logType}: ${log.value}`
+  } else {
+    message = log.logType || '未知'
   }
-  return log.logType || '未知'
+  
+  // 如果没有消息，直接返回
+  if (!message) return ''
+  
+  // 获取角色名（我方）
+  const playerName = game.character?.name || '你'
+  const playerNameVariants = [playerName, '你', '勇士'] // 可能的变体
+  
+  // 获取角色职业颜色（根据职业ID）
+  const character = game.character as any
+  const classId = character?.classId || character?.class || ''
+  const playerColor = getClassColor(classId) // 使用职业颜色，如果没有职业则使用默认绿色
+  
+  // 获取敌方角色名（从当前敌人或日志中的target/actor字段）
+  let enemyName = ''
+  // 优先使用target字段（如果actor是我方，target就是敌方）
+  if (log.target && log.target !== playerName && !playerNameVariants.includes(log.target)) {
+    enemyName = log.target
+  } 
+  // 如果actor不是我方角色，则actor是敌方
+  else if (log.actor && log.actor !== playerName && !playerNameVariants.includes(log.actor) && log.actor !== 'system') {
+    enemyName = log.actor
+  } 
+  // 最后尝试从当前敌人列表获取
+  else if (game.currentEnemies && game.currentEnemies.length > 0) {
+    const currentEnemy = game.currentEnemies[0] as any
+    enemyName = currentEnemy?.name || ''
+  }
+  
+  // 获取技能名（从日志的action字段或消息中的方括号内容）
+  let skillName = ''
+  if (log.action && log.action !== '攻击' && log.action !== 'encounter' && log.action !== 'victory' && log.action !== 'defeat' && log.action !== 'loot' && log.action !== 'levelup') {
+    skillName = log.action
+  }
+  
+  // 解析消息并添加颜色标记
+  return formatMessageWithColors(message, playerName, playerNameVariants, enemyName, skillName, playerColor)
+}
+
+// 格式化消息，为角色名和技能名添加颜色
+function formatMessageWithColors(
+  message: string,
+  playerName: string,
+  playerNameVariants: string[],
+  enemyName: string,
+  skillName: string,
+  playerColor: string = '#ffff55' // 默认金色，如果未传入则使用默认值
+): string {
+  // 转义HTML特殊字符
+  const escapeHtml = (text: string) => {
+    const div = document.createElement('div')
+    div.textContent = text
+    return div.innerHTML
+  }
+  
+  // 检查位置是否在HTML标签内
+  const isInHtmlTag = (text: string, pos: number): boolean => {
+    const before = text.substring(0, pos)
+    const lastOpen = before.lastIndexOf('<')
+    const lastClose = before.lastIndexOf('>')
+    return lastOpen > lastClose
+  }
+  
+  // 检查位置是否已经在span标签内
+  const isInSpanTag = (text: string, pos: number): boolean => {
+    const before = text.substring(0, pos)
+    const lastSpanOpen = before.lastIndexOf('<span')
+    const lastSpanClose = before.lastIndexOf('</span>')
+    if (lastSpanOpen === -1) return false
+    return lastSpanOpen > lastSpanClose
+  }
+  
+  // 定义颜色（使用传入的职业颜色，敌方和技能使用固定颜色）
+  const enemyColor = '#ff7777' // var(--text-red)
+  const skillColor = '#77ffff' // var(--text-cyan)
+  
+  // 先转义整个消息
+  let formatted = escapeHtml(message)
+  
+  // 标记技能名（方括号内的内容）- 优先处理，避免与其他标记冲突
+  formatted = formatted.replace(/\[([^\]]+)\]/g, (match, skill) => {
+    return `<span style="color: ${skillColor}">[${escapeHtml(skill)}]</span>`
+  })
+  
+  // 标记我方角色名（按长度从长到短排序，避免短名称覆盖长名称）
+  const sortedPlayerNames = [...playerNameVariants].filter(n => n).sort((a, b) => b.length - a.length)
+  sortedPlayerNames.forEach(name => {
+    if (name) {
+      const regex = new RegExp(escapeRegex(name), 'g')
+      // 收集所有匹配位置（从后往前处理，避免索引变化）
+      const matches: Array<{ match: string; index: number }> = []
+      let match
+      while ((match = regex.exec(formatted)) !== null) {
+        matches.push({ match: match[0], index: match.index })
+      }
+      // 从后往前替换
+      for (let i = matches.length - 1; i >= 0; i--) {
+        const { match: matchText, index } = matches[i]
+        if (!isInHtmlTag(formatted, index) && !isInSpanTag(formatted, index)) {
+          formatted = formatted.substring(0, index) + 
+                      `<span style="color: ${playerColor}">${matchText}</span>` + 
+                      formatted.substring(index + matchText.length)
+        }
+      }
+    }
+  })
+  
+  // 标记敌方角色名（避免与已标记的内容冲突）
+  if (enemyName) {
+    const regex = new RegExp(escapeRegex(enemyName), 'g')
+    // 收集所有匹配位置（从后往前处理，避免索引变化）
+    const matches: Array<{ match: string; index: number }> = []
+    let match
+    while ((match = regex.exec(formatted)) !== null) {
+      matches.push({ match: match[0], index: match.index })
+    }
+    // 从后往前替换
+    for (let i = matches.length - 1; i >= 0; i--) {
+      const { match: matchText, index } = matches[i]
+      if (!isInHtmlTag(formatted, index) && !isInSpanTag(formatted, index)) {
+        formatted = formatted.substring(0, index) + 
+                    `<span style="color: ${enemyColor}">${matchText}</span>` + 
+                    formatted.substring(index + matchText.length)
+      }
+    }
+  }
+  
+  return formatted
+}
+
+// 转义正则表达式特殊字符
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 </script>
 
@@ -326,9 +463,8 @@ function formatLogMessage(log: any): string {
                   class="log-message"
                   :class="getLogClass(log.type || log.logType || 'info')"
                   :style="{ color: log.color || '#00ff00' }"
-                >
-                  {{ formatLogMessage(log) }}
-                </span>
+                  v-html="formatLogMessage(log)"
+                ></span>
               </div>
               <div class="log-line" v-if="game.isRunning">
                 <span class="log-time"></span>
