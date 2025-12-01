@@ -401,30 +401,43 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 			target.HP -= playerDamage
 			
 			// 消耗资源（如果是战士，消耗怒气）
+			resourceCost := 0
+			usedSkill := false // 标记是否使用了技能
 			if char.ResourceType == "rage" && skillCost > 0 {
 				char.Resource -= skillCost
+				resourceCost = skillCost
+				usedSkill = true // 使用了技能
 				if char.Resource < 0 {
 					char.Resource = 0
 				}
 			}
 			
-			// 战士攻击获得怒气
-			if char.ResourceType == "rage" {
+			// 战士攻击获得怒气（只有普通攻击才获得怒气，使用技能时不获得）
+			resourceGain := 0
+			if char.ResourceType == "rage" && !usedSkill {
+				// 只有普通攻击才获得怒气
 				if isCrit {
-					char.Resource += 10 // 暴击获得10点怒气
+					rageGain := 10 // 暴击获得10点怒气
+					char.Resource += rageGain
+					resourceGain = rageGain
 				} else {
-					char.Resource += 5 // 普通攻击获得5点怒气
+					rageGain := 5 // 普通攻击获得5点怒气
+					char.Resource += rageGain
+					resourceGain = rageGain
 				}
 				// 确保不超过最大值
 				if char.Resource > char.MaxResource {
 					char.Resource = char.MaxResource
 				}
 			}
+			
+			// 构建战斗日志消息，包含资源变化（带颜色）
+			resourceChangeText := m.formatResourceChange(char.ResourceType, resourceCost, resourceGain)
 
 			if isCrit {
-				m.addLog(session, "combat", fmt.Sprintf("%s 使用 [%s] 💥暴击！对 %s 造成 %d 点伤害", char.Name, skillName, target.Name, playerDamage), "#ff6b6b")
+				m.addLog(session, "combat", fmt.Sprintf("%s 使用 [%s] 💥暴击！对 %s 造成 %d 点伤害%s", char.Name, skillName, target.Name, playerDamage, resourceChangeText), "#ff6b6b")
 			} else {
-				m.addLog(session, "combat", fmt.Sprintf("%s 使用 [%s] 对 %s 造成 %d 点伤害", char.Name, skillName, target.Name, playerDamage), "#ffaa00")
+				m.addLog(session, "combat", fmt.Sprintf("%s 使用 [%s] 对 %s 造成 %d 点伤害%s", char.Name, skillName, target.Name, playerDamage, resourceChangeText), "#ffaa00")
 			}
 			logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
 
@@ -487,6 +500,7 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 			char.HP -= enemyDamage
 			
 			// 战士受到伤害时获得怒气
+			resourceGain := 0
 			if char.ResourceType == "rage" && enemyDamage > 0 {
 				// 受到伤害获得怒气: 伤害/最大HP × 50，至少1点
 				rageGain := int(float64(enemyDamage) / float64(char.MaxHP) * 50)
@@ -494,12 +508,16 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 					rageGain = 1
 				}
 				char.Resource += rageGain
+				resourceGain = rageGain
 				if char.Resource > char.MaxResource {
 					char.Resource = char.MaxResource
 				}
 			}
+			
+			// 构建战斗日志消息，包含资源变化（带颜色）
+			resourceChangeText := m.formatResourceChange(char.ResourceType, 0, resourceGain)
 
-			m.addLog(session, "combat", fmt.Sprintf("%s 攻击了 %s，造成 %d 点伤害", enemy.Name, char.Name, enemyDamage), "#ff4444")
+			m.addLog(session, "combat", fmt.Sprintf("%s 攻击了 %s，造成 %d 点伤害%s", enemy.Name, char.Name, enemyDamage, resourceChangeText), "#ff4444")
 			logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
 
 			// 检查玩家是否死亡
@@ -831,6 +849,67 @@ func (m *BattleManager) addLog(session *BattleSession, logType, message, color s
 	if len(session.BattleLogs) > 200 {
 		session.BattleLogs = session.BattleLogs[len(session.BattleLogs)-200:]
 	}
+}
+
+// getResourceName 获取资源的中文名称
+func (m *BattleManager) getResourceName(resourceType string) string {
+	switch resourceType {
+	case "rage":
+		return "怒气"
+	case "mana":
+		return "MP"
+	case "energy":
+		return "能量"
+	default:
+		return "资源"
+	}
+}
+
+// getResourceColor 获取资源的颜色（参考魔兽世界）
+func (m *BattleManager) getResourceColor(resourceType string) string {
+	switch resourceType {
+	case "rage":
+		return "#ff4444" // 红色 - 怒气
+	case "mana":
+		return "#3d85c6" // 蓝色 - 法力
+	case "energy":
+		return "#ffd700" // 金色/黄色 - 能量
+	default:
+		return "#ffffff" // 白色 - 默认
+	}
+}
+
+// formatResourceChange 格式化资源变化文本（带颜色）
+func (m *BattleManager) formatResourceChange(resourceType string, cost int, gain int) string {
+	if cost == 0 && gain == 0 {
+		return ""
+	}
+	
+	resourceName := m.getResourceName(resourceType)
+	color := m.getResourceColor(resourceType)
+	
+	var parts []string
+	if cost > 0 {
+		parts = append(parts, fmt.Sprintf("<span style=\"color: %s\">-%d</span>", color, cost))
+	}
+	if gain > 0 {
+		parts = append(parts, fmt.Sprintf("<span style=\"color: %s\">+%d</span>", color, gain))
+	}
+	
+	if len(parts) == 0 {
+		return ""
+	}
+	
+	// 将多个部分用空格连接
+	changeText := ""
+	for i, part := range parts {
+		if i > 0 {
+			changeText += " "
+		}
+		changeText += part
+	}
+	
+	return fmt.Sprintf(" (<span style=\"color: %s\">%s</span> %s)", color, resourceName, changeText)
 }
 
 // getRandomSkillName 获取随机技能名称

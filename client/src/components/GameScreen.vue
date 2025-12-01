@@ -238,16 +238,39 @@ function formatMessageWithColors(
     return lastSpanOpen > lastSpanClose
   }
   
-  // 定义颜色（使用传入的职业颜色，敌方和技能使用固定颜色）
+  // 定义颜色（使用传入的职业颜色，敌方使用固定颜色）
   const enemyColor = '#ff7777' // var(--text-red)
-  const skillColor = '#77ffff' // var(--text-cyan)
+  const normalAttackColor = '#ffffff' // 普通攻击使用白色
+  const skillColor = playerColor // 技能使用职业颜色
   
-  // 先转义整个消息
-  let formatted = escapeHtml(message)
+  // 处理消息：保护已有的 HTML 标签，转义纯文本部分
+  // 使用占位符保护 HTML 标签
+  const htmlPlaceholders: string[] = []
+  let processedMessage = message
+  let placeholderIndex = 0
+  
+  // 提取所有 HTML 标签并用占位符替换
+  processedMessage = processedMessage.replace(/<[^>]+>/g, (match) => {
+    const placeholder = `__HTML_PLACEHOLDER_${placeholderIndex}__`
+    htmlPlaceholders[placeholderIndex] = match
+    placeholderIndex++
+    return placeholder
+  })
+  
+  // 转义纯文本部分
+  let formatted = escapeHtml(processedMessage)
+  
+  // 恢复 HTML 标签
+  htmlPlaceholders.forEach((html, index) => {
+    formatted = formatted.replace(`__HTML_PLACEHOLDER_${index}__`, html)
+  })
   
   // 标记技能名（方括号内的内容）- 优先处理，避免与其他标记冲突
+  // 普通攻击使用白色，其他技能使用职业颜色
   formatted = formatted.replace(/\[([^\]]+)\]/g, (match, skill) => {
-    return `<span style="color: ${skillColor}">[${escapeHtml(skill)}]</span>`
+    const isNormalAttack = skill === '普通攻击'
+    const color = isNormalAttack ? normalAttackColor : skillColor
+    return `<span style="color: ${color}">[${escapeHtml(skill)}]</span>`
   })
   
   // 标记我方角色名（按长度从长到短排序，避免短名称覆盖长名称）
