@@ -58,12 +58,15 @@ export const useGameStore = defineStore('game', () => {
 
   async function fetchCharacter() {
     try {
-      const res = await fetch(`${API_BASE}/character`)
-      if (res.ok) {
-        character.value = await res.json()
+      const response = await get<Character>('/character')
+      if (response.success && response.data) {
+        character.value = response.data
+      } else {
+        character.value = null
       }
     } catch (e) {
       console.error('Failed to fetch character:', e)
+      character.value = null
     }
   }
 
@@ -102,6 +105,16 @@ export const useGameStore = defineStore('game', () => {
           session_exp: data.totalExp ?? data.session_exp ?? 0,
           totalExp: data.totalExp ?? data.session_exp ?? 0,
           ...data // 保留其他字段
+        }
+        
+        // 如果战斗状态中包含角色数据（Team），更新角色数据
+        // Team 是一个数组，不是包含 characters 的对象
+        if (data.team && Array.isArray(data.team) && data.team.length > 0) {
+          // 使用第一个活跃角色更新角色数据
+          character.value = data.team[0]
+        } else if (data.character) {
+          // 如果直接返回了角色数据，也更新
+          character.value = data.character
         }
       } else {
         // 如果获取失败，确保 battleStatus.value 有默认值
@@ -329,6 +342,10 @@ export const useGameStore = defineStore('game', () => {
     battleInterval.value = window.setInterval(() => {
       if (battleStatus.value?.is_running) {
         battleTick()
+      } else {
+        // 即使战斗停止，也要定期获取角色数据和战斗状态（用于显示死亡/复活状态）
+        fetchCharacter().catch(console.error)
+        fetchBattleStatus().catch(console.error)
       }
     }, 1500) // 每1.5秒一个回合
   }

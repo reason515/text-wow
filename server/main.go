@@ -69,6 +69,7 @@ func main() {
 			protected.GET("/user", h.GetCurrentUser)
 
 			// 角色
+			protected.GET("/character", h.GetCharacter) // 获取当前活跃角色（单数）
 			protected.GET("/characters", h.GetCharacters)
 			protected.POST("/characters", h.CreateCharacter)
 			protected.PUT("/characters/active", h.SetCharacterActive)

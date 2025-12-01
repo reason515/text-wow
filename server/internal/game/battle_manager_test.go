@@ -360,6 +360,7 @@ func TestBattleManager_RestMechanism_RestDuration(t *testing.T) {
 	defer cleanup()
 
 	// 测试不同HP/MP损失下的休息时间
+	// 每秒恢复2%，所以恢复时间 = 损失百分比 * 50秒
 	testCases := []struct {
 		name     string
 		hp       int
@@ -369,20 +370,20 @@ func TestBattleManager_RestMechanism_RestDuration(t *testing.T) {
 		minSec   int // 最小休息秒数
 		maxSec   int // 最大休息秒数
 	}{
-		{"无损失", 100, 100, 50, 50, 1, 2},
-		{"少量损失", 90, 100, 45, 50, 1, 3},
-		{"中等损失", 50, 100, 25, 50, 3, 8},
-		{"大量损失", 20, 100, 10, 50, 5, 15},
+		{"无损失", 100, 100, 50, 50, 0, 0}, // 无损失应该返回0
+		{"少量损失", 90, 100, 45, 50, 4, 6}, // HP损失10% = 5秒，MP损失10% = 5秒，取最大值5秒
+		{"中等损失", 50, 100, 25, 50, 24, 26}, // HP损失50% = 25秒，MP损失50% = 25秒，取最大值25秒
+		{"大量损失", 20, 100, 10, 50, 39, 41}, // HP损失80% = 40秒，MP损失80% = 40秒，取最大值40秒
 	}
 
-	for _, tc := range testCases {
+		for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			char.HP = tc.hp
 			char.MaxHP = tc.maxHP
 			char.Resource = tc.resource
 			char.MaxResource = tc.maxRes
 
-			restDuration := manager.calculateRestTime(char, tc.maxHP, tc.maxRes)
+			restDuration := manager.calculateRestTime(char)
 			restSeconds := int(restDuration.Seconds())
 
 			assert.GreaterOrEqual(t, restSeconds, tc.minSec, "休息时间应该至少%d秒", tc.minSec)

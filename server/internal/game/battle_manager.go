@@ -169,12 +169,10 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if !session.IsRunning || len(characters) == 0 {
+	// 如果没有角色，返回nil
+	if len(characters) == 0 {
 		return nil, nil
 	}
-
-	session.LastTick = time.Now()
-	logs := make([]models.BattleLog, 0)
 
 	// 使用第一个角色进行战斗
 	char := characters[0]
@@ -183,6 +181,42 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 	if char.ResourceType == "rage" {
 		char.MaxResource = 100
 	}
+	
+	// 如果战斗未运行且不在休息状态，检查是否需要返回角色数据
+	// 如果角色刚复活（之前死亡但现在不死亡），需要返回一次数据让前端更新
+	if !session.IsRunning && !session.IsResting {
+		// 从数据库重新加载角色数据以确保状态正确
+		updatedChar, err := m.charRepo.GetByID(char.ID)
+		if err == nil && updatedChar != nil {
+			char = updatedChar
+			// 确保战士的怒气上限为100
+			if char.ResourceType == "rage" {
+				char.MaxResource = 100
+			}
+			// 如果角色已经复活（之前死亡但现在不死亡），返回角色数据
+			if !char.IsDead {
+				// 返回角色数据，让前端知道角色已经复活
+				return &BattleTickResult{
+					Character:    char,
+					Enemy:        nil,
+					Enemies:      nil,
+					Logs:         []models.BattleLog{},
+					IsRunning:    false,
+					IsResting:    false,
+					RestUntil:    nil,
+					SessionKills: session.SessionKills,
+					SessionGold:  session.SessionGold,
+					SessionExp:   session.SessionExp,
+					BattleCount:  session.BattleCount,
+				}, nil
+			}
+		}
+		// 如果无法获取角色数据或角色仍然死亡，返回nil
+		return nil, nil
+	}
+
+	session.LastTick = time.Now()
+	logs := make([]models.BattleLog, 0)
 	
 	// 检查角色是否死亡且还没到复活时间
 	now := time.Now()
@@ -218,8 +252,29 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 		session.LastTick = now
 		
 		if !session.IsResting {
-			// 休息结束
-			m.addLog(session, "system", ">> 休息结束，准备下一场战斗", "#33ff33")
+			// 休息结束，保存角色数据
+			m.charRepo.UpdateAfterBattle(char.ID, char.HP, char.Resource, char.Exp, char.Level,
+				char.ExpToNext, char.MaxHP, char.MaxResource, char.Attack, char.Defense,
+				char.Strength, char.Agility, char.Stamina, char.TotalKills)
+			
+			// 休息结束后，确保返回角色数据，让前端知道休息已结束
+			// 从数据库重新加载角色数据以确保状态正确
+			updatedChar, err := m.charRepo.GetByID(char.ID)
+			if err == nil && updatedChar != nil {
+				char = updatedChar
+				// 确保战士的怒气上限为100
+				if char.ResourceType == "rage" {
+					char.MaxResource = 100
+				}
+			}
+			
+			// 如果角色已经复活（不再死亡），自动恢复战斗
+			if !char.IsDead {
+				session.IsRunning = true
+				m.addLog(session, "system", ">> 休息结束，自动恢复战斗", "#33ff33")
+			} else {
+				m.addLog(session, "system", ">> 休息结束，准备下一场战斗", "#33ff33")
+			}
 			logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
 		} else {
 			// 仍在休息中
@@ -526,6 +581,16 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 		m.addLog(session, "battle_separator", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", "#666666")
 		logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
 
+		// 战斗结束后，战士的怒气直接归0
+		if char.ResourceType == "rage" {
+			char.Resource = 0
+		}
+
+		// 保存角色数据（包括怒气归0）
+		m.charRepo.UpdateAfterBattle(char.ID, char.HP, char.Resource, char.Exp, char.Level,
+			char.ExpToNext, char.MaxHP, char.MaxResource, char.Attack, char.Defense,
+			char.Strength, char.Agility, char.Stamina, char.TotalKills)
+
 		// 计算并开始休息
 		restDuration := m.calculateRestTime(char)
 		now := time.Now()
@@ -813,10 +878,25 @@ func (m *BattleManager) getSkillForAttack(char *models.Character) (string, int) 
 }
 
 // calculateReviveTime 计算复活时间（根据死亡人数）
+// 注意：只统计当前活跃的死亡角色，不包括已经死亡但不在队伍中的角色
 func (m *BattleManager) calculateReviveTime(userID int) time.Duration {
-	deadCount, err := m.charRepo.CountDeadByUserID(userID)
+	// 获取活跃角色（队伍成员）
+	characters, err := m.charRepo.GetActiveByUserID(userID)
 	if err != nil {
-		deadCount = 1 // 默认值
+		return 30 * time.Second // 默认30秒
+	}
+	
+	// 统计活跃角色中死亡的数量
+	deadCount := 0
+	for _, char := range characters {
+		if char.IsDead {
+			deadCount++
+		}
+	}
+	
+	// 如果没有死亡角色，返回默认值
+	if deadCount == 0 {
+		deadCount = 1 // 至少有一个角色死亡才会调用这个函数
 	}
 	
 	// 根据死亡人数计算复活时间（秒）
@@ -838,25 +918,45 @@ func (m *BattleManager) calculateReviveTime(userID int) time.Duration {
 }
 
 // calculateRestTime 计算休息时间（基于HP/MP损失）
+// 注意：战士的怒气不需要恢复，战斗结束后直接归0，每场战斗从0开始
 func (m *BattleManager) calculateRestTime(char *models.Character) time.Duration {
 	hpLoss := float64(char.MaxHP - char.HP)
-	mpLoss := float64(char.MaxResource - char.Resource)
 	
-	// 如果已经满血满蓝，不需要休息
+	// 战士的怒气不需要恢复，只计算HP损失
+	// 其他职业需要计算MP损失
+	var mpLoss float64
+	if char.ResourceType != "rage" {
+		mpLoss = float64(char.MaxResource - char.Resource)
+	} else {
+		// 战士的怒气不参与休息时间计算
+		mpLoss = 0
+	}
+	
+	// 如果已经满血满蓝（或满血），不需要休息
 	if hpLoss <= 0 && mpLoss <= 0 {
 		return 0
 	}
 	
-	// 基础休息时间：每损失1% HP/MP = 0.1秒，最少1秒
-	// 使用HP和MP损失的平均值
+	// 分别计算HP和MP的恢复时间
+	// 每秒恢复2%，所以需要的时间 = 损失百分比 / 0.02 = 损失百分比 * 50
 	hpLossPercent := hpLoss / float64(char.MaxHP)
-	mpLossPercent := mpLoss / float64(char.MaxResource)
-	totalLoss := (hpLossPercent + mpLossPercent) / 2.0
 	
-	// 每秒恢复2%，所以需要的时间 = 损失百分比 / 0.02
-	// 但为了更合理，我们使用：每损失1% = 0.5秒（因为每秒恢复2%，所以50%损失需要25秒）
-	restSeconds := totalLoss * 50.0
+	hpRestSeconds := hpLossPercent * 50.0
+	var mpRestSeconds float64
+	if char.ResourceType != "rage" && char.MaxResource > 0 {
+		mpLossPercent := mpLoss / float64(char.MaxResource)
+		mpRestSeconds = mpLossPercent * 50.0
+	} else {
+		mpRestSeconds = 0
+	}
 	
+	// 取两者中的最大值，因为HP和MP是同时恢复的
+	restSeconds := hpRestSeconds
+	if mpRestSeconds > restSeconds {
+		restSeconds = mpRestSeconds
+	}
+	
+	// 最少1秒
 	if restSeconds < 1.0 {
 		restSeconds = 1.0
 	}

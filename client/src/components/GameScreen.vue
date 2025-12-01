@@ -32,16 +32,30 @@ onMounted(async () => {
   
   console.log('activeChar:', activeChar)
   
-  if (activeChar) {
-    // 同步角色数据到 gameStore
+  // 优先从 API 获取最新的角色数据（包含死亡/复活状态）
+  await game.fetchCharacter()
+  
+  if (game.character) {
+    console.log('Character loaded from API:', game.character)
+  } else if (activeChar) {
+    // 如果 API 没有返回，使用 characterStore 中的数据作为后备
     game.character = activeChar
-    console.log('Character synced to gameStore:', game.character)
-    
-    // 获取战斗状态和日志
-    await game.fetchBattleStatus()
-    await game.fetchBattleLogs()
-  } else {
-    console.warn('No character found!')
+    console.log('Character synced from characterStore:', game.character)
+  }
+  
+  // 获取战斗状态和日志
+  await game.fetchBattleStatus()
+  await game.fetchBattleLogs()
+  
+  // 如果战斗状态中有角色数据，使用它（可能包含最新的死亡/复活状态）
+  // Team 是一个数组，不是包含 characters 的对象
+  if (game.battleStatus?.team && Array.isArray(game.battleStatus.team) && game.battleStatus.team.length > 0) {
+    game.character = game.battleStatus.team[0]
+    console.log('Character updated from battle status:', game.character)
+  }
+  
+  if (!game.character) {
+    console.warn('No character found after all attempts!')
   }
 })
 
