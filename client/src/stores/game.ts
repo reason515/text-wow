@@ -11,6 +11,9 @@ export const useGameStore = defineStore('game', () => {
   const battleStatus = ref<any>({
     is_running: false,
     isRunning: false,
+    is_resting: false,
+    isResting: false,
+    restUntil: null,
     current_zone: '',
     currentZoneId: '',
     current_enemy: null,
@@ -90,6 +93,9 @@ export const useGameStore = defineStore('game', () => {
         battleStatus.value = {
           is_running: data.isRunning ?? data.is_running ?? false,
           isRunning: data.isRunning ?? data.is_running ?? false,
+          is_resting: data.isResting ?? data.is_resting ?? false,
+          isResting: data.isResting ?? data.is_resting ?? false,
+          restUntil: data.restUntil ?? data.rest_until ?? null,
           current_zone: data.currentZoneId ?? data.current_zone ?? '',
           currentZoneId: data.currentZoneId ?? data.current_zone ?? '',
           current_enemy: data.currentMonster ?? data.current_enemy ?? null,
@@ -255,35 +261,47 @@ export const useGameStore = defineStore('game', () => {
           }
         }
         
-        // 合并状态数据，而不是直接替换
-        if (result.status) {
-          const status = result.status as any
+        // 更新战斗状态：后端直接返回 BattleTickResult，包含 IsRunning、IsResting 等字段
+        // 同时也支持通过 status 对象传递（向后兼容）
+        const status = (result as any).status || result
+        if (status) {
           battleStatus.value = {
             ...battleStatus.value,
             is_running: status.isRunning ?? status.is_running ?? battleStatus.value.is_running,
             isRunning: status.isRunning ?? status.is_running ?? battleStatus.value.isRunning,
+            is_resting: status.isResting ?? status.is_resting ?? battleStatus.value.is_resting ?? false,
+            isResting: status.isResting ?? status.is_resting ?? battleStatus.value.isResting ?? false,
+            restUntil: status.restUntil ?? status.rest_until ?? battleStatus.value.restUntil,
             current_zone: status.currentZoneId ?? status.current_zone ?? battleStatus.value.current_zone,
             currentZoneId: status.currentZoneId ?? status.current_zone ?? battleStatus.value.currentZoneId,
             current_enemy: status.currentMonster ?? status.current_enemy ?? battleStatus.value.current_enemy,
             currentMonster: status.currentMonster ?? status.current_enemy ?? battleStatus.value.currentMonster,
-            current_enemies: status.currentEnemies ?? status.current_enemies ?? battleStatus.value.current_enemies,
-            currentEnemies: status.currentEnemies ?? status.current_enemies ?? battleStatus.value.currentEnemies,
+            // 如果 status 中有 currentEnemies 字段（包括 null），使用它；否则保留旧值
+            current_enemies: status.currentEnemies !== undefined ? (status.currentEnemies ?? null) : (status.current_enemies !== undefined ? (status.current_enemies ?? null) : battleStatus.value.current_enemies),
+            currentEnemies: status.currentEnemies !== undefined ? (status.currentEnemies ?? null) : (status.current_enemies !== undefined ? (status.current_enemies ?? null) : battleStatus.value.currentEnemies),
             battle_count: status.battleCount ?? status.battle_count ?? battleStatus.value.battle_count,
             battleCount: status.battleCount ?? status.battle_count ?? battleStatus.value.battleCount,
-            session_kills: status.totalKills ?? status.session_kills ?? battleStatus.value.session_kills,
-            totalKills: status.totalKills ?? status.session_kills ?? battleStatus.value.totalKills,
-            session_gold: status.totalGold ?? status.session_gold ?? battleStatus.value.session_gold,
-            totalGold: status.totalGold ?? status.session_gold ?? battleStatus.value.totalGold,
-            session_exp: status.totalExp ?? status.session_exp ?? battleStatus.value.session_exp,
-            totalExp: status.totalExp ?? status.session_exp ?? battleStatus.value.totalExp,
+            session_kills: status.sessionKills ?? status.totalKills ?? status.session_kills ?? battleStatus.value.session_kills,
+            totalKills: status.sessionKills ?? status.totalKills ?? status.session_kills ?? battleStatus.value.totalKills,
+            session_gold: status.sessionGold ?? status.totalGold ?? status.session_gold ?? battleStatus.value.session_gold,
+            totalGold: status.sessionGold ?? status.totalGold ?? status.session_gold ?? battleStatus.value.totalGold,
+            session_exp: status.sessionExp ?? status.totalExp ?? status.session_exp ?? battleStatus.value.session_exp,
+            totalExp: status.sessionExp ?? status.totalExp ?? status.session_exp ?? battleStatus.value.totalExp,
             ...status // 保留其他字段
           }
         }
         
-        // 如果 result 中有 enemies 字段，也更新
-        if (result.enemies) {
-          battleStatus.value.current_enemies = result.enemies
-          battleStatus.value.currentEnemies = result.enemies
+        // 如果 result 中有 enemies 字段，也更新（包括 null/undefined，用于清除敌人显示）
+        // 优先使用 result.enemies，如果没有则使用 status.currentEnemies
+        if ('enemies' in result && result.enemies !== undefined) {
+          battleStatus.value.current_enemies = result.enemies ?? null
+          battleStatus.value.currentEnemies = result.enemies ?? null
+        } else if (status && 'currentEnemies' in status && status.currentEnemies !== undefined) {
+          battleStatus.value.current_enemies = status.currentEnemies ?? null
+          battleStatus.value.currentEnemies = status.currentEnemies ?? null
+        } else if (status && 'current_enemies' in status && status.current_enemies !== undefined) {
+          battleStatus.value.current_enemies = status.current_enemies ?? null
+          battleStatus.value.currentEnemies = status.current_enemies ?? null
         }
         
         // 添加新日志
@@ -340,10 +358,14 @@ export const useGameStore = defineStore('game', () => {
     }
     
     battleInterval.value = window.setInterval(() => {
-      if (battleStatus.value?.is_running) {
+      // 如果战斗正在运行，或者正在休息，都需要调用 battleTick 来处理
+      const isRunning = battleStatus.value?.is_running ?? false
+      const isResting = battleStatus.value?.isResting ?? battleStatus.value?.is_resting ?? false
+      
+      if (isRunning || isResting) {
         battleTick()
       } else {
-        // 即使战斗停止，也要定期获取角色数据和战斗状态（用于显示死亡/复活状态）
+        // 即使战斗停止且不在休息，也要定期获取角色数据和战斗状态（用于显示死亡/复活状态）
         fetchCharacter().catch(console.error)
         fetchBattleStatus().catch(console.error)
       }

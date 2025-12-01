@@ -233,7 +233,7 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 			session.RestStartedAt = &now
 			session.LastRestTick = &now
 			session.RestSpeed = 1.0
-			session.IsRunning = false
+			// 保持 isRunning = true，这样按钮会显示"停止挂机"，休息状态可以自动处理
 			
 			remainingSeconds := int(reviveRemaining.Seconds()) + 1
 			m.addLog(session, "death", fmt.Sprintf("%s 正在复活中... (剩余 %d 秒)", char.Name, remainingSeconds), "#ff0000")
@@ -523,7 +523,8 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 			// 检查玩家是否死亡
 			if char.HP <= 0 {
 				char.TotalDeaths++
-				session.IsRunning = false
+				// 角色死亡时不停止战斗，保持 isRunning = true，这样休息状态可以自动处理
+				// 用户已经开启了自动战斗，死亡只是暂时进入休息状态，休息结束后应该自动恢复战斗
 				session.CurrentEnemies = nil
 				session.CurrentEnemy = nil
 				session.CurrentTurnIndex = -1
@@ -557,6 +558,22 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 				
 				m.addLog(session, "system", fmt.Sprintf(">> 进入休息恢复状态 (预计 %d 秒)", int(restDuration.Seconds())+1), "#33ff33")
 				logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
+				
+				// 角色死亡时，立即返回，确保前端清除敌人显示
+				// 保持 isRunning = true，这样按钮会显示"停止挂机"，休息状态可以自动处理
+				return &BattleTickResult{
+					Character:    char,
+					Enemy:        nil,
+					Enemies:      nil, // 明确返回 nil，让前端清除敌人显示
+					Logs:         logs,
+					IsRunning:    session.IsRunning, // 保持运行状态，不停止
+					IsResting:    session.IsResting,
+					RestUntil:    session.RestUntil,
+					SessionKills: session.SessionKills,
+					SessionGold:  session.SessionGold,
+					SessionExp:   session.SessionExp,
+					BattleCount:  session.BattleCount,
+				}, nil
 			} else {
 				// 移动到下一个敌人或回到玩家回合
 				session.CurrentTurnIndex++
