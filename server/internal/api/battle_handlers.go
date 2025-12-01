@@ -252,3 +252,5 @@ func (h *BattleHandler) GetZonesWithMonsters(c *gin.Context) {
 }
 
 
+
+

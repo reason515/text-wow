@@ -193,6 +193,15 @@ func (r *CharacterRepository) CountByUserID(userID int) (int, error) {
 	return count, err
 }
 
+// CountDeadByUserID 获取用户死亡角色数量
+func (r *CharacterRepository) CountDeadByUserID(userID int) (int, error) {
+	var count int
+	err := database.DB.QueryRow(`
+		SELECT COUNT(*) FROM characters WHERE user_id = ? AND is_dead = 1`, userID,
+	).Scan(&count)
+	return count, err
+}
+
 // NameExists 检查角色名是否存在
 func (r *CharacterRepository) NameExists(name string) (bool, error) {
 	var count int
@@ -281,10 +290,10 @@ func (r *CharacterRepository) UpdateAfterBattle(id int, hp, resource, exp, level
 }
 
 // UpdateAfterDeath 死亡后更新角色数据
-func (r *CharacterRepository) UpdateAfterDeath(id int, hp, totalDeaths int) error {
+func (r *CharacterRepository) UpdateAfterDeath(id int, hp, totalDeaths int, reviveAt *time.Time) error {
 	_, err := database.DB.Exec(`
-		UPDATE characters SET hp = ?, total_deaths = ?, updated_at = ? WHERE id = ?`,
-		hp, totalDeaths, time.Now(), id,
+		UPDATE characters SET hp = ?, total_deaths = ?, is_dead = ?, revive_at = ?, updated_at = ? WHERE id = ?`,
+		hp, totalDeaths, 1, reviveAt, time.Now(), id,
 	)
 	return err
 }
