@@ -3,7 +3,7 @@ import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import { useGameStore } from '../stores/game'
 import { useCharacterStore } from '../stores/character'
 import { useAuthStore } from '../stores/auth'
-import { getClassColor } from '../types/game'
+import { getClassColor, getResourceColor } from '../types/game'
 import ChatPanel from './ChatPanel.vue'
 
 const emit = defineEmits<{
@@ -179,6 +179,10 @@ function formatLogMessage(log: any): string {
   const classId = character?.classId || character?.class || ''
   const playerColor = getClassColor(classId) // 使用职业颜色，如果没有职业则使用默认绿色
   
+  // 获取资源类型和资源颜色（用于技能颜色）
+  const resourceType = character?.resourceType || 'mana'
+  const resourceColor = getResourceColor(resourceType)
+  
   // 获取敌方角色名（从当前敌人或日志中的target/actor字段）
   let enemyName = ''
   // 优先使用target字段（如果actor是我方，target就是敌方）
@@ -201,8 +205,8 @@ function formatLogMessage(log: any): string {
     skillName = log.action
   }
   
-  // 解析消息并添加颜色标记
-  return formatMessageWithColors(message, playerName, playerNameVariants, enemyName, skillName, playerColor)
+  // 解析消息并添加颜色标记（传入资源颜色用于技能颜色）
+  return formatMessageWithColors(message, playerName, playerNameVariants, enemyName, skillName, playerColor, resourceColor)
 }
 
 // 格式化消息，为角色名和技能名添加颜色
@@ -212,7 +216,8 @@ function formatMessageWithColors(
   playerNameVariants: string[],
   enemyName: string,
   skillName: string,
-  playerColor: string = '#ffff55' // 默认金色，如果未传入则使用默认值
+  playerColor: string = '#ffff55', // 默认金色，如果未传入则使用默认值
+  resourceColor: string = '#ffffff' // 资源颜色，用于技能颜色
 ): string {
   // 转义HTML特殊字符
   const escapeHtml = (text: string) => {
@@ -241,7 +246,7 @@ function formatMessageWithColors(
   // 定义颜色（使用传入的职业颜色，敌方使用固定颜色）
   const enemyColor = '#ff7777' // var(--text-red)
   const normalAttackColor = '#ffffff' // 普通攻击使用白色
-  const skillColor = playerColor // 技能使用职业颜色
+  const skillColor = resourceColor // 技能使用资源颜色（与消耗的资源颜色一致）
   
   // 处理消息：保护已有的 HTML 标签，转义纯文本部分
   // 使用占位符保护 HTML 标签
@@ -266,7 +271,7 @@ function formatMessageWithColors(
   })
   
   // 标记技能名（方括号内的内容）- 优先处理，避免与其他标记冲突
-  // 普通攻击使用白色，其他技能使用职业颜色
+  // 普通攻击使用白色，其他技能使用资源颜色（与消耗的资源颜色一致）
   formatted = formatted.replace(/\[([^\]]+)\]/g, (match, skill) => {
     const isNormalAttack = skill === '普通攻击'
     const color = isNormalAttack ? normalAttackColor : skillColor

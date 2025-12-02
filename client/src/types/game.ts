@@ -262,3 +262,18 @@ export function getQualityColorClass(quality: string): string {
 export function getQualityColor(quality: string): string {
   return QUALITY_COLORS[quality] || '#9d9d9d'
 }
+
+// ═══════════════════════════════════════════════════════════
+// 资源颜色映射 (参考魔兽世界)
+// ═══════════════════════════════════════════════════════════
+
+export const RESOURCE_COLORS: Record<string, string> = {
+  rage: '#ff4444',    // 红色 - 怒气
+  mana: '#3d85c6',    // 蓝色 - 法力
+  energy: '#ffd700',  // 金色/黄色 - 能量
+}
+
+// 获取资源颜色值
+export function getResourceColor(resourceType: string): string {
+  return RESOURCE_COLORS[resourceType] || '#ffffff'
+}
