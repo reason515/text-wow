@@ -97,8 +97,8 @@ func (h *BattleHandler) ToggleBattle(c *gin.Context) {
 func (h *BattleHandler) BattleTick(c *gin.Context) {
 	userID := c.GetInt("userID")
 
-	// 获取用户的活跃角色
-	characters, err := h.charRepo.GetActiveByUserID(userID)
+	// 获取用户的所有角色（所有角色都参与战斗）
+	characters, err := h.charRepo.GetByUserID(userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.APIResponse{
 			Success: false,
@@ -110,7 +110,7 @@ func (h *BattleHandler) BattleTick(c *gin.Context) {
 	if len(characters) == 0 {
 		c.JSON(http.StatusBadRequest, models.APIResponse{
 			Success: false,
-			Error:   "no active characters",
+			Error:   "no characters",
 		})
 		return
 	}
@@ -148,8 +148,8 @@ func (h *BattleHandler) GetBattleStatus(c *gin.Context) {
 
 	status := h.battleMgr.GetBattleStatus(userID)
 
-	// 获取角色列表
-	characters, _ := h.charRepo.GetActiveByUserID(userID)
+	// 获取所有角色（所有角色都参与战斗）
+	characters, _ := h.charRepo.GetByUserID(userID)
 	status.Team = characters
 
 	c.JSON(http.StatusOK, models.APIResponse{
@@ -191,12 +191,12 @@ func (h *BattleHandler) ChangeZone(c *gin.Context) {
 		return
 	}
 
-	// 获取玩家等级
-	characters, err := h.charRepo.GetActiveByUserID(userID)
+	// 获取玩家等级（使用第一个角色）
+	characters, err := h.charRepo.GetByUserID(userID)
 	if err != nil || len(characters) == 0 {
 		c.JSON(http.StatusBadRequest, models.APIResponse{
 			Success: false,
-			Error:   "no active characters",
+			Error:   "no characters",
 		})
 		return
 	}

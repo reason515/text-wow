@@ -17,7 +17,7 @@ type ChatHandler struct {
 	chatRepo *repository.ChatRepository
 	charRepo *repository.CharacterRepository
 	userRepo *repository.UserRepository
-	
+
 	// 简单的刷屏检测 (生产环境应使用Redis)
 	lastMessages map[int]time.Time
 }
@@ -52,7 +52,7 @@ type SendMessageRequest struct {
 	Channel  string `json:"channel" binding:"required"`
 	Content  string `json:"content" binding:"required,min=1,max=200"`
 	ZoneID   string `json:"zoneId,omitempty"`
-	Receiver string `json:"receiver,omitempty"` // 私聊目标角色名
+	Receiver string `json:"receiver,omitempty"` // 私聊目标玩家名
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -96,16 +96,26 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 		}
 	}
 
-	// 获取发送者信息
-	chars, err := h.charRepo.GetActiveByUserID(userID)
-	if err != nil || len(chars) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{
+	// 获取玩家信息
+	user, err := h.userRepo.GetByID(userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
-			"error":   "no active character",
+			"error":   "failed to get user info",
 		})
 		return
 	}
-	sender := chars[0] // 使用第一个活跃角色
+
+	// 获取第一个角色以获取阵营信息（玩家创建的第一个角色决定阵营）
+	chars, err := h.charRepo.GetByUserID(userID)
+	if err != nil || len(chars) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "no character",
+		})
+		return
+	}
+	faction := chars[0].Faction // 使用第一个角色的阵营
 
 	// 内容过滤
 	content := filterContent(req.Content)
@@ -117,13 +127,14 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 		return
 	}
 
+	// 聊天使用玩家用户名，而不是角色名
 	msg := &repository.ChatMessage{
 		Channel:     req.Channel,
-		Faction:     sender.Faction,
+		Faction:     faction,
 		ZoneID:      req.ZoneID,
 		SenderID:    userID,
-		SenderName:  sender.Name,
-		SenderClass: sender.ClassID,
+		SenderName:  user.Username, // 使用玩家用户名
+		SenderClass: "",            // 玩家没有职业，角色才有职业
 		Content:     content,
 	}
 
@@ -148,7 +159,18 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 		}
 
 		// 检查阵营 (不能跨阵营私聊)
-		if receiver.Faction != sender.Faction {
+		// 获取接收者的阵营（通过第一个角色）
+		receiverChars, err := h.charRepo.GetByUserID(receiver.UserID)
+		if err != nil || len(receiverChars) == 0 {
+			c.JSON(http.StatusNotFound, gin.H{
+				"success": false,
+				"error":   "receiver has no character",
+			})
+			return
+		}
+		receiverFaction := receiverChars[0].Faction
+
+		if receiverFaction != faction {
 			c.JSON(http.StatusForbidden, gin.H{
 				"success": false,
 				"error":   "cannot whisper to enemy faction",
@@ -389,13 +411,12 @@ func (h *ChatHandler) UnblockUser(c *gin.Context) {
 	})
 }
 
-// SetOnline 设置在线状态
+// SetOnline 设置在线状态（使用玩家信息）
 func (h *ChatHandler) SetOnline(c *gin.Context) {
 	userID := c.GetInt("userID")
 
 	var req struct {
-		CharacterID int    `json:"characterId" binding:"required"`
-		ZoneID      string `json:"zoneId"`
+		ZoneID string `json:"zoneId"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -405,26 +426,34 @@ func (h *ChatHandler) SetOnline(c *gin.Context) {
 		return
 	}
 
-	// 获取角色信息
-	char, err := h.charRepo.GetByID(req.CharacterID)
-	if err != nil || char.UserID != userID {
+	// 获取玩家信息
+	user, err := h.userRepo.GetByID(userID)
+	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"success": false,
-			"error":   "character not found",
+			"error":   "user not found",
 		})
 		return
 	}
 
+	// 获取第一个角色以获取阵营信息
+	chars, err := h.charRepo.GetByUserID(userID)
+	if err != nil || len(chars) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "no character",
+		})
+		return
+	}
+	faction := chars[0].Faction
+
 	zoneID := req.ZoneID
 	if zoneID == "" {
-		// 从用户获取当前区域
-		user, _ := h.userRepo.GetByID(userID)
-		if user != nil {
-			zoneID = user.CurrentZoneID
-		}
+		zoneID = user.CurrentZoneID
 	}
 
-	if err := h.chatRepo.SetOnlineStatus(userID, char.ID, char.Name, char.Faction, zoneID, true); err != nil {
+	// 使用玩家用户名而不是角色名
+	if err := h.chatRepo.SetOnlineStatus(userID, 0, user.Username, faction, zoneID, true); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"error":   "failed to set online status",
@@ -469,7 +498,7 @@ func (h *ChatHandler) Heartbeat(c *gin.Context) {
 func filterContent(content string) string {
 	// 去除首尾空白
 	content = strings.TrimSpace(content)
-	
+
 	// 敏感词替换
 	if sensitiveRegex != nil {
 		content = sensitiveRegex.ReplaceAllString(content, "***")
@@ -482,7 +511,7 @@ func filterContent(content string) string {
 func GarbleMessage(content string, fromFaction string) string {
 	// 兽人语音节
 	orcSyllables := []string{"lok", "tar", "ogar", "zug", "kek", "gul", "mok", "throm", "ka"}
-	// 通用语音节  
+	// 通用语音节
 	commonSyllables := []string{"bur", "gol", "len", "mos", "nud", "ras", "ver", "ash", "thu"}
 
 	syllables := orcSyllables
@@ -493,7 +522,7 @@ func GarbleMessage(content string, fromFaction string) string {
 	// 简单的乱码化：根据原文长度生成相应长度的"语言"
 	words := strings.Fields(content)
 	var result []string
-	
+
 	for _, word := range words {
 		runeCount := utf8.RuneCountInString(word)
 		// 每2-3个字符一个音节
@@ -501,7 +530,7 @@ func GarbleMessage(content string, fromFaction string) string {
 		if syllableCount < 1 {
 			syllableCount = 1
 		}
-		
+
 		var newWord []string
 		for i := 0; i < syllableCount; i++ {
 			idx := (len(word) + i) % len(syllables)
@@ -512,13 +541,3 @@ func GarbleMessage(content string, fromFaction string) string {
 
 	return strings.Join(result, " ")
 }
-
-
-
-
-
-
-
-
-
-

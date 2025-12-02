@@ -21,11 +21,11 @@ type ChatMessage struct {
 	CreatedAt   time.Time `json:"createdAt"`
 }
 
-// OnlineUser 在线用户
+// OnlineUser 在线用户（CharacterName字段现在存储玩家名，不是角色名）
 type OnlineUser struct {
 	UserID        int       `json:"userId"`
 	CharacterID   int       `json:"characterId,omitempty"`
-	CharacterName string    `json:"characterName"`
+	CharacterName string    `json:"characterName"` // 注意：现在存储的是玩家名
 	Faction       string    `json:"faction"`
 	ZoneID        string    `json:"zoneId,omitempty"`
 	LastActive    time.Time `json:"lastActive"`
@@ -71,7 +71,7 @@ func (r *ChatRepository) GetChannelMessages(channel, faction, zoneID string, lim
 		       COALESCE(receiver_id, 0), content, created_at
 		FROM chat_messages
 		WHERE channel = ?`
-	
+
 	args := []interface{}{channel}
 
 	if faction != "" {
@@ -188,8 +188,8 @@ func (r *ChatRepository) IsBlocked(userID, blockedID int) (bool, error) {
 	return count > 0, err
 }
 
-// SetOnlineStatus 设置在线状态
-func (r *ChatRepository) SetOnlineStatus(userID int, charID int, charName, faction, zoneID string, online bool) error {
+// SetOnlineStatus 设置在线状态（character_name字段现在存储玩家名）
+func (r *ChatRepository) SetOnlineStatus(userID int, charID int, playerName, faction, zoneID string, online bool) error {
 	_, err := database.DB.Exec(`
 		INSERT INTO user_online_status (user_id, character_id, character_name, faction, zone_id, last_active, is_online)
 		VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -200,7 +200,7 @@ func (r *ChatRepository) SetOnlineStatus(userID int, charID int, charName, facti
 			zone_id = excluded.zone_id,
 			last_active = excluded.last_active,
 			is_online = excluded.is_online`,
-		userID, charID, charName, faction, zoneID, time.Now(), boolToInt(online),
+		userID, charID, playerName, faction, zoneID, time.Now(), boolToInt(online),
 	)
 	return err
 }
@@ -221,7 +221,7 @@ func (r *ChatRepository) GetOnlineUsers(faction string) ([]OnlineUser, error) {
 		       COALESCE(faction, ''), COALESCE(zone_id, ''), last_active, is_online
 		FROM user_online_status
 		WHERE is_online = 1`
-	
+
 	args := []interface{}{}
 	if faction != "" {
 		query += " AND faction = ?"
@@ -254,7 +254,7 @@ func (r *ChatRepository) GetOnlineUsers(faction string) ([]OnlineUser, error) {
 func (r *ChatRepository) GetOnlineCount(faction string) (int, error) {
 	query := "SELECT COUNT(*) FROM user_online_status WHERE is_online = 1"
 	args := []interface{}{}
-	
+
 	if faction != "" {
 		query += " AND faction = ?"
 		args = append(args, faction)
@@ -276,7 +276,7 @@ func (r *ChatRepository) CleanupInactiveUsers() error {
 	return err
 }
 
-// GetUserByName 根据角色名获取用户
+// GetUserByName 根据玩家名获取用户（注意：character_name字段现在存储的是玩家名）
 func (r *ChatRepository) GetUserByName(name string) (*OnlineUser, error) {
 	var u OnlineUser
 	var isOnline int
@@ -329,13 +329,3 @@ func nullInt(i int) interface{} {
 	}
 	return i
 }
-
-
-
-
-
-
-
-
-
-

@@ -406,13 +406,13 @@ func (h *Handler) GetCharacters(c *gin.Context) {
 	})
 }
 
-// GetCharacter 获取当前活跃的第一个角色（用于游戏界面显示）
+// GetCharacter 获取第一个角色（用于游戏界面显示）
 // 即使角色死亡也会返回，以便显示复活倒计时
 func (h *Handler) GetCharacter(c *gin.Context) {
 	userID := c.GetInt("userID")
 
-	// 先尝试获取活跃角色
-	characters, err := h.charRepo.GetActiveByUserID(userID)
+	// 获取所有角色（所有角色都参与战斗）
+	characters, err := h.charRepo.GetByUserID(userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.APIResponse{
 			Success: false,
@@ -421,37 +421,18 @@ func (h *Handler) GetCharacter(c *gin.Context) {
 		return
 	}
 
-	// 如果没有活跃角色，尝试获取所有角色（包括死亡的）
-	if len(characters) == 0 {
-		allCharacters, err := h.charRepo.GetByUserID(userID)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, models.APIResponse{
-				Success: false,
-				Error:   "failed to get character",
-			})
-			return
-		}
-		
-		// 返回第一个角色（即使死亡或非活跃）
-		if len(allCharacters) > 0 {
-			c.JSON(http.StatusOK, models.APIResponse{
-				Success: true,
-				Data:    allCharacters[0],
-			})
-			return
-		}
-		
-		c.JSON(http.StatusNotFound, models.APIResponse{
-			Success: false,
-			Error:   "no character found",
+	// 返回第一个角色（即使死亡也会返回，以便显示复活状态）
+	if len(characters) > 0 {
+		c.JSON(http.StatusOK, models.APIResponse{
+			Success: true,
+			Data:    characters[0],
 		})
 		return
 	}
-
-	// 返回第一个活跃角色（即使死亡也会返回，以便显示复活状态）
-	c.JSON(http.StatusOK, models.APIResponse{
-		Success: true,
-		Data:    characters[0],
+	
+	c.JSON(http.StatusNotFound, models.APIResponse{
+		Success: false,
+		Error:   "no character found",
 	})
 }
 
@@ -468,7 +449,8 @@ func (h *Handler) GetTeam(c *gin.Context) {
 		return
 	}
 
-	characters, err := h.charRepo.GetActiveByUserID(userID)
+	// 获取所有角色（所有角色都参与战斗）
+	characters, err := h.charRepo.GetByUserID(userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.APIResponse{
 			Success: false,

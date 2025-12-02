@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { Character, BattleLog, BattleStatus, Monster, Zone, BattleResult } from '../types/game'
 import { get, post } from '@/api/client'
+import { useCharacterStore } from './character'
 
 export const useGameStore = defineStore('game', () => {
   // 状态
@@ -116,7 +117,11 @@ export const useGameStore = defineStore('game', () => {
         // 如果战斗状态中包含角色数据（Team），更新角色数据
         // Team 是一个数组，不是包含 characters 的对象
         if (data.team && Array.isArray(data.team) && data.team.length > 0) {
-          // 使用第一个活跃角色更新角色数据
+          // 同步更新 characterStore 中的角色列表，确保界面显示最新的HP/MP等数据
+          const charStore = useCharacterStore()
+          charStore.characters = data.team
+          
+          // 使用第一个角色更新当前显示角色
           character.value = data.team[0]
         } else if (data.character) {
           // 如果直接返回了角色数据，也更新
@@ -240,6 +245,10 @@ export const useGameStore = defineStore('game', () => {
       if (response.success && response.data) {
         const result = response.data
         character.value = result.character
+        
+        // 战斗后刷新战斗状态以获取最新的角色数据（包括所有角色的HP/MP等）
+        // fetchBattleStatus 会更新 charStore.characters
+        await fetchBattleStatus()
         
         // 确保 battleStatus.value 存在
         if (!battleStatus.value) {

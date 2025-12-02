@@ -93,11 +93,8 @@ onMounted(async () => {
   // 加载最近消息
   await chatStore.fetchMessages('recent')
   
-  // 设置在线状态
-  if (charStore.characters.length > 0) {
-    const char = charStore.characters[0]
-    await chatStore.setOnline(char.id)
-  }
+  // 设置在线状态（使用玩家信息，不再需要角色ID）
+  await chatStore.setOnline()
 
   // 获取在线用户
   await chatStore.fetchOnlineUsers()
@@ -175,7 +172,7 @@ onUnmounted(() => {
           </span>
           <span 
             class="msg-sender"
-            :style="{ color: getClassColor(msg.senderClass) }"
+            :style="{ color: msg.senderClass ? getClassColor(msg.senderClass) : '#cccccc' }"
           >
             {{ msg.senderName }}:
           </span>
@@ -213,7 +210,7 @@ onUnmounted(() => {
           v-model="inputMessage"
           class="chat-input"
           type="text"
-          placeholder="输入消息... (/w 玩家名 私聊)"
+          placeholder="输入消息... (/w 玩家名 私聊，聊天显示的是玩家名)"
           maxlength="200"
           @keydown="handleKeydown"
         />

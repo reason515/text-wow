@@ -16,19 +16,35 @@ const charStore = useCharacterStore()
 const authStore = useAuthStore()
 const logContainer = ref<HTMLElement | null>(null)
 
+// 角色详情弹窗
+const showCharacterDetail = ref(false)
+const selectedCharacter = ref<any>(null)
+
+// 显示角色详情
+function showDetail(char: any) {
+  selectedCharacter.value = char
+  showCharacterDetail.value = true
+}
+
+// 关闭角色详情
+function closeDetail() {
+  showCharacterDetail.value = false
+  selectedCharacter.value = null
+}
+
+
 // 初始化：从 characterStore 获取角色数据并同步到 gameStore
 onMounted(async () => {
   console.log('GameScreen mounted')
   console.log('charStore.characters:', charStore.characters)
-  console.log('charStore.activeCharacters:', charStore.activeCharacters)
   
   // 如果没有角色，先尝试获取
   if (charStore.characters.length === 0) {
     await charStore.fetchCharacters()
   }
   
-  // 获取当前激活的角色
-  const activeChar = charStore.activeCharacters[0] || charStore.characters[0]
+  // 获取第一个角色（所有角色都参与战斗）
+  const activeChar = charStore.characters[0]
   
   console.log('activeChar:', activeChar)
   
@@ -47,11 +63,16 @@ onMounted(async () => {
   await game.fetchBattleStatus()
   await game.fetchBattleLogs()
   
-  // 如果战斗状态中有角色数据，使用它（可能包含最新的死亡/复活状态）
-  // Team 是一个数组，不是包含 characters 的对象
+  // 如果战斗状态中有队伍数据，使用第一个角色作为当前显示角色
+  // Team 是一个数组，包含所有角色（所有角色都参与战斗）
   if (game.battleStatus?.team && Array.isArray(game.battleStatus.team) && game.battleStatus.team.length > 0) {
     game.character = game.battleStatus.team[0]
-    console.log('Character updated from battle status:', game.character)
+    console.log('Character updated from battle status team:', game.character)
+    console.log('Team size:', game.battleStatus.team.length)
+  } else if (charStore.characters.length > 0) {
+    // 如果没有队伍数据，使用第一个角色
+    game.character = charStore.characters[0]
+    console.log('Character set from characters:', game.character)
   }
   
   if (!game.character) {
@@ -67,32 +88,38 @@ watch(() => game.battleLogs.length, async () => {
   }
 })
 
-// 计算HP/MP/EXP百分比
-const hpPercent = computed(() => {
-  if (!game.character) return 0
-  const char = game.character as any
+// 计算角色HP/MP/EXP百分比（用于详情弹窗）
+function getHpPercent(char: any): number {
+  if (!char) return 0
   const maxHp = char.maxHp || char.max_hp || 100
   const hp = char.hp || 0
-  return (hp / maxHp) * 100
-})
+  return maxHp > 0 ? (hp / maxHp) * 100 : 0
+}
 
-const mpPercent = computed(() => {
-  if (!game.character) return 0
-  const char = game.character as any
-  // 支持多种字段名：resource/maxResource 或 mp/max_mp
+function getMpPercent(char: any): number {
+  if (!char) return 0
   const maxResource = char.maxResource || char.max_resource || char.max_mp || 100
   const resource = char.resource || char.mp || 0
-  return (resource / maxResource) * 100
-})
+  return maxResource > 0 ? (resource / maxResource) * 100 : 0
+}
 
-const expPercent = computed(() => {
-  if (!game.character) return 0
-  const char = game.character as any
-  // 支持多种字段名：expToNext 或 exp_to_next
+function getExpPercent(char: any): number {
+  if (!char) return 0
   const expToNext = char.expToNext || char.exp_to_next || 100
   const exp = char.exp || 0
-  return (exp / expToNext) * 100
-})
+  return expToNext > 0 ? (exp / expToNext) * 100 : 0
+}
+
+function getResourceTypeName(char: any): string {
+  if (!char) return 'MP'
+  const type = char.resourceType || 'mana'
+  const names: Record<string, string> = {
+    mana: '法力',
+    rage: '怒气',
+    energy: '能量'
+  }
+  return names[type] || 'MP'
+}
 
 const enemyHpPercent = computed(() => {
   if (!game.currentEnemy) return 0
@@ -111,17 +138,6 @@ function getEnemyHpPercent(enemy: any): number {
 }
 
 // 获取资源类型名称
-const resourceTypeName = computed(() => {
-  if (!game.character) return 'MP'
-  const char = game.character as any
-  const type = char.resourceType || 'mana'
-  const names: Record<string, string> = {
-    mana: '法力',
-    rage: '怒气',
-    energy: '能量'
-  }
-  return names[type] || 'MP'
-})
 
 // 获取日志类型的CSS类
 function getLogClass(type: string) {
@@ -374,102 +390,76 @@ function escapeRegex(str: string): string {
       <div class="game-main">
         <!-- 左侧角色信息面板 -->
         <div class="game-sidebar">
-          <div class="character-card">
-            <div 
-              class="character-name"
-              :style="{ 
-                color: getClassColor((game.character as any)?.classId || (game.character as any)?.class || ''),
-                textShadow: `0 0 10px ${getClassColor((game.character as any)?.classId || (game.character as any)?.class || '')}`
-              }"
-            >
-              {{ game.character?.name }}
+          <!-- 队伍成员列表（显示所有角色，点击查看详情） -->
+          <div v-if="charStore.characters.length > 0" class="team-panel">
+            <div class="team-panel-title">
+              队伍成员 ({{ charStore.characters.length }}/5)
+              <span v-if="charStore.characters.length >= 5" class="team-panel-full">已满</span>
             </div>
-            <div class="character-level">
-              Lv.{{ game.character?.level }} {{ getClassName((game.character as any)?.classId || (game.character as any)?.class || '') }}
-            </div>
-            
-            <!-- 进度条 -->
-            <div class="progress-section">
-              <div class="progress-item">
-                <div class="progress-label">生命值</div>
-                <div class="progress-bar hp-bar">
-                  <div class="progress-fill" :style="{ width: hpPercent + '%' }"></div>
+            <div class="team-characters">
+              <div
+                v-for="char in charStore.characters"
+                :key="char.id"
+                class="team-character-card"
+                :class="{ dead: char.isDead }"
+                @click="showDetail(char)"
+              >
+                <div 
+                  class="team-character-name"
+                  :style="{ 
+                    color: getClassColor(char.classId || ''),
+                    textShadow: `0 0 8px ${getClassColor(char.classId || '')}`
+                  }"
+                >
+                  {{ char.name }}
                 </div>
-                <div class="progress-text">
-                  {{ (game.character as any)?.hp || 0 }}/{{ (game.character as any)?.maxHp || (game.character as any)?.max_hp || 100 }}
+                <div class="team-character-level">
+                  Lv.{{ char.level }} {{ getClassName(char.classId || '') }}
                 </div>
-              </div>
-              
-              <div class="progress-item">
-                <div class="progress-label">{{ resourceTypeName }}</div>
-                <div class="progress-bar mp-bar">
-                  <div class="progress-fill" :style="{ width: mpPercent + '%' }"></div>
+                <div class="team-character-hp">
+                  <div class="team-character-hp-label">HP:</div>
+                  <div class="team-character-hp-bar">
+                    <div 
+                      class="team-character-hp-fill" 
+                      :style="{ 
+                        width: getHpPercent(char) + '%' 
+                      }"
+                    ></div>
+                  </div>
+                  <div class="team-character-hp-value">
+                    {{ char.hp || 0 }}/{{ char.maxHp || 100 }}
+                  </div>
                 </div>
-                <div class="progress-text">
-                  {{ (game.character as any)?.resource || (game.character as any)?.mp || 0 }}/{{ (game.character as any)?.maxResource || (game.character as any)?.max_resource || (game.character as any)?.max_mp || 100 }}
+                <div class="team-character-resource">
+                  <div class="team-character-resource-label">{{ getResourceTypeName(char) }}:</div>
+                  <div class="team-character-resource-bar">
+                    <div 
+                      class="team-character-resource-fill" 
+                      :style="{ 
+                        width: getMpPercent(char) + '%',
+                        background: getResourceTypeName(char) === '怒气' ? 'linear-gradient(90deg, #ff4444, #ff6666)' : 
+                                    getResourceTypeName(char) === '能量' ? 'linear-gradient(90deg, #ffd700, #ffed4e)' :
+                                    'linear-gradient(90deg, #3d85c6, #5ba3d6)'
+                      }"
+                    ></div>
+                  </div>
+                  <div class="team-character-resource-value">
+                    {{ char.resource || char.mp || 0 }}/{{ char.maxResource || char.max_resource || char.max_mp || 100 }}
+                  </div>
                 </div>
-              </div>
-              
-              <div class="progress-item">
-                <div class="progress-label">经验值</div>
-                <div class="progress-bar exp-bar">
-                  <div class="progress-fill" :style="{ width: expPercent + '%' }"></div>
+                <div v-if="char.isDead" class="team-character-dead">
+                  死亡中...
                 </div>
-                <div class="progress-text">
-                  {{ (game.character as any)?.exp || 0 }}/{{ (game.character as any)?.expToNext || (game.character as any)?.exp_to_next || 100 }}
-                </div>
-              </div>
-            </div>
-
-            <!-- 属性 -->
-            <div class="character-stats">
-              <div class="character-stat">
-                <span class="character-stat-label">力量</span>
-                <span class="character-stat-value">{{ (game.character as any)?.strength || 0 }}</span>
-              </div>
-              <div class="character-stat">
-                <span class="character-stat-label">敏捷</span>
-                <span class="character-stat-value">{{ (game.character as any)?.agility || 0 }}</span>
-              </div>
-              <div class="character-stat">
-                <span class="character-stat-label">智力</span>
-                <span class="character-stat-value">{{ (game.character as any)?.intellect || 0 }}</span>
-              </div>
-              <div class="character-stat">
-                <span class="character-stat-label">耐力</span>
-                <span class="character-stat-value">{{ (game.character as any)?.stamina || 0 }}</span>
-              </div>
-              <div class="character-stat">
-                <span class="character-stat-label">精神</span>
-                <span class="character-stat-value">{{ (game.character as any)?.spirit || 0 }}</span>
               </div>
             </div>
-
-            <!-- 战斗统计 -->
-            <div class="combat-stats">
-              <div class="combat-stat">
-                <span class="combat-stat-label">攻击力</span>
-                <span class="combat-stat-value">{{ (game.character as any)?.attack || 0 }}</span>
-              </div>
-              <div class="combat-stat">
-                <span class="combat-stat-label">防御力</span>
-                <span class="combat-stat-value">{{ (game.character as any)?.defense || 0 }}</span>
-              </div>
-              <div class="combat-stat">
-                <span class="combat-stat-label">暴击率</span>
-                <span class="combat-stat-value">{{ ((game.character as any)?.critRate || 0).toFixed(1) }}%</span>
-              </div>
-              <div class="combat-stat">
-                <span class="combat-stat-label">暴击伤害</span>
-                <span class="combat-stat-value">{{ ((game.character as any)?.critDamage || 150).toFixed(0) }}%</span>
-              </div>
-            </div>
-
-            <!-- 总结统计 -->
-            <div class="summary-stats">
-              <div class="summary-kills">击杀: {{ (game.character as any)?.totalKills || 0 }}</div>
-              <div class="summary-deaths">死亡: {{ (game.character as any)?.totalDeaths || 0 }}</div>
-            </div>
+          </div>
+          
+          <!-- 空状态提示 -->
+          <div v-else class="no-characters-hint">
+            <div class="hint-text">还没有角色</div>
+            <button class="hint-btn" @click="$emit('create-character')">
+              创建角色
+            </button>
           </div>
         </div>
 
@@ -551,6 +541,111 @@ function escapeRegex(str: string): string {
       <!-- 底部聊天面板 -->
       <ChatPanel />
     </template>
+    
+    <!-- 角色详情弹窗 -->
+    <div v-if="showCharacterDetail && selectedCharacter" class="character-detail-modal" @click.self="closeDetail">
+      <div class="character-detail-content">
+        <div class="character-detail-header">
+          <div 
+            class="character-detail-name"
+            :style="{ 
+              color: getClassColor(selectedCharacter.classId || ''),
+              textShadow: `0 0 10px ${getClassColor(selectedCharacter.classId || '')}`
+            }"
+          >
+            {{ selectedCharacter.name }}
+          </div>
+          <button class="character-detail-close" @click="closeDetail">×</button>
+        </div>
+        
+        <div class="character-detail-level">
+          Lv.{{ selectedCharacter.level }} {{ getClassName(selectedCharacter.classId || '') }}
+        </div>
+        
+        <!-- 进度条 -->
+        <div class="character-detail-progress">
+          <div class="character-detail-progress-item">
+            <div class="character-detail-progress-label">生命值</div>
+            <div class="character-detail-progress-bar hp-bar">
+              <div class="character-detail-progress-fill" :style="{ width: getHpPercent(selectedCharacter) + '%' }"></div>
+            </div>
+            <div class="character-detail-progress-text">
+              {{ selectedCharacter.hp || 0 }}/{{ selectedCharacter.maxHp || 100 }}
+            </div>
+          </div>
+          
+          <div class="character-detail-progress-item">
+            <div class="character-detail-progress-label">{{ getResourceTypeName(selectedCharacter) }}</div>
+            <div class="character-detail-progress-bar mp-bar">
+              <div class="character-detail-progress-fill" :style="{ width: getMpPercent(selectedCharacter) + '%' }"></div>
+            </div>
+            <div class="character-detail-progress-text">
+              {{ selectedCharacter.resource || selectedCharacter.mp || 0 }}/{{ selectedCharacter.maxResource || selectedCharacter.max_resource || selectedCharacter.max_mp || 100 }}
+            </div>
+          </div>
+          
+          <div class="character-detail-progress-item">
+            <div class="character-detail-progress-label">经验值</div>
+            <div class="character-detail-progress-bar exp-bar">
+              <div class="character-detail-progress-fill" :style="{ width: getExpPercent(selectedCharacter) + '%' }"></div>
+            </div>
+            <div class="character-detail-progress-text">
+              {{ selectedCharacter.exp || 0 }}/{{ selectedCharacter.expToNext || selectedCharacter.exp_to_next || 100 }}
+            </div>
+          </div>
+        </div>
+
+        <!-- 属性 -->
+        <div class="character-detail-stats">
+          <div class="character-detail-stat">
+            <span class="character-detail-stat-label">力量</span>
+            <span class="character-detail-stat-value">{{ selectedCharacter.strength || 0 }}</span>
+          </div>
+          <div class="character-detail-stat">
+            <span class="character-detail-stat-label">敏捷</span>
+            <span class="character-detail-stat-value">{{ selectedCharacter.agility || 0 }}</span>
+          </div>
+          <div class="character-detail-stat">
+            <span class="character-detail-stat-label">智力</span>
+            <span class="character-detail-stat-value">{{ selectedCharacter.intellect || 0 }}</span>
+          </div>
+          <div class="character-detail-stat">
+            <span class="character-detail-stat-label">耐力</span>
+            <span class="character-detail-stat-value">{{ selectedCharacter.stamina || 0 }}</span>
+          </div>
+          <div class="character-detail-stat">
+            <span class="character-detail-stat-label">精神</span>
+            <span class="character-detail-stat-value">{{ selectedCharacter.spirit || 0 }}</span>
+          </div>
+        </div>
+
+        <!-- 战斗统计 -->
+        <div class="character-detail-combat-stats">
+          <div class="character-detail-combat-stat">
+            <span class="character-detail-combat-stat-label">攻击力</span>
+            <span class="character-detail-combat-stat-value">{{ selectedCharacter.attack || 0 }}</span>
+          </div>
+          <div class="character-detail-combat-stat">
+            <span class="character-detail-combat-stat-label">防御力</span>
+            <span class="character-detail-combat-stat-value">{{ selectedCharacter.defense || 0 }}</span>
+          </div>
+          <div class="character-detail-combat-stat">
+            <span class="character-detail-combat-stat-label">暴击率</span>
+            <span class="character-detail-combat-stat-value">{{ ((selectedCharacter.critRate || 0).toFixed(1)) }}%</span>
+          </div>
+          <div class="character-detail-combat-stat">
+            <span class="character-detail-combat-stat-label">暴击伤害</span>
+            <span class="character-detail-combat-stat-value">{{ ((selectedCharacter.critDamage || 150).toFixed(0)) }}%</span>
+          </div>
+        </div>
+
+        <!-- 总结统计 -->
+        <div class="character-detail-summary">
+          <div class="character-detail-summary-kills">击杀: {{ selectedCharacter.totalKills || 0 }}</div>
+          <div class="character-detail-summary-deaths">死亡: {{ selectedCharacter.totalDeaths || 0 }}</div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -664,12 +759,404 @@ function escapeRegex(str: string): string {
   padding: 15px;
   background: rgba(0, 0, 0, 0.3);
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
 }
 
-.character-card {
-  border: 2px solid var(--border-color);
-  padding: 15px;
-  background: rgba(51, 255, 51, 0.03);
+/* 空状态提示 */
+.no-characters-hint {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--terminal-gray);
+}
+
+.hint-text {
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+
+.hint-btn {
+  background: transparent;
+  border: 1px solid var(--terminal-green);
+  color: var(--terminal-green);
+  padding: 8px 16px;
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.hint-btn:hover {
+  background: var(--terminal-green);
+  color: var(--terminal-bg);
+}
+
+/* 队伍面板 */
+.team-panel {
+  border: 1px solid var(--border-color);
+  background: rgba(0, 0, 0, 0.5);
+  padding: 10px;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.team-panel-title {
+  color: var(--terminal-cyan);
+  font-size: 12px;
+  margin-bottom: 8px;
+  text-align: center;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--text-dim);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+}
+
+.team-panel-full {
+  color: var(--terminal-red);
+  font-size: 10px;
+  padding: 2px 6px;
+  border: 1px solid var(--terminal-red);
+  border-radius: 2px;
+}
+
+.team-characters {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* 队伍成员滚动条样式 */
+.team-characters::-webkit-scrollbar {
+  width: 6px;
+}
+
+.team-characters::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.team-characters::-webkit-scrollbar-thumb {
+  background: var(--terminal-gray);
+  border-radius: 3px;
+}
+
+.team-characters::-webkit-scrollbar-thumb:hover {
+  background: var(--terminal-green);
+}
+
+.team-character-card {
+  border: 1px solid var(--text-dim);
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.3);
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.team-character-card:hover {
+  border-color: var(--terminal-green);
+  background: rgba(0, 255, 0, 0.05);
+  box-shadow: 0 0 8px rgba(0, 255, 0, 0.2);
+}
+
+.team-character-card.dead {
+  opacity: 0.6;
+  border-color: var(--terminal-red);
+}
+
+.team-character-name {
+  font-size: 13px;
+  font-weight: bold;
+  margin-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.team-character-level {
+  color: var(--text-secondary);
+  font-size: 11px;
+  margin-bottom: 6px;
+}
+
+.team-character-hp {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+}
+
+.team-character-hp-label {
+  color: var(--text-gray);
+  min-width: 24px;
+}
+
+.team-character-hp-bar {
+  flex: 1;
+  height: 8px;
+  background: var(--bg-color);
+  border: 1px solid var(--text-green);
+  overflow: hidden;
+}
+
+.team-character-hp-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #00ff00, #44ff44);
+  transition: width 0.3s ease;
+}
+
+.team-character-hp-value {
+  color: var(--text-green);
+  font-size: 10px;
+  white-space: nowrap;
+  min-width: 50px;
+  text-align: right;
+}
+
+.team-character-resource {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  margin-top: 4px;
+}
+
+.team-character-resource-label {
+  color: var(--text-gray);
+  font-size: 10px;
+  min-width: 32px;
+}
+
+.team-character-resource-bar {
+  flex: 1;
+  height: 6px;
+  background: var(--bg-color);
+  border: 1px solid var(--text-dim);
+  overflow: hidden;
+}
+
+.team-character-resource-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.team-character-resource-value {
+  color: var(--text-cyan);
+  font-size: 10px;
+  white-space: nowrap;
+  min-width: 50px;
+  text-align: right;
+}
+
+.team-character-dead {
+  color: var(--terminal-red);
+  font-size: 10px;
+  margin-top: 4px;
+  text-align: center;
+}
+
+/* 角色详情弹窗 */
+.character-detail-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 20px;
+}
+
+.character-detail-content {
+  background: rgba(0, 20, 0, 0.95);
+  border: 2px solid var(--terminal-green);
+  padding: 20px;
+  max-width: 500px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 0 30px rgba(0, 255, 0, 0.3);
+  position: relative;
+}
+
+.character-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--text-dim);
+}
+
+.character-detail-name {
+  font-family: var(--font-pixel);
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.character-detail-close {
+  background: transparent;
+  border: 1px solid var(--terminal-gray);
+  color: var(--terminal-gray);
+  width: 28px;
+  height: 28px;
+  font-size: 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.character-detail-close:hover {
+  border-color: var(--terminal-red);
+  color: var(--terminal-red);
+}
+
+.character-detail-level {
+  color: var(--text-cyan);
+  margin-bottom: 15px;
+  font-size: 14px;
+  text-align: center;
+}
+
+.character-detail-progress {
+  margin-bottom: 15px;
+}
+
+.character-detail-progress-item {
+  margin-bottom: 12px;
+}
+
+.character-detail-progress-label {
+  color: var(--text-secondary);
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.character-detail-progress-bar {
+  width: 100%;
+  height: 14px;
+  background: var(--bg-color);
+  border: 1px solid var(--text-dim);
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+.character-detail-progress-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.character-detail-progress-bar.hp-bar .character-detail-progress-fill {
+  background: linear-gradient(90deg, #00ff00, #44ff44);
+  box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+}
+
+.character-detail-progress-bar.mp-bar .character-detail-progress-fill {
+  background: linear-gradient(90deg, #ff4444, #ff6666);
+  box-shadow: 0 0 10px rgba(255, 68, 68, 0.5);
+}
+
+.character-detail-progress-bar.exp-bar .character-detail-progress-fill {
+  background: linear-gradient(90deg, #ffd700, #ffed4e);
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+}
+
+.character-detail-progress-text {
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.character-detail-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 15px;
+  font-size: 14px;
+  padding-top: 15px;
+  border-top: 1px solid var(--text-dim);
+}
+
+.character-detail-stat {
+  display: flex;
+  justify-content: space-between;
+}
+
+.character-detail-stat-label {
+  color: var(--text-secondary);
+}
+
+.character-detail-stat-value {
+  color: var(--text-white);
+}
+
+.character-detail-combat-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 15px;
+  font-size: 14px;
+  padding-top: 15px;
+  border-top: 1px solid var(--text-dim);
+}
+
+.character-detail-combat-stat {
+  display: flex;
+  justify-content: space-between;
+}
+
+.character-detail-combat-stat-label {
+  color: var(--text-secondary);
+}
+
+.character-detail-combat-stat-value {
+  color: var(--text-cyan);
+}
+
+.character-detail-summary {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--text-dim);
+}
+
+.character-detail-summary-kills {
+  color: var(--terminal-red);
+}
+
+.character-detail-summary-deaths {
+  color: var(--terminal-gray);
+  opacity: 0.7;
+}
+
+/* 弹窗滚动条样式 */
+.character-detail-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.character-detail-content::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.character-detail-content::-webkit-scrollbar-thumb {
+  background: var(--terminal-gray);
+  border-radius: 3px;
+}
+
+.character-detail-content::-webkit-scrollbar-thumb:hover {
+  background: var(--terminal-green);
 }
 
 .character-name {

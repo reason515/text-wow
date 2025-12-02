@@ -289,11 +289,11 @@ func (r *CharacterRepository) UpdateAfterBattle(id int, hp, resource, exp, level
 	return err
 }
 
-// UpdateAfterDeath 死亡后更新角色数据
-func (r *CharacterRepository) UpdateAfterDeath(id int, hp, totalDeaths int, reviveAt *time.Time) error {
+// UpdateAfterDeath 死亡后更新角色数据（包括怒气归0）
+func (r *CharacterRepository) UpdateAfterDeath(id int, hp, resource, totalDeaths int, reviveAt *time.Time) error {
 	_, err := database.DB.Exec(`
-		UPDATE characters SET hp = ?, total_deaths = ?, is_dead = ?, revive_at = ?, updated_at = ? WHERE id = ?`,
-		hp, totalDeaths, 1, reviveAt, time.Now(), id,
+		UPDATE characters SET hp = ?, resource = ?, total_deaths = ?, is_dead = ?, revive_at = ?, updated_at = ? WHERE id = ?`,
+		hp, resource, totalDeaths, 1, reviveAt, time.Now(), id,
 	)
 	return err
 }

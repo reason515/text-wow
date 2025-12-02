@@ -18,7 +18,7 @@ export interface ChatMessage {
 export interface OnlineUser {
   userId: number
   characterId?: number
-  characterName: string
+  characterName: string // 注意：现在存储的是玩家名，不是角色名
   faction: string
   zoneId?: string
   isOnline: boolean
@@ -141,10 +141,10 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  // 设置在线状态
-  async function setOnline(characterId: number, zoneId?: string) {
+  // 设置在线状态（不再需要characterId，使用玩家信息）
+  async function setOnline(zoneId?: string) {
     try {
-      await post('/chat/online', { characterId, zoneId })
+      await post('/chat/online', { zoneId })
     } catch (e) {
       // 忽略错误
     }

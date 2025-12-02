@@ -14,9 +14,6 @@ export const useCharacterStore = defineStore('character', () => {
 
   // 计算属性
   const hasCharacters = computed(() => characters.value.length > 0)
-  const activeCharacters = computed(() => 
-    characters.value.filter(c => c.isActive)
-  )
   const allianceRaces = computed(() => 
     races.value.filter(r => r.faction === 'alliance')
   )
@@ -112,23 +109,6 @@ export const useCharacterStore = defineStore('character', () => {
     }
   }
 
-  // 设置角色激活状态
-  async function setCharacterActive(characterId: number, active: boolean): Promise<boolean> {
-    try {
-      const response = await put('/characters/active', { characterId, active })
-      if (response.success) {
-        const char = characters.value.find(c => c.id === characterId)
-        if (char) {
-          char.isActive = active
-        }
-        return true
-      }
-      return false
-    } catch (e) {
-      return false
-    }
-  }
-
   // 初始化游戏数据
   async function init() {
     await Promise.all([
@@ -153,7 +133,6 @@ export const useCharacterStore = defineStore('character', () => {
     error,
     // 计算属性
     hasCharacters,
-    activeCharacters,
     allianceRaces,
     hordeRaces,
     // 方法
@@ -162,7 +141,6 @@ export const useCharacterStore = defineStore('character', () => {
     fetchCharacters,
     fetchTeam,
     createCharacter,
-    setCharacterActive,
     init,
     clear,
   }
