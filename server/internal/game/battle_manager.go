@@ -547,6 +547,9 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 				m.addLog(session, "death", fmt.Sprintf("%s 被击败了... 需要 %d 秒复活", char.Name, int(reviveDuration.Seconds())), "#ff0000")
 				logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
 
+				// 战斗失败总结
+				m.addBattleSummary(session, false, &logs)
+
 				// 保存死亡数据（包括死亡标记、复活时间和怒气归0）
 				m.charRepo.UpdateAfterDeath(char.ID, char.HP, char.Resource, char.TotalDeaths, &reviveAt)
 
@@ -563,6 +566,12 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 
 				m.addLog(session, "system", fmt.Sprintf(">> 进入休息恢复状态 (预计 %d 秒)", int(restDuration.Seconds())+1), "#33ff33")
 				logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
+
+				// 重置本场战斗统计
+				session.CurrentBattleExp = 0
+				session.CurrentBattleGold = 0
+				session.CurrentBattleKills = 0
+				session.CurrentTurnIndex = -1
 
 				// 角色死亡时，立即返回，确保前端清除敌人显示
 				// 保持 isRunning = true，这样按钮会显示"停止挂机"，休息状态可以自动处理
@@ -610,16 +619,7 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 		}
 
 		// 战斗胜利总结
-		if session.CurrentBattleKills > 0 {
-			summaryMsg := fmt.Sprintf("━━━ 战斗总结 ━━━ 击杀: %d | 经验: %d | 金币: %d",
-				session.CurrentBattleKills, session.CurrentBattleExp, session.CurrentBattleGold)
-			m.addLog(session, "battle_summary", summaryMsg, "#ffd700")
-			logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
-		}
-
-		// 添加分割线
-		m.addLog(session, "battle_separator", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", "#666666")
-		logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
+		m.addBattleSummary(session, true, &logs)
 
 		// 战斗结束后，所有战士角色的怒气都归0
 		for _, c := range characters {
@@ -872,6 +872,39 @@ func (m *BattleManager) addLog(session *BattleSession, logType, message, color s
 	if len(session.BattleLogs) > 200 {
 		session.BattleLogs = session.BattleLogs[len(session.BattleLogs)-200:]
 	}
+}
+
+// addBattleSummary 添加战斗总结和分割线
+func (m *BattleManager) addBattleSummary(session *BattleSession, isVictory bool, logs *[]models.BattleLog) {
+	// 生成战斗总结，使用不同颜色标记不同指标
+	var summaryMsg string
+	if isVictory {
+		if session.CurrentBattleKills > 0 {
+			// 使用HTML标签为不同部分添加颜色
+			// 结果：金色 #ffd700，击杀：红色 #ff4444，经验：蓝色 #3d85c6，金币：金色 #ffd700
+			summaryMsg = fmt.Sprintf("━━━ 战斗总结 ━━━ 结果: <span style=\"color: #ffd700\">✓ 胜利</span> | 击杀: <span style=\"color: #ff4444\">%d</span> | 经验: <span style=\"color: #3d85c6\">%d</span> | 金币: <span style=\"color: #ffd700\">%d</span>",
+				session.CurrentBattleKills, session.CurrentBattleExp, session.CurrentBattleGold)
+		} else {
+			summaryMsg = "━━━ 战斗总结 ━━━ 结果: <span style=\"color: #ffd700\">✓ 胜利</span>"
+		}
+		m.addLog(session, "battle_summary", summaryMsg, "#ffd700")
+		*logs = append(*logs, session.BattleLogs[len(session.BattleLogs)-1])
+	} else {
+		// 失败时的总结
+		if session.CurrentBattleKills > 0 {
+			// 结果：红色 #ff6666，击杀：橙色 #ffaa00，经验：蓝色 #3d85c6，金币：金色 #ffd700
+			summaryMsg = fmt.Sprintf("━━━ 战斗总结 ━━━ 结果: <span style=\"color: #ff6666\">✗ 失败</span> | 击杀: <span style=\"color: #ffaa00\">%d</span> | 经验: <span style=\"color: #3d85c6\">%d</span> | 金币: <span style=\"color: #ffd700\">%d</span>",
+				session.CurrentBattleKills, session.CurrentBattleExp, session.CurrentBattleGold)
+		} else {
+			summaryMsg = "━━━ 战斗总结 ━━━ 结果: <span style=\"color: #ff6666\">✗ 失败</span>"
+		}
+		m.addLog(session, "battle_summary", summaryMsg, "#ff6666")
+		*logs = append(*logs, session.BattleLogs[len(session.BattleLogs)-1])
+	}
+
+	// 添加分割线
+	m.addLog(session, "battle_separator", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", "#666666")
+	*logs = append(*logs, session.BattleLogs[len(session.BattleLogs)-1])
 }
 
 // getResourceName 获取资源的中文名称
