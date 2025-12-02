@@ -127,7 +127,7 @@ function backToGame() {
 
 .loading-text {
   color: var(--terminal-green);
-  font-size: 16px;
+  font-size: 14px;
   margin-bottom: 20px;
   animation: blink 1s infinite;
 }

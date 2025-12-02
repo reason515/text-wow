@@ -358,13 +358,13 @@ function escapeRegex(str: string): string {
 
       <!-- 状态栏 -->
       <div class="status-line">
-        <span>战斗: {{ (game.battleStatus as any)?.battleCount || (game.battleStatus as any)?.battle_count || 0 }}</span>
-        <span>|</span>
-        <span>击杀: {{ (game.battleStatus as any)?.totalKills || (game.battleStatus as any)?.session_kills || 0 }}</span>
-        <span>|</span>
-        <span>+{{ (game.battleStatus as any)?.totalExp || (game.battleStatus as any)?.session_exp || 0 }} EXP</span>
-        <span>|</span>
-        <span>+{{ (game.battleStatus as any)?.totalGold || (game.battleStatus as any)?.session_gold || 0 }} G</span>
+        <span class="stat-battle">战斗: {{ (game.battleStatus as any)?.battleCount || (game.battleStatus as any)?.battle_count || 0 }}</span>
+        <span class="stat-separator">|</span>
+        <span class="stat-kills">击杀: {{ (game.battleStatus as any)?.totalKills || (game.battleStatus as any)?.session_kills || 0 }}</span>
+        <span class="stat-separator">|</span>
+        <span class="stat-exp">+{{ (game.battleStatus as any)?.totalExp || (game.battleStatus as any)?.session_exp || 0 }} EXP</span>
+        <span class="stat-separator">|</span>
+        <span class="stat-gold">+{{ (game.battleStatus as any)?.totalGold || (game.battleStatus as any)?.session_gold || 0 }} G</span>
         <span class="battle-status" :class="{ active: game.isRunning }">
           {{ game.isRunning ? '× 战斗中' : '○ 待机' }}
         </span>
@@ -375,7 +375,13 @@ function escapeRegex(str: string): string {
         <!-- 左侧角色信息面板 -->
         <div class="game-sidebar">
           <div class="character-card">
-            <div class="character-name">
+            <div 
+              class="character-name"
+              :style="{ 
+                color: getClassColor((game.character as any)?.classId || (game.character as any)?.class || ''),
+                textShadow: `0 0 10px ${getClassColor((game.character as any)?.classId || (game.character as any)?.class || '')}`
+              }"
+            >
               {{ game.character?.name }}
             </div>
             <div class="character-level">
@@ -461,8 +467,8 @@ function escapeRegex(str: string): string {
 
             <!-- 总结统计 -->
             <div class="summary-stats">
-              <div>击杀: {{ (game.character as any)?.totalKills || 0 }}</div>
-              <div>死亡: {{ (game.character as any)?.totalDeaths || 0 }}</div>
+              <div class="summary-kills">击杀: {{ (game.character as any)?.totalKills || 0 }}</div>
+              <div class="summary-deaths">死亡: {{ (game.character as any)?.totalDeaths || 0 }}</div>
             </div>
           </div>
         </div>
@@ -615,6 +621,27 @@ function escapeRegex(str: string): string {
   font-size: 12px;
 }
 
+.stat-battle {
+  color: var(--terminal-green);
+}
+
+.stat-kills {
+  color: var(--terminal-red);
+}
+
+.stat-exp {
+  color: var(--terminal-cyan);
+}
+
+.stat-gold {
+  color: var(--terminal-gold);
+}
+
+.stat-separator {
+  color: var(--terminal-gray);
+  opacity: 0.5;
+}
+
 .battle-status {
   margin-left: auto;
   color: var(--terminal-gray);
@@ -647,16 +674,15 @@ function escapeRegex(str: string): string {
 
 .character-name {
   font-family: var(--font-pixel);
-  font-size: 14px;
-  color: var(--text-gold);
-  text-shadow: 0 0 10px var(--text-gold);
+  font-size: 18px;
   margin-bottom: 8px;
+  /* 颜色通过内联样式动态设置 */
 }
 
 .character-level {
   color: var(--text-cyan);
   margin-bottom: 15px;
-  font-size: 12px;
+  font-size: 14px;
 }
 
 /* 进度条区域 */
@@ -670,7 +696,7 @@ function escapeRegex(str: string): string {
 
 .progress-label {
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: 12px;
   margin-bottom: 4px;
 }
 
@@ -700,13 +726,13 @@ function escapeRegex(str: string): string {
 }
 
 .exp-bar .progress-fill {
-  background: linear-gradient(90deg, #00aaff, #00ddff);
-  box-shadow: 0 0 10px rgba(0, 170, 255, 0.5);
+  background: linear-gradient(90deg, #ffd700, #ffed4e);
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
 }
 
 .progress-text {
   color: var(--text-primary);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 /* 属性网格 */
@@ -715,7 +741,7 @@ function escapeRegex(str: string): string {
   grid-template-columns: 1fr 1fr;
   gap: 8px;
   margin-bottom: 15px;
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .character-stat {
@@ -737,7 +763,7 @@ function escapeRegex(str: string): string {
   grid-template-columns: 1fr 1fr;
   gap: 8px;
   margin-bottom: 15px;
-  font-size: 12px;
+  font-size: 14px;
   padding-top: 15px;
   border-top: 1px solid var(--text-dim);
 }
@@ -759,10 +785,18 @@ function escapeRegex(str: string): string {
 .summary-stats {
   display: flex;
   justify-content: space-between;
-  font-size: 11px;
-  color: var(--text-gray);
+  font-size: 12px;
   padding-top: 10px;
   border-top: 1px solid var(--text-dim);
+}
+
+.summary-kills {
+  color: var(--terminal-red);
+}
+
+.summary-deaths {
+  color: var(--terminal-gray);
+  opacity: 0.7;
 }
 
 /* 游戏内容区 */
@@ -775,8 +809,10 @@ function escapeRegex(str: string): string {
 
 /* 敌人信息面板（固定在顶部，横向排列） */
 .enemies-panel {
+  position: relative;
+  z-index: 10;
   border-bottom: 2px solid var(--border-color);
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.8);
   padding: 8px 12px;
   display: flex;
   gap: 12px;
@@ -791,6 +827,8 @@ function escapeRegex(str: string): string {
   min-height: 0;
   overflow-y: auto;
   padding: 16px;
+  position: relative;
+  z-index: 1;
 }
 
 .no-character {
@@ -812,17 +850,19 @@ function escapeRegex(str: string): string {
 .no-character-message h2 {
   color: var(--terminal-gold);
   margin-bottom: 20px;
-  font-size: 24px;
+  font-size: 18px;
 }
 
 .no-character-message p {
   color: var(--terminal-green);
-  font-size: 16px;
+  font-size: 14px;
   margin: 10px 0;
 }
 
 /* 敌人信息样式覆盖（横向排列） */
 .enemy-info {
+  position: relative;
+  z-index: 11;
   border: 1px solid var(--text-dim);
   padding: 6px 10px;
   display: flex;
@@ -831,7 +871,7 @@ function escapeRegex(str: string): string {
   min-width: 160px;
   flex: 1;
   max-width: 280px;
-  background: rgba(50, 0, 0, 0.3);
+  background: rgba(50, 0, 0, 0.5);
   transition: opacity 0.3s;
 }
 
@@ -841,7 +881,7 @@ function escapeRegex(str: string): string {
 }
 
 .enemy-info .enemy-name {
-  font-size: 12px;
+  font-size: 14px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

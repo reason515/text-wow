@@ -292,7 +292,7 @@ h2 {
   color: var(--terminal-gold);
   text-align: center;
   margin-bottom: 10px;
-  font-size: 20px;
+  font-size: 18px;
 }
 
 .hint {
@@ -343,7 +343,7 @@ h2 {
 }
 
 .faction-name {
-  font-size: 24px;
+  font-size: 18px;
   margin-bottom: 10px;
 }
 
@@ -358,7 +358,7 @@ h2 {
 
 .faction-races {
   color: var(--terminal-cyan);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 /* 种族和职业网格 */
@@ -392,12 +392,12 @@ h2 {
 
 .race-name {
   color: var(--terminal-green);
-  font-size: 16px;
+  font-size: 14px;
   margin-bottom: 8px;
 }
 
 .class-name {
-  font-size: 16px;
+  font-size: 14px;
   margin-bottom: 8px;
   text-shadow: 0 0 8px currentColor;
 }
@@ -405,7 +405,7 @@ h2 {
 .race-desc,
 .class-desc {
   color: var(--terminal-gray);
-  font-size: 11px;
+  font-size: 12px;
   margin-bottom: 10px;
   line-height: 1.4;
 }
@@ -477,7 +477,7 @@ h2 {
 
 .preview-info {
   color: var(--terminal-green);
-  font-size: 18px;
+  font-size: 14px;
 }
 
 .preview-sep {
@@ -496,7 +496,7 @@ h2 {
   border: 2px solid var(--terminal-gray);
   color: var(--terminal-green);
   font-family: inherit;
-  font-size: 18px;
+  font-size: 14px;
   text-align: center;
 }
 
@@ -507,7 +507,7 @@ h2 {
 
 .name-hint {
   color: var(--terminal-gray);
-  font-size: 11px;
+  font-size: 12px;
   text-align: center;
   margin-top: 10px;
 }
@@ -529,7 +529,7 @@ h2 {
   border: 2px solid var(--terminal-gold);
   color: var(--terminal-gold);
   font-family: inherit;
-  font-size: 16px;
+  font-size: 14px;
   cursor: pointer;
   transition: all 0.3s;
 }

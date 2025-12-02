@@ -181,7 +181,7 @@ async function handleSubmit() {
 
 .subtitle {
   color: var(--terminal-cyan);
-  font-size: 14px;
+  font-size: 12px;
   margin-top: 10px;
   letter-spacing: 4px;
 }
@@ -249,7 +249,7 @@ async function handleSubmit() {
 .field-error {
   display: block;
   color: var(--terminal-red);
-  font-size: 11px;
+  font-size: 10px;
   margin-top: 5px;
 }
 
@@ -318,7 +318,7 @@ async function handleSubmit() {
   position: fixed;
   bottom: 20px;
   color: var(--terminal-gray);
-  font-size: 11px;
+  font-size: 10px;
 }
 
 /* 响应式 */
@@ -332,6 +332,10 @@ async function handleSubmit() {
   }
 }
 </style>
+
+
+
+
 
 
 

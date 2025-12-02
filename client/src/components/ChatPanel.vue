@@ -267,7 +267,7 @@ onUnmounted(() => {
 
 .online-count {
   color: var(--terminal-cyan);
-  font-size: 11px;
+  font-size: 12px;
   cursor: pointer;
 }
 
@@ -280,7 +280,7 @@ onUnmounted(() => {
   border: none;
   color: var(--terminal-gray);
   cursor: pointer;
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .minimize-btn:hover {
@@ -301,7 +301,7 @@ onUnmounted(() => {
   color: var(--terminal-gray);
   padding: 3px 8px;
   font-family: inherit;
-  font-size: 11px;
+  font-size: 12px;
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -376,7 +376,7 @@ onUnmounted(() => {
   padding: 8px;
   border-bottom: 1px solid var(--terminal-gray);
   color: var(--terminal-cyan);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .close-btn {
@@ -396,7 +396,7 @@ onUnmounted(() => {
 .online-user {
   padding: 3px 8px;
   color: var(--terminal-green);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .online-user:hover {
@@ -407,7 +407,7 @@ onUnmounted(() => {
   color: var(--terminal-gray);
   text-align: center;
   padding: 10px;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 /* 输入框 */
@@ -443,7 +443,7 @@ onUnmounted(() => {
   color: var(--terminal-green);
   padding: 6px 15px;
   font-family: inherit;
-  font-size: 11px;
+  font-size: 12px;
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -463,7 +463,7 @@ onUnmounted(() => {
   padding: 5px 10px;
   background: rgba(255, 0, 0, 0.1);
   color: var(--terminal-red);
-  font-size: 11px;
+  font-size: 12px;
   text-align: center;
 }
 
@@ -488,6 +488,10 @@ onUnmounted(() => {
   background: var(--terminal-green);
 }
 </style>
+
+
+
+
 
 
 
