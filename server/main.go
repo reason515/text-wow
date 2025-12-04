@@ -40,7 +40,7 @@ func main() {
 		// ═══════════════════════════════════════════════════════════
 		// 公开API（无需认证）
 		// ═══════════════════════════════════════════════════════════
-		
+
 		// 健康检查
 		apiGroup.GET("/health", func(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{"status": "ok", "version": "0.1.0"})
@@ -61,7 +61,7 @@ func main() {
 		// ═══════════════════════════════════════════════════════════
 		// 需要认证的API
 		// ═══════════════════════════════════════════════════════════
-		
+
 		protected := apiGroup.Group("")
 		protected.Use(h.AuthMiddleware())
 		{
@@ -73,6 +73,13 @@ func main() {
 			protected.GET("/characters", h.GetCharacters)
 			protected.POST("/characters", h.CreateCharacter)
 			protected.PUT("/characters/active", h.SetCharacterActive)
+
+			// 技能选择
+			protected.GET("/characters/:characterId/skills/initial", h.GetInitialSkillSelection)
+			protected.POST("/characters/:characterId/skills/initial", h.SelectInitialSkills)
+			protected.GET("/characters/:characterId/skills/selection", h.GetSkillSelection)
+			protected.POST("/characters/:characterId/skills/select", h.SelectSkill)
+			protected.GET("/characters/:characterId/skills", h.GetCharacterSkills)
 
 			// 小队
 			protected.GET("/team", h.GetTeam)
@@ -120,7 +127,7 @@ func main() {
 	log.Println("   GET  /api/battle/status    - 战斗状态 (需认证)")
 	log.Println("   GET  /api/battle/logs      - 战斗日志 (需认证)")
 	log.Println("   POST /api/battle/zone      - 切换区域 (需认证)")
-	
+
 	if err := r.Run(":8080"); err != nil {
 		log.Fatalf("❌ Failed to start server: %v", err)
 	}

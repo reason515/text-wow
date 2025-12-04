@@ -8,18 +8,18 @@ import "time"
 
 // User 用户
 type User struct {
-	ID             int       `json:"id"`
-	Username       string    `json:"username"`
-	Email          string    `json:"email,omitempty"`
-	MaxTeamSize    int       `json:"maxTeamSize"`
-	UnlockedSlots  int       `json:"unlockedSlots"`
-	Gold           int       `json:"gold"`
-	CurrentZoneID  string    `json:"currentZoneId"`
-	TotalKills     int       `json:"totalKills"`
-	TotalGoldGained int      `json:"totalGoldGained"`
-	PlayTime       int       `json:"playTime"` // 秒
-	CreatedAt      time.Time `json:"createdAt"`
-	LastLoginAt    *time.Time `json:"lastLoginAt,omitempty"`
+	ID              int        `json:"id"`
+	Username        string     `json:"username"`
+	Email           string     `json:"email,omitempty"`
+	MaxTeamSize     int        `json:"maxTeamSize"`
+	UnlockedSlots   int        `json:"unlockedSlots"`
+	Gold            int        `json:"gold"`
+	CurrentZoneID   string     `json:"currentZoneId"`
+	TotalKills      int        `json:"totalKills"`
+	TotalGoldGained int        `json:"totalGoldGained"`
+	PlayTime        int        `json:"playTime"` // 秒
+	CreatedAt       time.Time  `json:"createdAt"`
+	LastLoginAt     *time.Time `json:"lastLoginAt,omitempty"`
 }
 
 // UserCredentials 用户登录凭据
@@ -52,7 +52,7 @@ type Character struct {
 	Name         string     `json:"name"`
 	RaceID       string     `json:"raceId"`
 	ClassID      string     `json:"classId"`
-	Faction      string     `json:"faction"` // alliance, horde
+	Faction      string     `json:"faction"`  // alliance, horde
 	TeamSlot     int        `json:"teamSlot"` // 1-5
 	IsActive     bool       `json:"isActive"`
 	IsDead       bool       `json:"isDead"`
@@ -201,7 +201,7 @@ type BattleStatus struct {
 	TotalExp       int          `json:"totalExp"`
 	TotalGold      int          `json:"totalGold"`
 	SessionStart   *time.Time   `json:"sessionStart,omitempty"`
-	IsResting      bool         `json:"isResting"`      // 是否在休息
+	IsResting      bool         `json:"isResting"`           // 是否在休息
 	RestUntil      *time.Time   `json:"restUntil,omitempty"` // 休息结束时间
 }
 
@@ -211,21 +211,84 @@ type BattleStatus struct {
 
 // Skill 技能
 type Skill struct {
-	ID            string  `json:"id"`
-	Name          string  `json:"name"`
-	Description   string  `json:"description"`
-	ClassID       string  `json:"classId"`
-	Type          string  `json:"type"`       // attack/heal/buff/debuff/dot/hot/shield/control
-	TargetType    string  `json:"targetType"` // self/ally/enemy/ally_all/enemy_all
-	DamageType    string  `json:"damageType,omitempty"`
-	BaseValue     int     `json:"baseValue"`
-	ScalingStat   string  `json:"scalingStat,omitempty"`
-	ScalingRatio  float64 `json:"scalingRatio"`
-	ResourceCost  int     `json:"resourceCost"`
-	Cooldown      int     `json:"cooldown"`
-	LevelRequired int     `json:"levelRequired"`
+	ID             string  `json:"id"`
+	Name           string  `json:"name"`
+	Description    string  `json:"description"`
+	ClassID        string  `json:"classId"`
+	Type           string  `json:"type"`       // attack/heal/buff/debuff/dot/hot/shield/control
+	TargetType     string  `json:"targetType"` // self/ally/enemy/ally_all/enemy_all
+	DamageType     string  `json:"damageType,omitempty"`
+	BaseValue      int     `json:"baseValue"`
+	ScalingStat    string  `json:"scalingStat,omitempty"`
+	ScalingRatio   float64 `json:"scalingRatio"`
+	ResourceCost   int     `json:"resourceCost"`
+	Cooldown       int     `json:"cooldown"`
+	LevelRequired  int     `json:"levelRequired"`
 	ThreatModifier float64 `json:"threatModifier"`
-	ThreatType    string  `json:"threatType"` // normal/high/taunt/reduce/clear
+	ThreatType     string  `json:"threatType"`     // normal/high/taunt/reduce/clear
+	Tags           string  `json:"tags,omitempty"` // JSON数组字符串
+}
+
+// CharacterSkill 角色技能（已学会的技能）
+type CharacterSkill struct {
+	ID          int    `json:"id"`
+	CharacterID int    `json:"characterId"`
+	SkillID     string `json:"skillId"`
+	SkillLevel  int    `json:"skillLevel"`
+	Slot        *int   `json:"slot,omitempty"`
+	IsAuto      bool   `json:"isAuto"`
+	Skill       *Skill `json:"skill,omitempty"` // 关联的技能详情
+}
+
+// PassiveSkill 被动技能
+type PassiveSkill struct {
+	ID           string  `json:"id"`
+	Name         string  `json:"name"`
+	Description  string  `json:"description"`
+	ClassID      string  `json:"classId"`
+	Rarity       string  `json:"rarity"` // common/rare/epic/legendary
+	Tier         int     `json:"tier"`
+	EffectType   string  `json:"effectType"`
+	EffectValue  float64 `json:"effectValue"`
+	EffectStat   string  `json:"effectStat,omitempty"`
+	MaxLevel     int     `json:"maxLevel"`
+	LevelScaling float64 `json:"levelScaling"`
+}
+
+// CharacterPassiveSkill 角色被动技能
+type CharacterPassiveSkill struct {
+	ID          int           `json:"id"`
+	CharacterID int           `json:"characterId"`
+	PassiveID   string        `json:"passiveId"`
+	Level       int           `json:"level"`
+	AcquiredAt  time.Time     `json:"acquiredAt"`
+	Passive     *PassiveSkill `json:"passive,omitempty"` // 关联的被动技能详情
+}
+
+// SkillSelection 技能选择机会
+type SkillSelection struct {
+	CharacterID     int                      `json:"characterId"`
+	Level           int                      `json:"level"`
+	SelectionType   string                   `json:"selectionType"`             // "initial_active" / "active" / "passive"
+	CanUpgrade      bool                     `json:"canUpgrade"`                // 是否可以升级现有技能
+	UpgradeSkills   []*CharacterSkill        `json:"upgradeSkills,omitempty"`   // 可升级的主动技能列表
+	UpgradePassives []*CharacterPassiveSkill `json:"upgradePassives,omitempty"` // 可升级的被动技能列表
+	NewSkills       []*Skill                 `json:"newSkills,omitempty"`       // 新技能选项（随机4个）
+	NewPassives     []*PassiveSkill          `json:"newPassives,omitempty"`     // 新被动技能选项（随机4个）
+}
+
+// SkillSelectionRequest 技能选择请求
+type SkillSelectionRequest struct {
+	CharacterID int    `json:"characterId" binding:"required"`
+	SkillID     string `json:"skillId,omitempty"`   // 选择的技能ID（新技能或升级）
+	PassiveID   string `json:"passiveId,omitempty"` // 选择的被动技能ID（新被动或升级）
+	IsUpgrade   bool   `json:"isUpgrade"`           // 是否为升级
+}
+
+// InitialSkillSelectionRequest 初始技能选择请求
+type InitialSkillSelectionRequest struct {
+	CharacterID int      `json:"characterId" binding:"required"`
+	SkillIDs    []string `json:"skillIds" binding:"required,len=2"` // 必须选择2个技能
 }
 
 // ═══════════════════════════════════════════════════════════

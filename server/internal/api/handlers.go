@@ -2,29 +2,37 @@ package api
 
 import (
 	"database/sql"
+	"fmt"
 	"net/http"
 	"strings"
 
 	"text-wow/internal/auth"
 	"text-wow/internal/models"
 	"text-wow/internal/repository"
+	"text-wow/internal/service"
 
 	"github.com/gin-gonic/gin"
 )
 
 // Handler API处理器
 type Handler struct {
-	userRepo *repository.UserRepository
-	charRepo *repository.CharacterRepository
-	gameRepo *repository.GameRepository
+	userRepo     *repository.UserRepository
+	charRepo     *repository.CharacterRepository
+	gameRepo     *repository.GameRepository
+	skillRepo    *repository.SkillRepository
+	skillService *service.SkillService
 }
 
 // NewHandler 创建处理器
 func NewHandler() *Handler {
+	skillRepo := repository.NewSkillRepository()
+	skillService := service.NewSkillService(skillRepo, repository.NewCharacterRepository())
 	return &Handler{
-		userRepo: repository.NewUserRepository(),
-		charRepo: repository.NewCharacterRepository(),
-		gameRepo: repository.NewGameRepository(),
+		userRepo:     repository.NewUserRepository(),
+		charRepo:     repository.NewCharacterRepository(),
+		gameRepo:     repository.NewGameRepository(),
+		skillRepo:    skillRepo,
+		skillService: skillService,
 	}
 }
 
@@ -356,7 +364,7 @@ func (h *Handler) CreateCharacter(c *gin.Context) {
 	// 计算HP和资源
 	char.MaxHP = class.BaseHP + char.Stamina*2
 	char.HP = char.MaxHP
-	
+
 	// 战士的怒气最大值固定为100，初始值为0
 	if class.ResourceType == "rage" {
 		char.MaxResource = 100
@@ -429,7 +437,7 @@ func (h *Handler) GetCharacter(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	c.JSON(http.StatusNotFound, models.APIResponse{
 		Success: false,
 		Error:   "no character found",
@@ -572,5 +580,257 @@ func (h *Handler) GetZones(c *gin.Context) {
 	c.JSON(http.StatusOK, models.APIResponse{
 		Success: true,
 		Data:    zones,
+	})
+}
+
+// ═══════════════════════════════════════════════════════════
+// 技能选择相关API
+// ═══════════════════════════════════════════════════════════
+
+// GetInitialSkillSelection 获取初始技能选择机会
+func (h *Handler) GetInitialSkillSelection(c *gin.Context) {
+	characterID := c.Param("characterId")
+	if characterID == "" {
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Success: false,
+			Error:   "characterId is required",
+		})
+		return
+	}
+
+	var charID int
+	if _, err := fmt.Sscanf(characterID, "%d", &charID); err != nil {
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Success: false,
+			Error:   "invalid characterId",
+		})
+		return
+	}
+
+	selection, err := h.skillService.GetInitialSkillSelection(charID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Success: false,
+			Error:   err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.APIResponse{
+		Success: true,
+		Data:    selection,
+	})
+}
+
+// SelectInitialSkills 选择初始技能
+func (h *Handler) SelectInitialSkills(c *gin.Context) {
+	var req models.InitialSkillSelectionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		// 检查是否是长度验证错误
+		if strings.Contains(err.Error(), "len") {
+			c.JSON(http.StatusBadRequest, models.APIResponse{
+				Success: false,
+				Error:   "必须选择2个初始技能",
+			})
+		} else {
+			c.JSON(http.StatusBadRequest, models.APIResponse{
+				Success: false,
+				Error:   err.Error(),
+			})
+		}
+		return
+	}
+
+	// 验证角色所有权
+	character, err := h.charRepo.GetByID(req.CharacterID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, models.APIResponse{
+			Success: false,
+			Error:   "character not found",
+		})
+		return
+	}
+
+	userID, _ := c.Get("userID")
+	if character.UserID != userID {
+		c.JSON(http.StatusForbidden, models.APIResponse{
+			Success: false,
+			Error:   "forbidden",
+		})
+		return
+	}
+
+	if err := h.skillService.SelectInitialSkills(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Success: false,
+			Error:   err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.APIResponse{
+		Success: true,
+		Message: "初始技能选择成功",
+	})
+}
+
+// GetSkillSelection 获取技能选择机会
+func (h *Handler) GetSkillSelection(c *gin.Context) {
+	characterID := c.Param("characterId")
+	if characterID == "" {
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Success: false,
+			Error:   "characterId is required",
+		})
+		return
+	}
+
+	var charID int
+	if _, err := fmt.Sscanf(characterID, "%d", &charID); err != nil {
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Success: false,
+			Error:   "invalid characterId",
+		})
+		return
+	}
+
+	// 验证角色所有权
+	character, err := h.charRepo.GetByID(charID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, models.APIResponse{
+			Success: false,
+			Error:   "character not found",
+		})
+		return
+	}
+
+	userID, _ := c.Get("userID")
+	if character.UserID != userID {
+		c.JSON(http.StatusForbidden, models.APIResponse{
+			Success: false,
+			Error:   "forbidden",
+		})
+		return
+	}
+
+	selection, err := h.skillService.CheckSkillSelectionOpportunity(charID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Error:   err.Error(),
+		})
+		return
+	}
+
+	if selection == nil {
+		c.JSON(http.StatusOK, models.APIResponse{
+			Success: true,
+			Message: "当前没有技能选择机会",
+			Data:    nil,
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.APIResponse{
+		Success: true,
+		Data:    selection,
+	})
+}
+
+// SelectSkill 选择技能（新技能或升级）
+func (h *Handler) SelectSkill(c *gin.Context) {
+	var req models.SkillSelectionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Success: false,
+			Error:   err.Error(),
+		})
+		return
+	}
+
+	// 验证角色所有权
+	character, err := h.charRepo.GetByID(req.CharacterID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, models.APIResponse{
+			Success: false,
+			Error:   "character not found",
+		})
+		return
+	}
+
+	userID, _ := c.Get("userID")
+	if character.UserID != userID {
+		c.JSON(http.StatusForbidden, models.APIResponse{
+			Success: false,
+			Error:   "forbidden",
+		})
+		return
+	}
+
+	if err := h.skillService.SelectSkill(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Success: false,
+			Error:   err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.APIResponse{
+		Success: true,
+		Message: "技能选择成功",
+	})
+}
+
+// GetCharacterSkills 获取角色的所有技能
+func (h *Handler) GetCharacterSkills(c *gin.Context) {
+	characterID := c.Param("characterId")
+	if characterID == "" {
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Success: false,
+			Error:   "characterId is required",
+		})
+		return
+	}
+
+	var charID int
+	if _, err := fmt.Sscanf(characterID, "%d", &charID); err != nil {
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Success: false,
+			Error:   "invalid characterId",
+		})
+		return
+	}
+
+	// 验证角色所有权
+	character, err := h.charRepo.GetByID(charID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, models.APIResponse{
+			Success: false,
+			Error:   "character not found",
+		})
+		return
+	}
+
+	userID, _ := c.Get("userID")
+	if character.UserID != userID {
+		c.JSON(http.StatusForbidden, models.APIResponse{
+			Success: false,
+			Error:   "forbidden",
+		})
+		return
+	}
+
+	skills, err := h.skillService.GetCharacterAllSkills(charID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Error:   err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.APIResponse{
+		Success: true,
+		Data:    skills,
 	})
 }

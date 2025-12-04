@@ -262,17 +262,10 @@ INSERT OR REPLACE INTO effects (id, name, description, type, is_buff, is_stackab
 -- 4. 强力技能必须有冷却
 
 -- ═══════════════════════════════════════════════════════════
--- 战士技能 (怒气系统: 上限100, 攻击+5, 受伤+怒气)
+-- 战士技能 (已迁移到 warrior_skills.sql)
 -- ═══════════════════════════════════════════════════════════
-INSERT OR REPLACE INTO skills (id, name, description, class_id, type, target_type, damage_type, base_value, scaling_stat, scaling_ratio, resource_cost, cooldown, level_required, effect_id, effect_chance) VALUES
-('heroic_strike', '英勇打击', '强力的武器攻击。', 'warrior', 'attack', 'enemy', 'physical', 8, 'strength', 0.5, 10, 0, 1, NULL, 1.0),
-('charge', '冲锋', '冲向敌人造成伤害并眩晕1回合。', 'warrior', 'attack', 'enemy', 'physical', 5, 'strength', 0.3, 0, 4, 1, 'eff_stun', 1.0),
-('rend', '撕裂', '造成流血，持续3回合。', 'warrior', 'dot', 'enemy', 'physical', 2, 'strength', 0.15, 8, 0, 2, 'eff_rend', 1.0),
-('thunder_clap', '雷霆一击', '对所有敌人造成伤害并减速。', 'warrior', 'attack', 'enemy_all', 'physical', 6, 'strength', 0.3, 15, 3, 4, 'eff_slow', 0.8),
-('sunder_armor', '破甲攻击', '降低敌人防御20%，可叠加。', 'warrior', 'debuff', 'enemy', 'physical', 4, 'strength', 0.2, 12, 0, 6, 'eff_sunder_armor', 1.0),
-('execute', '斩杀', '对HP<30%的敌人造成巨额伤害。', 'warrior', 'attack', 'enemy_lowest_hp', 'physical', 25, 'strength', 1.0, 20, 3, 8, NULL, 1.0),
-('shield_wall', '盾墙', '3回合内受到伤害降低50%。', 'warrior', 'buff', 'self', NULL, 0, NULL, 0, 30, 10, 10, 'eff_shield_wall', 1.0),
-('battle_shout', '战斗怒吼', '全队攻击力提升10%，持续5回合。', 'warrior', 'buff', 'ally_all', NULL, 0, NULL, 0, 15, 6, 3, 'eff_battle_shout', 1.0);
+-- 注意：所有战士技能数据已迁移到 warrior_skills.sql
+-- 请确保在运行seed.sql之前或之后运行warrior_skills.sql
 
 -- ═══════════════════════════════════════════════════════════
 -- 法师技能 (法力系统: 基础40, 每回合+精神×0.5%)
@@ -390,12 +383,7 @@ INSERT OR REPLACE INTO skills (id, name, description, class_id, type, target_typ
 -- 仇恨管理技能 (嘲讽/仇恨清除)
 -- ═══════════════════════════════════════════════════════════
 INSERT OR REPLACE INTO skills (id, name, description, class_id, type, target_type, damage_type, base_value, scaling_stat, scaling_ratio, resource_cost, cooldown, level_required, effect_id, effect_chance, threat_modifier, threat_type) VALUES
--- 战士仇恨技能
-('taunt', '嘲讽', '强制敌人攻击自己，并获得额外仇恨。', 'warrior', 'taunt', 'enemy', NULL, 0, NULL, 0, 5, 4, 3, 'eff_taunt', 1.0, 0, 'taunt'),
-('challenging_shout', '挑战怒吼', '嘲讽所有敌人。', 'warrior', 'taunt', 'enemy_all', NULL, 0, NULL, 0, 25, 8, 10, 'eff_taunt', 1.0, 0, 'taunt'),
-('shield_slam', '盾牌猛击', '用盾牌猛击敌人，造成高仇恨。', 'warrior', 'attack', 'enemy', 'physical', 10, 'strength', 0.4, 15, 0, 6, NULL, 1.0, 2.0, 'high'),
-('revenge', '复仇', '格挡后反击并产生额外仇恨。', 'warrior', 'attack', 'enemy', 'physical', 8, 'strength', 0.3, 5, 0, 4, NULL, 1.0, 1.5, 'high'),
-('demoralizing_shout', '挫志怒吼', '降低所有敌人攻击力10%，产生仇恨。', 'warrior', 'debuff', 'enemy_all', NULL, 0, NULL, 0, 10, 3, 5, 'eff_demo_shout', 1.0, 1.5, 'high'),
+-- 战士仇恨技能 (已迁移到 warrior_skills.sql)
 
 -- 圣骑士仇恨技能
 ('righteous_defense', '正义防御', '嘲讽攻击队友的敌人。', 'paladin', 'taunt', 'enemy', NULL, 0, NULL, 0, 4, 4, 4, 'eff_taunt', 1.0, 0, 'taunt'),

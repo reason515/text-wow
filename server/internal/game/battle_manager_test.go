@@ -45,9 +45,12 @@ func setupBattleManagerTest(t *testing.T) (*BattleManager, *models.Character, fu
 	}
 
 	manager := &BattleManager{
-		sessions: make(map[int]*BattleSession),
-		gameRepo: repository.NewGameRepository(),
-		charRepo: repository.NewCharacterRepository(),
+		sessions:            make(map[int]*BattleSession),
+		gameRepo:            repository.NewGameRepository(),
+		charRepo:            repository.NewCharacterRepository(),
+		skillManager:        NewSkillManager(),
+		buffManager:         NewBuffManager(),
+		passiveSkillManager: NewPassiveSkillManager(),
 	}
 
 	cleanup := func() {
@@ -408,8 +411,12 @@ func TestBattleManager_RestMechanism_Regeneration(t *testing.T) {
 	session := manager.GetOrCreateSession(userID)
 	session.IsRunning = true
 	session.IsResting = true
-	restUntil := time.Now().Add(5 * time.Second)
+	now := time.Now()
+	restStartedAt := now.Add(-1 * time.Second) // 设置为1秒前，确保时间差大于100ms
+	restUntil := now.Add(5 * time.Second)
 	session.RestUntil = &restUntil
+	session.RestStartedAt = &restStartedAt
+	session.LastRestTick = nil // 设置为nil，让processRest从RestStartedAt开始计算
 	session.RestSpeed = 1.0
 
 	initialHP := char.HP
@@ -440,8 +447,10 @@ func TestBattleManager_RestMechanism_RestEnd(t *testing.T) {
 	session := manager.GetOrCreateSession(userID)
 	session.IsRunning = true
 	session.IsResting = true
-	restUntil := time.Now().Add(-1 * time.Second) // 已经过去
+	now := time.Now()
+	restUntil := now.Add(-1 * time.Second) // 已经过去
 	session.RestUntil = &restUntil
+	session.RestStartedAt = &now // 必须设置，否则processRest会直接return
 	session.RestSpeed = 1.0
 
 	// 执行tick，应该结束休息

@@ -12,10 +12,13 @@ import (
 
 // BattleManager 战斗管理器 - 管理所有用户的战斗状态
 type BattleManager struct {
-	mu       sync.RWMutex
-	sessions map[int]*BattleSession // key: userID
-	gameRepo *repository.GameRepository
-	charRepo *repository.CharacterRepository
+	mu                  sync.RWMutex
+	sessions            map[int]*BattleSession // key: userID
+	gameRepo            *repository.GameRepository
+	charRepo            *repository.CharacterRepository
+	skillManager        *SkillManager
+	buffManager         *BuffManager
+	passiveSkillManager *PassiveSkillManager
 }
 
 // BattleSession 用户战斗会话
@@ -47,9 +50,12 @@ type BattleSession struct {
 // NewBattleManager 创建战斗管理器
 func NewBattleManager() *BattleManager {
 	return &BattleManager{
-		sessions: make(map[int]*BattleSession),
-		gameRepo: repository.NewGameRepository(),
-		charRepo: repository.NewCharacterRepository(),
+		sessions:            make(map[int]*BattleSession),
+		gameRepo:            repository.NewGameRepository(),
+		charRepo:            repository.NewCharacterRepository(),
+		skillManager:        NewSkillManager(),
+		buffManager:         NewBuffManager(),
+		passiveSkillManager: NewPassiveSkillManager(),
 	}
 }
 
@@ -180,6 +186,18 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 	// 确保战士的怒气上限为100（每次tick都检查，防止被覆盖）
 	if char.ResourceType == "rage" {
 		char.MaxResource = 100
+	}
+
+	// 加载角色的技能（如果还没有加载）
+	if err := m.skillManager.LoadCharacterSkills(char.ID); err != nil {
+		// 如果加载失败，记录日志但不中断战斗
+		m.addLog(session, "system", fmt.Sprintf("警告：无法加载角色技能: %v", err), "#ffaa00")
+	}
+
+	// 加载角色的被动技能（如果还没有加载）
+	if err := m.passiveSkillManager.LoadCharacterPassiveSkills(char.ID); err != nil {
+		// 如果加载失败，记录日志但不中断战斗
+		m.addLog(session, "system", fmt.Sprintf("警告：无法加载角色被动技能: %v", err), "#ffaa00")
 	}
 
 	// 如果战斗未运行且不在休息状态，检查是否需要返回角色数据
@@ -380,59 +398,253 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 		// 玩家回合：攻击第一个存活的敌人
 		if len(aliveEnemies) > 0 {
 			target := aliveEnemies[0]
+			targetHPPercent := float64(target.HP) / float64(target.MaxHP)
+			hasMultipleEnemies := len(aliveEnemies) > 1
 
-			// 确定使用的技能和消耗
-			skillName, skillCost := m.getSkillForAttack(char)
+			// 使用技能管理器选择技能
+			skillState := m.skillManager.SelectBestSkill(char.ID, char.Resource, targetHPPercent, hasMultipleEnemies)
 
-			// 如果是战士，检查怒气是否足够使用技能
-			if char.ResourceType == "rage" {
-				if skillCost > 0 && char.Resource < skillCost {
-					// 怒气不足，只能使用普通攻击
-					skillName = "普通攻击"
-					skillCost = 0
-				}
-			}
+			var skillName string
+			var playerDamage int
+			var resourceCost int
+			var resourceGain int
+			var usedSkill bool
+			var skillEffects map[string]interface{}
+			var isCrit bool
 
-			playerDamage := m.calculateDamage(char.Attack, target.Defense)
-			isCrit := rand.Float64() < char.CritRate
-			if isCrit {
-				playerDamage = int(float64(playerDamage) * char.CritDamage)
-			}
-			target.HP -= playerDamage
+			if skillState != nil {
+				// 使用技能
+				skillName = skillState.Skill.Name
+				resourceCost = m.skillManager.GetSkillResourceCost(skillState)
 
-			// 消耗资源（如果是战士，消耗怒气）
-			resourceCost := 0
-			usedSkill := false // 标记是否使用了技能
-			if char.ResourceType == "rage" && skillCost > 0 {
-				char.Resource -= skillCost
-				resourceCost = skillCost
-				usedSkill = true // 使用了技能
-				if char.Resource < 0 {
-					char.Resource = 0
-				}
-			}
+				// 检查资源是否足够
+				if resourceCost <= char.Resource {
+					// 计算技能伤害（基础伤害，暴击在后面处理）
+					baseDamage := m.skillManager.CalculateSkillDamage(skillState, char, target, m.passiveSkillManager, m.buffManager)
 
-			// 战士攻击获得怒气（只有普通攻击才获得怒气，使用技能时不获得）
-			resourceGain := 0
-			if char.ResourceType == "rage" && !usedSkill {
-				// 只有普通攻击才获得怒气
-				if isCrit {
-					rageGain := 10 // 暴击获得10点怒气
-					char.Resource += rageGain
-					resourceGain = rageGain
+					// 计算暴击（技能也可以暴击，应用被动技能和Buff加成）
+					actualCritRate := char.CritRate
+					if m.passiveSkillManager != nil {
+						critModifier := m.passiveSkillManager.GetPassiveModifier(char.ID, "crit_rate")
+						actualCritRate = char.CritRate + critModifier/100.0
+					}
+					// 应用Buff的暴击率加成（鲁莽等）
+					if m.buffManager != nil {
+						critBuffValue := m.buffManager.GetBuffValue(char.ID, "crit_rate")
+						if critBuffValue > 0 {
+							actualCritRate = actualCritRate + critBuffValue/100.0
+						}
+					}
+					if actualCritRate > 1.0 {
+						actualCritRate = 1.0
+					}
+					isCrit = rand.Float64() < actualCritRate
+					if isCrit {
+						playerDamage = int(float64(baseDamage) * char.CritDamage)
+					} else {
+						playerDamage = baseDamage
+					}
+
+					// 应用技能效果
+					skillEffects = m.skillManager.ApplySkillEffects(skillState, char, target)
+
+					// 应用Buff/Debuff效果
+					m.applySkillBuffs(skillState, char, target, skillEffects)
+
+					// 应用Debuff到敌人（挫志怒吼、旋风斩等）
+					m.applySkillDebuffs(skillState, char, target, aliveEnemies, skillEffects)
+
+					// 消耗资源
+					char.Resource -= resourceCost
+					if char.Resource < 0 {
+						char.Resource = 0
+					}
+
+					// 使用技能（设置冷却）
+					m.skillManager.UseSkill(char.ID, skillState.SkillID)
+					usedSkill = true
+
+					// 处理技能特殊效果（怒气获得等）
+					if rageGain, ok := skillEffects["rageGain"].(int); ok {
+						// 应用被动技能的怒气获得加成（愤怒掌握等）
+						actualRageGain := m.applyRageGenerationModifiers(char.ID, rageGain)
+						char.Resource += actualRageGain
+						resourceGain = actualRageGain
+						if char.Resource > char.MaxResource {
+							char.Resource = char.MaxResource
+						}
+					}
+
+					// 处理AOE技能（旋风斩等）
+					if skillState.Skill.TargetType == "enemy_all" {
+						// 对所有敌人造成伤害
+						for _, enemy := range aliveEnemies {
+							if enemy.HP > 0 {
+								damage := m.skillManager.CalculateSkillDamage(skillState, char, enemy, m.passiveSkillManager, m.buffManager)
+								if isCrit {
+									damage = int(float64(damage) * char.CritDamage)
+								}
+								enemy.HP -= damage
+								if enemy.HP < 0 {
+									enemy.HP = 0
+								}
+							}
+						}
+						// playerDamage用于日志显示（主目标伤害）
+					} else if skillState.SkillID == "warrior_cleave" {
+						// 顺劈斩：主目标+相邻目标
+						target.HP -= playerDamage
+
+						// 对相邻目标造成伤害（最多2个）
+						adjacentCount := 0
+						for _, enemy := range aliveEnemies {
+							if enemy != target && enemy.HP > 0 && adjacentCount < 2 {
+								// 计算相邻目标伤害
+								if effect, ok := skillState.Effect["adjacentMultiplier"].(float64); ok {
+									adjacentDamage := int(float64(char.Attack) * effect)
+									adjacentDamage = adjacentDamage - enemy.Defense/2
+									if adjacentDamage < 1 {
+										adjacentDamage = 1
+									}
+									if isCrit {
+										adjacentDamage = int(float64(adjacentDamage) * char.CritDamage)
+									}
+									enemy.HP -= adjacentDamage
+									if enemy.HP < 0 {
+										enemy.HP = 0
+									}
+									adjacentCount++
+									m.addLog(session, "combat", fmt.Sprintf("%s 的顺劈斩波及到 %s，造成 %d 点伤害", char.Name, enemy.Name, adjacentDamage), "#ffaa00")
+									logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
+								}
+							}
+						}
+					} else {
+						// 单体技能
+						target.HP -= playerDamage
+					}
 				} else {
-					rageGain := 5 // 普通攻击获得5点怒气
-					char.Resource += rageGain
-					resourceGain = rageGain
+					// 资源不足，使用普通攻击
+					skillState = nil
 				}
+			}
+
+			// 如果没有使用技能或资源不足，使用普通攻击
+			if skillState == nil {
+				skillName = "普通攻击"
+				// 计算实际攻击力（应用被动技能加成）
+				actualAttack := float64(char.Attack)
+				if m.passiveSkillManager != nil {
+					attackModifier := m.passiveSkillManager.GetPassiveModifier(char.ID, "attack")
+					actualAttack = actualAttack * (1.0 + attackModifier/100.0)
+					// 应用被动技能的伤害加成
+					damageModifier := m.passiveSkillManager.GetPassiveModifier(char.ID, "damage")
+					actualAttack = actualAttack * (1.0 + damageModifier/100.0)
+
+					// 处理低血量时的攻击力加成（狂暴之心）
+					hpPercent := float64(char.HP) / float64(char.MaxHP)
+					passives := m.passiveSkillManager.GetPassiveSkills(char.ID)
+					for _, passive := range passives {
+						if passive.Passive.EffectType == "stat_mod" && passive.Passive.ID == "warrior_passive_berserker_heart" {
+							// 根据等级计算触发阈值（1级50%，5级30%）
+							threshold := 0.50 - float64(passive.Level-1)*0.05
+							if hpPercent < threshold {
+								// 根据等级计算攻击力加成（1级20%，5级60%）
+								attackBonus := 20.0 + float64(passive.Level-1)*10.0
+								actualAttack = actualAttack * (1.0 + attackBonus/100.0)
+							}
+						}
+					}
+				}
+				// 应用Buff的攻击力加成（战斗怒吼、狂暴之怒、天神下凡等）
+				if m.buffManager != nil {
+					attackBuffValue := m.buffManager.GetBuffValue(char.ID, "attack")
+					if attackBuffValue > 0 {
+						actualAttack = actualAttack * (1.0 + attackBuffValue/100.0)
+					}
+				}
+				baseDamage := m.calculateDamage(int(actualAttack), target.Defense)
+				// 计算暴击率（应用被动技能和Buff加成）
+				actualCritRate := char.CritRate
+				if m.passiveSkillManager != nil {
+					critModifier := m.passiveSkillManager.GetPassiveModifier(char.ID, "crit_rate")
+					actualCritRate = char.CritRate + critModifier/100.0
+				}
+				// 应用Buff的暴击率加成（鲁莽等）
+				if m.buffManager != nil {
+					critBuffValue := m.buffManager.GetBuffValue(char.ID, "crit_rate")
+					if critBuffValue > 0 {
+						actualCritRate = actualCritRate + critBuffValue/100.0
+					}
+				}
+				if actualCritRate > 1.0 {
+					actualCritRate = 1.0
+				}
+				isCrit = rand.Float64() < actualCritRate
+				if isCrit {
+					playerDamage = int(float64(baseDamage) * char.CritDamage)
+				} else {
+					playerDamage = baseDamage
+				}
+				target.HP -= playerDamage
+				resourceCost = 0
+				usedSkill = false
+			}
+			// 如果使用了技能，isCrit已经在上面计算了
+
+			// 普通攻击获得怒气（只有普通攻击才获得怒气，使用技能时不获得）
+			if char.ResourceType == "rage" && !usedSkill {
+				var baseRageGain int
+				if isCrit {
+					baseRageGain = 10 // 暴击获得10点怒气
+				} else {
+					baseRageGain = 5 // 普通攻击获得5点怒气
+				}
+
+				// 应用被动技能的怒气获得加成（愤怒掌握等）
+				rageGain := m.applyRageGenerationModifiers(char.ID, baseRageGain)
+
+				char.Resource += rageGain
+				resourceGain = rageGain
 				// 确保不超过最大值
 				if char.Resource > char.MaxResource {
 					char.Resource = char.MaxResource
 				}
 			}
 
+			// 处理被动技能的特殊效果（攻击时触发）
+			m.handlePassiveOnHitEffects(char, playerDamage, usedSkill, session, &logs)
+
 			// 构建战斗日志消息，包含资源变化（带颜色）
 			resourceChangeText := m.formatResourceChange(char.ResourceType, resourceCost, resourceGain)
+
+			// 处理技能特殊效果日志
+			if skillEffects != nil {
+				if stun, ok := skillEffects["stun"].(bool); ok && stun {
+					m.addLog(session, "combat", fmt.Sprintf("%s 被眩晕了！", target.Name), "#ff00ff")
+					logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
+				}
+				// 处理基于伤害的恢复（嗜血等）
+				if healPercent, ok := skillEffects["healPercent"].(float64); ok && usedSkill {
+					healAmount := int(float64(playerDamage) * healPercent / 100.0)
+					char.HP += healAmount
+					if char.HP > char.MaxHP {
+						char.HP = char.MaxHP
+					}
+					m.addLog(session, "heal", fmt.Sprintf("%s 恢复了 %d 点生命值", char.Name, healAmount), "#00ff00")
+					logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
+				}
+				// 处理破釜沉舟的立即恢复（基于最大HP）
+				if healMaxHpPercent, ok := skillEffects["healMaxHpPercent"].(float64); ok && usedSkill {
+					healAmount := int(float64(char.MaxHP) * healMaxHpPercent / 100.0)
+					char.HP += healAmount
+					if char.HP > char.MaxHP {
+						char.HP = char.MaxHP
+					}
+					m.addLog(session, "heal", fmt.Sprintf("%s 的破釜沉舟恢复了 %d 点生命值", char.Name, healAmount), "#00ff00")
+					logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
+				}
+			}
 
 			if isCrit {
 				m.addLog(session, "combat", fmt.Sprintf("%s 使用 [%s] 💥暴击！对 %s 造成 %d 点伤害%s", char.Name, skillName, target.Name, playerDamage, resourceChangeText), "#ff6b6b")
@@ -441,10 +653,24 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 			}
 			logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
 
+			// 减少技能冷却时间
+			m.skillManager.TickCooldowns(char.ID)
+
+			// 减少Buff/Debuff持续时间
+			expiredBuffs := m.buffManager.TickBuffs(char.ID)
+			for _, effectID := range expiredBuffs {
+				m.addLog(session, "buff", fmt.Sprintf("%s 的 %s 效果消失了", char.Name, effectID), "#888888")
+				logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
+			}
+
 			// 检查目标是否死亡
 			if target.HP <= 0 {
 				// 确保HP归零
 				target.HP = 0
+
+				// 处理战争机器的击杀回怒效果
+				m.handleWarMachineRageGain(char, session, &logs)
+
 				// 敌人死亡
 				expGain := target.ExpReward
 				goldGain := target.GoldMin + rand.Intn(target.GoldMax-target.GoldMin+1)
@@ -497,16 +723,78 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 		if session.CurrentTurnIndex < len(aliveEnemies) {
 			enemy := aliveEnemies[session.CurrentTurnIndex]
 			enemyDamage := m.calculateDamage(enemy.Attack, char.Defense)
+
+			// 应用buff/debuff效果（如盾牌格挡的减伤等）
+			enemyDamage = m.buffManager.CalculateDamageTakenWithBuffs(enemyDamage, char.ID, true)
+
+			// 处理被动技能的减伤效果（不灭意志等）
+			enemyDamage = m.handlePassiveDamageReduction(char, enemyDamage)
+
+			// 处理护盾效果（不灭壁垒等）
+			shieldAmount := m.buffManager.GetBuffValue(char.ID, "shield")
+			if shieldAmount > 0 {
+				// 有护盾，先消耗护盾
+				shieldInt := int(shieldAmount)
+				if enemyDamage <= shieldInt {
+					// 伤害完全被护盾吸收
+					shieldInt -= enemyDamage
+					absorbedDamage := enemyDamage
+					enemyDamage = 0
+					m.addLog(session, "shield", fmt.Sprintf("%s 的护盾吸收了 %d 点伤害", char.Name, absorbedDamage), "#00ffff")
+					logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
+					// 更新护盾值（通过更新Buff的value）
+					m.updateShieldValue(char.ID, float64(shieldInt))
+				} else {
+					// 护盾被击破，剩余伤害继续
+					absorbedDamage := shieldInt
+					enemyDamage -= shieldInt
+					m.addLog(session, "shield", fmt.Sprintf("%s 的护盾吸收了 %d 点伤害后被击破", char.Name, absorbedDamage), "#00ffff")
+					logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
+					m.updateShieldValue(char.ID, 0)
+				}
+			}
+
+			// 处理被动技能的生存效果（坚韧不拔等）- 在受到伤害前检查
+			originalHP := char.HP
 			char.HP -= enemyDamage
+
+			// 如果受到致命伤害，检查坚韧不拔效果
+			if originalHP > 0 && char.HP <= 0 {
+				if m.passiveSkillManager != nil {
+					passives := m.passiveSkillManager.GetPassiveSkills(char.ID)
+					for _, passive := range passives {
+						if passive.Passive.EffectType == "survival" && passive.Passive.ID == "warrior_passive_unbreakable" {
+							// 坚韧不拔：受到致命伤害时保留1点HP
+							char.HP = 1
+							m.addLog(session, "survival", fmt.Sprintf("%s 的坚韧不拔效果触发，保留了1点生命值！", char.Name), "#ff00ff")
+							logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
+							break // 只触发一次
+						}
+					}
+				}
+			}
+
+			// 处理反击效果（反击风暴、复仇被动等）
+			m.handleCounterAttacks(char, enemy, enemyDamage, session, &logs)
+
+			// 处理被动技能的反射效果（盾牌反射被动等）
+			m.handlePassiveReflectEffects(char, enemy, enemyDamage, session, &logs)
+
+			// 处理主动技能的反射效果（盾牌反射技能等）
+			m.handleActiveReflectEffects(char, enemy, enemyDamage, session, &logs)
 
 			// 战士受到伤害时获得怒气
 			resourceGain := 0
 			if char.ResourceType == "rage" && enemyDamage > 0 {
 				// 受到伤害获得怒气: 伤害/最大HP × 50，至少1点
-				rageGain := int(float64(enemyDamage) / float64(char.MaxHP) * 50)
-				if rageGain < 1 {
-					rageGain = 1
+				baseRageGain := int(float64(enemyDamage) / float64(char.MaxHP) * 50)
+				if baseRageGain < 1 {
+					baseRageGain = 1
 				}
+
+				// 应用被动技能的怒气获得加成（愤怒掌握等）
+				rageGain := m.applyRageGenerationModifiers(char.ID, baseRageGain)
+
 				char.Resource += rageGain
 				resourceGain = rageGain
 				if char.Resource > char.MaxResource {
@@ -1249,4 +1537,357 @@ type BattleTickResult struct {
 	SessionGold  int                `json:"sessionGold"`
 	SessionExp   int                `json:"sessionExp"`
 	BattleCount  int                `json:"battleCount"`
+}
+
+// applySkillBuffs 应用技能的Buff/Debuff效果
+func (m *BattleManager) applySkillBuffs(skillState *CharacterSkillState, character *models.Character, target *models.Monster, skillEffects map[string]interface{}) {
+	skill := skillState.Skill
+	effect := skillState.Effect
+
+	switch skill.ID {
+	case "warrior_shield_block":
+		// 盾牌格挡：减少受到的物理伤害
+		if damageReduction, ok := effect["damageReduction"].(float64); ok {
+			duration := 2
+			if d, ok := effect["duration"].(int); ok {
+				duration = d
+			}
+			m.buffManager.ApplyBuff(character.ID, "shield_block", "盾牌格挡", "buff", true, duration, -damageReduction, "physical_damage_taken", "")
+		}
+	case "warrior_battle_shout":
+		// 战斗怒吼：提升攻击力
+		if attackBonus, ok := effect["attackBonus"].(float64); ok {
+			duration := 5
+			if d, ok := effect["duration"].(int); ok {
+				duration = d
+			}
+			m.buffManager.ApplyBuff(character.ID, "battle_shout", "战斗怒吼", "buff", true, duration, attackBonus, "attack", "")
+		}
+	case "warrior_demoralizing_shout":
+		// 挫志怒吼：降低所有敌人攻击力（在applySkillDebuffs中处理）
+	case "warrior_whirlwind":
+		// 旋风斩：降低所有敌人防御（在applySkillDebuffs中处理）
+	case "warrior_mortal_strike":
+		// 致死打击：降低目标治疗效果
+		if healingReduction, ok := effect["healingReduction"].(float64); ok {
+			duration := 3
+			if d, ok := effect["debuffDuration"].(float64); ok {
+				duration = int(d)
+			}
+			// 应用到目标敌人
+			if target != nil {
+				m.buffManager.ApplyEnemyDebuff(target.ID, "mortal_strike", "致死打击", "debuff", duration, healingReduction, "healing_received", "")
+			}
+		}
+	case "warrior_last_stand":
+		// 破釜沉舟：立即恢复最大HP的百分比
+		if healPercent, ok := effect["healPercent"].(float64); ok {
+			// 立即恢复
+			healAmount := int(float64(character.MaxHP) * healPercent / 100.0)
+			character.HP += healAmount
+			if character.HP > character.MaxHP {
+				character.HP = character.MaxHP
+			}
+			// 通过skillEffects传递，在战斗日志中显示
+			skillEffects["healMaxHpPercent"] = healPercent
+		}
+	case "warrior_unbreakable_barrier":
+		// 不灭壁垒：获得护盾
+		if shieldPercent, ok := effect["shieldPercent"].(float64); ok {
+			duration := 4
+			if d, ok := effect["duration"].(float64); ok {
+				duration = int(d)
+			}
+			shieldAmount := int(float64(character.MaxHP) * shieldPercent / 100.0)
+			// 使用Buff存储护盾值，statAffected为"shield"，value为护盾值
+			m.buffManager.ApplyBuff(character.ID, "unbreakable_barrier", "不灭壁垒", "buff", true, duration, float64(shieldAmount), "shield", "")
+		}
+	case "warrior_shield_reflection":
+		// 盾牌反射：反射受到的伤害
+		if reflectPercent, ok := effect["reflectPercent"].(float64); ok {
+			duration := 2
+			if d, ok := effect["duration"].(float64); ok {
+				duration = int(d)
+			}
+			// 使用Buff存储反射比例，statAffected为"reflect"，value为反射百分比
+			m.buffManager.ApplyBuff(character.ID, "shield_reflection", "盾牌反射", "buff", true, duration, reflectPercent, "reflect", "")
+		}
+	case "warrior_shield_wall":
+		// 盾墙：大幅减少受到的伤害
+		if damageReduction, ok := effect["damageReduction"].(float64); ok {
+			duration := 2
+			if d, ok := effect["duration"].(float64); ok {
+				duration = int(d)
+			}
+			m.buffManager.ApplyBuff(character.ID, "shield_wall", "盾墙", "buff", true, duration, -damageReduction, "damage_taken", "")
+		}
+	case "warrior_recklessness":
+		// 鲁莽：提升暴击率，但受到伤害增加
+		if critBonus, ok := effect["critBonus"].(float64); ok {
+			duration := 3
+			if d, ok := effect["duration"].(float64); ok {
+				duration = int(d)
+			}
+			m.buffManager.ApplyBuff(character.ID, "recklessness_crit", "鲁莽", "buff", true, duration, critBonus, "crit_rate", "")
+		}
+		if damageIncrease, ok := effect["damageTakenIncrease"].(float64); ok {
+			duration := 3
+			if d, ok := effect["duration"].(float64); ok {
+				duration = int(d)
+			}
+			m.buffManager.ApplyBuff(character.ID, "recklessness_damage", "鲁莽", "debuff", false, duration, damageIncrease, "damage_taken", "")
+		}
+	case "warrior_retaliation":
+		// 反击风暴：受到攻击时反击
+		if counterDamage, ok := effect["counterDamagePercent"].(float64); ok {
+			duration := 3
+			if d, ok := effect["duration"].(float64); ok {
+				duration = int(d)
+			}
+			m.buffManager.ApplyBuff(character.ID, "retaliation", "反击风暴", "buff", true, duration, counterDamage, "counter_attack", "")
+		}
+	case "warrior_berserker_rage":
+		// 狂暴之怒：提升攻击力和怒气获取
+		if attackBonus, ok := effect["attackBonus"].(float64); ok {
+			duration := 4
+			if d, ok := effect["duration"].(float64); ok {
+				duration = int(d)
+			}
+			m.buffManager.ApplyBuff(character.ID, "berserker_rage", "狂暴之怒", "buff", true, duration, attackBonus, "attack", "")
+		}
+	case "warrior_avatar":
+		// 天神下凡：大幅提升攻击力，免疫控制
+		if attackBonus, ok := effect["attackBonus"].(float64); ok {
+			duration := 3
+			if d, ok := effect["duration"].(float64); ok {
+				duration = int(d)
+			}
+			m.buffManager.ApplyBuff(character.ID, "avatar", "天神下凡", "buff", true, duration, attackBonus, "attack", "")
+		}
+		if immuneCC, ok := effect["immuneCC"].(bool); ok && immuneCC {
+			duration := 3
+			if d, ok := effect["duration"].(float64); ok {
+				duration = int(d)
+			}
+			m.buffManager.ApplyBuff(character.ID, "avatar_cc_immune", "天神下凡", "buff", true, duration, 1.0, "cc_immune", "")
+		}
+	}
+}
+
+// handleCounterAttacks 处理反击效果
+func (m *BattleManager) handleCounterAttacks(character *models.Character, attacker *models.Monster, damageTaken int, session *BattleSession, logs *[]models.BattleLog) {
+	// 处理Buff的反击效果（反击风暴）
+	buffs := m.buffManager.GetBuffs(character.ID)
+	for _, buff := range buffs {
+		if buff.StatAffected == "counter_attack" && buff.IsBuff {
+			// 反击风暴：对攻击者造成反击伤害
+			counterDamage := int(float64(character.Attack) * buff.Value / 100.0)
+			attacker.HP -= counterDamage
+			if attacker.HP < 0 {
+				attacker.HP = 0
+			}
+			m.addLog(session, "combat", fmt.Sprintf("%s 的反击风暴对 %s 造成 %d 点反击伤害！", character.Name, attacker.Name, counterDamage), "#ff8800")
+			*logs = append(*logs, session.BattleLogs[len(session.BattleLogs)-1])
+		}
+	}
+
+	// 处理被动技能的反击效果（复仇）
+	if m.passiveSkillManager != nil {
+		passives := m.passiveSkillManager.GetPassiveSkills(character.ID)
+		for _, passive := range passives {
+			if passive.Passive.EffectType == "counter_attack" {
+				// 复仇：受到攻击时概率反击
+				// effectValue是触发概率（百分比），需要根据等级计算实际概率和伤害
+				triggerChance := passive.EffectValue / 100.0
+				if rand.Float64() < triggerChance {
+					// 计算反击伤害（根据等级：1级100%，5级180%）
+					counterDamagePercent := 100.0 + float64(passive.Level-1)*20.0
+					// 计算实际攻击力（应用被动技能和Buff加成）
+					actualAttack := float64(character.Attack)
+					if m.passiveSkillManager != nil {
+						attackModifier := m.passiveSkillManager.GetPassiveModifier(character.ID, "attack")
+						actualAttack = actualAttack * (1.0 + attackModifier/100.0)
+					}
+					if m.buffManager != nil {
+						attackBuffValue := m.buffManager.GetBuffValue(character.ID, "attack")
+						if attackBuffValue > 0 {
+							actualAttack = actualAttack * (1.0 + attackBuffValue/100.0)
+						}
+					}
+					counterDamage := int(actualAttack * counterDamagePercent / 100.0)
+					counterDamage = counterDamage - attacker.Defense/2
+					if counterDamage < 1 {
+						counterDamage = 1
+					}
+					attacker.HP -= counterDamage
+					if attacker.HP < 0 {
+						attacker.HP = 0
+					}
+					m.addLog(session, "combat", fmt.Sprintf("%s 的复仇对 %s 造成 %d 点反击伤害！", character.Name, attacker.Name, counterDamage), "#ff8800")
+					*logs = append(*logs, session.BattleLogs[len(session.BattleLogs)-1])
+				}
+			}
+		}
+	}
+}
+
+// handlePassiveOnHitEffects 处理被动技能的攻击时效果
+func (m *BattleManager) handlePassiveOnHitEffects(character *models.Character, damageDealt int, usedSkill bool, session *BattleSession, logs *[]models.BattleLog) {
+	if m.passiveSkillManager == nil {
+		return
+	}
+
+	passives := m.passiveSkillManager.GetPassiveSkills(character.ID)
+	for _, passive := range passives {
+		switch passive.Passive.EffectType {
+		case "on_hit_heal":
+			// 血之狂热：每次攻击恢复生命值
+			healPercent := passive.EffectValue // 百分比值（如1.0表示1%）
+			healAmount := int(float64(character.MaxHP) * healPercent / 100.0)
+			if healAmount > 0 {
+				character.HP += healAmount
+				if character.HP > character.MaxHP {
+					character.HP = character.MaxHP
+				}
+				m.addLog(session, "heal", fmt.Sprintf("%s 的血之狂热恢复了 %d 点生命值", character.Name, healAmount), "#00ff00")
+				*logs = append(*logs, session.BattleLogs[len(session.BattleLogs)-1])
+			}
+		}
+	}
+}
+
+// handlePassiveDamageReduction 处理被动技能的减伤效果
+func (m *BattleManager) handlePassiveDamageReduction(character *models.Character, damage int) int {
+	if m.passiveSkillManager == nil {
+		return damage
+	}
+
+	passives := m.passiveSkillManager.GetPassiveSkills(character.ID)
+	for _, passive := range passives {
+		if passive.Passive.EffectType == "survival" && passive.Passive.ID == "warrior_passive_unbreakable_will" {
+			// 不灭意志：HP低于阈值时减伤
+			hpPercent := float64(character.HP) / float64(character.MaxHP)
+			// 根据等级计算触发阈值（1级30%，5级10%）
+			threshold := 0.30 - float64(passive.Level-1)*0.05
+			if hpPercent < threshold {
+				// 根据等级计算减伤比例（1级25%，5级65%）
+				reductionPercent := 25.0 + float64(passive.Level-1)*10.0
+				damage = int(float64(damage) * (1.0 - reductionPercent/100.0))
+				if damage < 1 {
+					damage = 1
+				}
+			}
+		}
+	}
+
+	return damage
+}
+
+// handleActiveReflectEffects 处理主动技能的反射效果
+func (m *BattleManager) handleActiveReflectEffects(character *models.Character, attacker *models.Monster, damageTaken int, session *BattleSession, logs *[]models.BattleLog) {
+	if m.buffManager == nil {
+		return
+	}
+
+	buffs := m.buffManager.GetBuffs(character.ID)
+	for _, buff := range buffs {
+		if buff.StatAffected == "reflect" && buff.IsBuff && buff.EffectID == "shield_reflection" {
+			// 盾牌反射（主动技能）：反射受到的伤害
+			reflectPercent := buff.Value // 百分比值（如50.0表示50%）
+			reflectDamage := int(float64(damageTaken) * reflectPercent / 100.0)
+			if reflectDamage > 0 {
+				attacker.HP -= reflectDamage
+				if attacker.HP < 0 {
+					attacker.HP = 0
+				}
+				m.addLog(session, "combat", fmt.Sprintf("%s 的盾牌反射对 %s 造成 %d 点反射伤害！", character.Name, attacker.Name, reflectDamage), "#ff8800")
+				*logs = append(*logs, session.BattleLogs[len(session.BattleLogs)-1])
+			}
+		}
+	}
+}
+
+// updateShieldValue 更新护盾值
+func (m *BattleManager) updateShieldValue(characterID int, newShieldValue float64) {
+	if m.buffManager == nil {
+		return
+	}
+
+	buffs := m.buffManager.GetBuffs(characterID)
+	if buff, exists := buffs["unbreakable_barrier"]; exists {
+		buff.Value = newShieldValue
+	}
+}
+
+// applySkillDebuffs 应用技能的Debuff效果到敌人
+func (m *BattleManager) applySkillDebuffs(skillState *CharacterSkillState, character *models.Character, target *models.Monster, allEnemies []*models.Monster, skillEffects map[string]interface{}) {
+	skill := skillState.Skill
+	effect := skillState.Effect
+
+	switch skill.ID {
+	case "warrior_demoralizing_shout":
+		// 挫志怒吼：降低所有敌人攻击力
+		if attackReduction, ok := effect["attackReduction"].(float64); ok {
+			duration := 3
+			if d, ok := effect["duration"].(float64); ok {
+				duration = int(d)
+			}
+			// 应用到所有存活的敌人
+			for _, enemy := range allEnemies {
+				if enemy.HP > 0 {
+					m.buffManager.ApplyEnemyDebuff(enemy.ID, "demoralizing_shout", "挫志怒吼", "debuff", duration, attackReduction, "attack", "")
+				}
+			}
+		}
+	case "warrior_whirlwind":
+		// 旋风斩：降低所有敌人防御
+		if defenseReduction, ok := effect["defenseReduction"].(float64); ok {
+			duration := 2
+			if d, ok := effect["debuffDuration"].(float64); ok {
+				duration = int(d)
+			}
+			// 应用到所有存活的敌人
+			for _, enemy := range allEnemies {
+				if enemy.HP > 0 {
+					m.buffManager.ApplyEnemyDebuff(enemy.ID, "whirlwind", "旋风斩", "debuff", duration, defenseReduction, "defense", "")
+				}
+			}
+		}
+	case "warrior_mortal_strike":
+		// 致死打击：降低目标治疗效果
+		if healingReduction, ok := effect["healingReduction"].(float64); ok {
+			duration := 3
+			if d, ok := effect["debuffDuration"].(float64); ok {
+				duration = int(d)
+			}
+			// 应用到目标敌人
+			if target != nil && target.HP > 0 {
+				m.buffManager.ApplyEnemyDebuff(target.ID, "mortal_strike", "致死打击", "debuff", duration, healingReduction, "healing_received", "")
+			}
+		}
+	}
+}
+
+// handlePassiveReflectEffects 处理被动技能的反射效果
+func (m *BattleManager) handlePassiveReflectEffects(character *models.Character, attacker *models.Monster, damageTaken int, session *BattleSession, logs *[]models.BattleLog) {
+	if m.passiveSkillManager == nil {
+		return
+	}
+
+	passives := m.passiveSkillManager.GetPassiveSkills(character.ID)
+	for _, passive := range passives {
+		if passive.Passive.EffectType == "reflect" && passive.Passive.ID == "warrior_passive_shield_reflection" {
+			// 盾牌反射（被动）：受到物理攻击时反射伤害
+			reflectPercent := passive.EffectValue // 百分比值（如10.0表示10%）
+			reflectDamage := int(float64(damageTaken) * reflectPercent / 100.0)
+			if reflectDamage > 0 {
+				attacker.HP -= reflectDamage
+				if attacker.HP < 0 {
+					attacker.HP = 0
+				}
+				m.addLog(session, "combat", fmt.Sprintf("%s 的盾牌反射对 %s 造成 %d 点反射伤害！", character.Name, attacker.Name, reflectDamage), "#ff8800")
+				*logs = append(*logs, session.BattleLogs[len(session.BattleLogs)-1])
+			}
+		}
+	}
 }

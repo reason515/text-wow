@@ -2,7 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useCharacterStore } from '@/stores/character'
 import { useAuthStore } from '@/stores/auth'
-import type { Race, Class } from '@/types/game'
+import type { Race, Class, Character } from '@/types/game'
 import { CLASS_COLORS, getClassColorClass } from '@/types/game'
 
 const emit = defineEmits<{
@@ -14,11 +14,15 @@ const charStore = useCharacterStore()
 const authStore = useAuthStore()
 
 // 状态
-const step = ref(1) // 1=选阵营, 2=选种族, 3=选职业, 4=命名
+const step = ref(1) // 1=选阵营, 2=选种族, 3=选职业, 4=命名, 5=选择初始技能
 const selectedFaction = ref<'alliance' | 'horde' | null>(null)
 const selectedRace = ref<Race | null>(null)
 const selectedClass = ref<Class | null>(null)
 const characterName = ref('')
+const createdCharacter = ref<Character | null>(null)
+const initialSkills = ref<any[]>([])
+const selectedSkillIds = ref<string[]>([])
+const loadingSkills = ref(false)
 
 // 计算属性
 const availableRaces = computed(() => {
@@ -34,6 +38,7 @@ const canProceed = computed(() => {
     case 2: return !!selectedRace.value
     case 3: return !!selectedClass.value
     case 4: return characterName.value.length >= 2 && characterName.value.length <= 32
+    case 5: return selectedSkillIds.value.length === 2
     default: return false
   }
 })
@@ -102,7 +107,79 @@ async function createCharacter() {
   })
 
   if (char) {
+    createdCharacter.value = char
+    // 检查是否需要选择初始技能（战士职业）
+    if (char.classId === 'warrior') {
+      await checkInitialSkills(char.id)
+    } else {
+      // 其他职业暂时不需要选择初始技能，直接完成
+      emit('created')
+    }
+  }
+}
+
+async function checkInitialSkills(characterId: number) {
+  loadingSkills.value = true
+  try {
+    const response = await fetch(`/api/characters/${characterId}/skills/initial`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    })
+    const data = await response.json()
+    if (data.success && data.data) {
+      initialSkills.value = data.data.newSkills || []
+      step.value = 5
+    } else {
+      // 如果已经选择过或不需要选择，直接完成
+      emit('created')
+    }
+  } catch (e) {
+    console.error('Failed to fetch initial skills:', e)
     emit('created')
+  } finally {
+    loadingSkills.value = false
+  }
+}
+
+function toggleSkill(skillId: string) {
+  const index = selectedSkillIds.value.indexOf(skillId)
+  if (index > -1) {
+    selectedSkillIds.value.splice(index, 1)
+  } else {
+    if (selectedSkillIds.value.length < 2) {
+      selectedSkillIds.value.push(skillId)
+    }
+  }
+}
+
+async function confirmInitialSkills() {
+  if (!createdCharacter.value || selectedSkillIds.value.length !== 2) return
+  
+  loadingSkills.value = true
+  try {
+    const response = await fetch(`/api/characters/${createdCharacter.value.id}/skills/initial`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      },
+      body: JSON.stringify({
+        characterId: createdCharacter.value.id,
+        skillIds: selectedSkillIds.value
+      })
+    })
+    const data = await response.json()
+    if (data.success) {
+      emit('created')
+    } else {
+      charStore.error = data.error || '选择初始技能失败'
+    }
+  } catch (e) {
+    console.error('Failed to select initial skills:', e)
+    charStore.error = '网络错误'
+  } finally {
+    loadingSkills.value = false
   }
 }
 
@@ -125,7 +202,7 @@ onMounted(async () => {
         ← {{ step === 1 ? '返回' : '上一步' }}
       </div>
       <div class="step-indicator">
-        步骤 {{ step }}/4
+        步骤 {{ step }}/{{ selectedClass?.id === 'warrior' ? 5 : 4 }}
       </div>
     </div>
 
@@ -254,6 +331,46 @@ onMounted(async () => {
       >
         <span v-if="charStore.loading">创建中...</span>
         <span v-else>创建角色</span>
+      </button>
+    </div>
+
+    <!-- 步骤5: 选择初始技能（仅战士） -->
+    <div v-if="step === 5" class="skill-select">
+      <h2>选择初始技能</h2>
+      <p class="hint">作为战士，你需要选择2个初始技能来开始你的冒险</p>
+      
+      <div class="skill-grid">
+        <div 
+          v-for="skill in initialSkills" 
+          :key="skill.id"
+          class="skill-card"
+          :class="{ selected: selectedSkillIds.includes(skill.id), disabled: selectedSkillIds.length >= 2 && !selectedSkillIds.includes(skill.id) }"
+          @click="toggleSkill(skill.id)"
+        >
+          <div class="skill-name">{{ skill.name }}</div>
+          <div class="skill-desc">{{ skill.description }}</div>
+          <div class="skill-info">
+            <span v-if="skill.resourceCost" class="skill-cost">消耗: {{ skill.resourceCost }} 怒气</span>
+            <span v-if="skill.cooldown" class="skill-cooldown">冷却: {{ skill.cooldown }} 回合</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="selection-hint">
+        已选择: {{ selectedSkillIds.length }}/2
+      </div>
+
+      <div class="error-message" v-if="charStore.error">
+        <span class="error-icon">⚠</span> {{ charStore.error }}
+      </div>
+
+      <button 
+        class="create-btn"
+        :disabled="!canProceed || loadingSkills"
+        @click="confirmInitialSkills"
+      >
+        <span v-if="loadingSkills">确认中...</span>
+        <span v-else>确认选择</span>
       </button>
     </div>
   </div>
@@ -544,10 +661,90 @@ h2 {
   cursor: not-allowed;
 }
 
+/* 技能选择 */
+.skill-select {
+  padding: 20px 0;
+}
+
+.skill-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.skill-card {
+  border: 2px solid var(--terminal-gray);
+  padding: 15px;
+  cursor: pointer;
+  transition: all 0.3s;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.skill-card:hover:not(.disabled) {
+  border-color: var(--terminal-green);
+  background: rgba(0, 255, 0, 0.1);
+}
+
+.skill-card.selected {
+  border-color: var(--terminal-gold);
+  background: rgba(255, 215, 0, 0.1);
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.3);
+}
+
+.skill-card.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.skill-name {
+  color: var(--terminal-green);
+  font-size: 14px;
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.skill-card.selected .skill-name {
+  color: var(--terminal-gold);
+}
+
+.skill-desc {
+  color: var(--terminal-gray);
+  font-size: 12px;
+  margin-bottom: 10px;
+  line-height: 1.4;
+}
+
+.skill-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+}
+
+.skill-cost {
+  color: var(--terminal-red);
+}
+
+.skill-cooldown {
+  color: var(--terminal-cyan);
+}
+
+.selection-hint {
+  text-align: center;
+  color: var(--terminal-cyan);
+  margin-bottom: 20px;
+  font-size: 14px;
+}
+
 @media (max-width: 600px) {
   .faction-options,
   .race-grid,
   .class-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .skill-grid {
     grid-template-columns: 1fr;
   }
 }

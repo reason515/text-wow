@@ -2,11 +2,21 @@ package database
 
 import (
 	"database/sql"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	_ "github.com/mattn/go-sqlite3"
 )
+
+// Helper function for min
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
 
 // SetupTestDB 创建一个用于测试的内存数据库
 func SetupTestDB() (*sql.DB, error) {
@@ -39,6 +49,114 @@ func SetupTestDB() (*sql.DB, error) {
 		if err != nil {
 			testDB.Close()
 			return nil, err
+		}
+		// 加载战士技能数据（用于技能选择测试）
+		warriorSkillsPath := filepath.Join(getProjectRoot(), "database", "warrior_skills.sql")
+		if warriorSkills, err := os.ReadFile(warriorSkillsPath); err == nil {
+			// 读取SQL文件内容
+			skillSQL := string(warriorSkills)
+
+			// 移除.read指令行
+			lines := strings.Split(skillSQL, "\n")
+			var filteredLines []string
+			for _, line := range lines {
+				trimmed := strings.TrimSpace(line)
+				if !strings.HasPrefix(trimmed, ".read") && trimmed != "" {
+					filteredLines = append(filteredLines, line)
+				}
+			}
+			skillSQL = strings.Join(filteredLines, "\n")
+
+			// 按分号分割SQL语句，但需要正确处理字符串中的分号
+			var statements []string
+			var currentStmt strings.Builder
+			inString := false
+			escapeNext := false
+
+			for _, char := range skillSQL {
+				if escapeNext {
+					currentStmt.WriteRune(char)
+					escapeNext = false
+					continue
+				}
+
+				if char == '\\' {
+					escapeNext = true
+					currentStmt.WriteRune(char)
+					continue
+				}
+
+				if char == '\'' {
+					inString = !inString
+					currentStmt.WriteRune(char)
+					continue
+				}
+
+				if char == ';' && !inString {
+					// 找到语句结束
+					stmt := strings.TrimSpace(currentStmt.String())
+					if stmt != "" {
+						statements = append(statements, stmt)
+					}
+					currentStmt.Reset()
+					continue
+				}
+
+				currentStmt.WriteRune(char)
+			}
+
+			// 添加最后一个语句（如果没有以分号结尾）
+			if currentStmt.Len() > 0 {
+				stmt := strings.TrimSpace(currentStmt.String())
+				if stmt != "" {
+					statements = append(statements, stmt)
+				}
+			}
+
+			// 执行所有SQL语句
+			for i, stmt := range statements {
+				stmt = strings.TrimSpace(stmt)
+				if stmt != "" {
+					// 移除注释行（以--开头的行，但不在字符串中）
+					lines := strings.Split(stmt, "\n")
+					var cleanLines []string
+					for _, line := range lines {
+						trimmed := strings.TrimSpace(line)
+						// 跳过单独的注释行
+						if !strings.HasPrefix(trimmed, "--") {
+							// 移除行内注释（但保留字符串中的内容）
+							if idx := strings.Index(line, "--"); idx >= 0 {
+								beforeComment := line[:idx]
+								quoteCount := strings.Count(beforeComment, "'")
+								if quoteCount%2 == 0 {
+									// 不在字符串中，移除注释
+									line = strings.TrimSpace(beforeComment)
+								}
+							}
+							if line != "" {
+								cleanLines = append(cleanLines, line)
+							}
+						}
+					}
+					if len(cleanLines) > 0 {
+						cleanStmt := strings.Join(cleanLines, "\n")
+						if _, err = testDB.Exec(cleanStmt); err != nil {
+							// 记录错误但不中断测试
+							// 某些错误可能是预期的（如重复插入），可以忽略
+							if strings.Contains(err.Error(), "FOREIGN KEY") {
+								// 外键约束错误，说明effects可能没有正确加载
+								fmt.Printf("Warning: Foreign key constraint error when loading skill data (statement %d/%d): %v\n", i+1, len(statements), err)
+							} else if !strings.Contains(err.Error(), "UNIQUE constraint") && !strings.Contains(err.Error(), "no such table") {
+								// 忽略UNIQUE约束错误和表不存在错误（INSERT OR REPLACE可能产生的）
+								fmt.Printf("Warning: Error loading skill data (statement %d/%d): %v\n", i+1, len(statements), err)
+							}
+						}
+					}
+				}
+			}
+		} else {
+			// 如果无法读取文件，记录但不中断测试
+			// 某些测试可能需要技能数据，会跳过
 		}
 	}
 
@@ -253,4 +371,3 @@ VALUES
     ('boar', 'durotar', '野猪', 2, 'normal', 35, 9, 3, 18, 2, 6, 100);
 `
 }
-
