@@ -127,15 +127,25 @@ async function checkInitialSkills(characterId: number) {
       }
     })
     const data = await response.json()
+    console.log('Initial skills response:', data)
     if (data.success && data.data) {
-      initialSkills.value = data.data.newSkills || []
-      step.value = 5
+      const skills = data.data.newSkills || []
+      console.log('Initial skills:', skills)
+      if (skills.length === 0) {
+        console.warn('No initial skills returned from API')
+        charStore.error = '无法获取初始技能列表，请检查数据库是否已加载技能数据'
+      } else {
+        initialSkills.value = skills
+        step.value = 5
+      }
     } else {
       // 如果已经选择过或不需要选择，直接完成
+      console.log('No initial skills selection needed:', data.error || 'unknown reason')
       emit('created')
     }
   } catch (e) {
     console.error('Failed to fetch initial skills:', e)
+    charStore.error = '获取初始技能失败: ' + (e instanceof Error ? e.message : '网络错误')
     emit('created')
   } finally {
     loadingSkills.value = false
@@ -339,7 +349,18 @@ onMounted(async () => {
       <h2>选择初始技能</h2>
       <p class="hint">作为战士，你需要选择2个初始技能来开始你的冒险</p>
       
-      <div class="skill-grid">
+      <div v-if="loadingSkills" class="loading-message">
+        正在加载技能列表...
+      </div>
+      
+      <div v-else-if="initialSkills.length === 0" class="error-message">
+        <span class="error-icon">⚠</span>
+        未找到可用的初始技能。请确保数据库已正确加载战士技能数据。
+        <br />
+        <small>如果问题持续存在，请联系管理员。</small>
+      </div>
+      
+      <div v-else class="skill-grid">
         <div 
           v-for="skill in initialSkills" 
           :key="skill.id"
@@ -356,7 +377,7 @@ onMounted(async () => {
         </div>
       </div>
 
-      <div class="selection-hint">
+      <div v-if="initialSkills.length > 0" class="selection-hint">
         已选择: {{ selectedSkillIds.length }}/2
       </div>
 
@@ -734,6 +755,13 @@ h2 {
   text-align: center;
   color: var(--terminal-cyan);
   margin-bottom: 20px;
+  font-size: 14px;
+}
+
+.loading-message {
+  text-align: center;
+  color: var(--terminal-cyan);
+  padding: 40px 20px;
   font-size: 14px;
 }
 

@@ -151,6 +151,15 @@ func seedData() error {
 	err := DB.QueryRow("SELECT COUNT(*) FROM races").Scan(&count)
 	if err == nil && count > 0 {
 		log.Println("📊 Seed data already exists")
+		// 即使已有基础数据，也检查是否需要加载战士技能数据
+		var skillCount int
+		err := DB.QueryRow("SELECT COUNT(*) FROM skills WHERE class_id = 'warrior'").Scan(&skillCount)
+		if err == nil && skillCount == 0 {
+			log.Println("⚠️ Warrior skills not found, loading...")
+			if err := loadWarriorSkills(); err != nil {
+				log.Printf("⚠️ Failed to load warrior skills: %v", err)
+			}
+		}
 		return nil
 	}
 
@@ -165,9 +174,35 @@ func seedData() error {
 			return fmt.Errorf("failed to execute seed: %w", err)
 		}
 		log.Println("🌱 Seed data loaded from file")
-		return nil
 	}
 
+	// 加载战士技能数据
+	if err := loadWarriorSkills(); err != nil {
+		log.Printf("⚠️ Failed to load warrior skills: %v", err)
+		// 不返回错误，因为技能数据可能已经存在
+	}
+
+	return nil
+}
+
+// loadWarriorSkills 加载战士技能数据
+func loadWarriorSkills() error {
+	warriorSkillsPath := filepath.Join("database", "warrior_skills.sql")
+	if _, err := os.Stat(warriorSkillsPath); err != nil {
+		return fmt.Errorf("warrior_skills.sql not found: %w", err)
+	}
+
+	content, err := ioutil.ReadFile(warriorSkillsPath)
+	if err != nil {
+		return fmt.Errorf("failed to read warrior_skills.sql: %w", err)
+	}
+
+	// 执行SQL文件
+	if _, err := DB.Exec(string(content)); err != nil {
+		return fmt.Errorf("failed to execute warrior_skills.sql: %w", err)
+	}
+
+	log.Println("⚔️ Warrior skills loaded")
 	return nil
 }
 
