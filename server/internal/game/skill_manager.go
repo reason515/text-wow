@@ -212,8 +212,22 @@ func (sm *SkillManager) CalculateSkillDamage(skillState *CharacterSkillState, ch
 	skill := skillState.Skill
 	effect := skillState.Effect
 
+	// 根据技能伤害类型决定使用物理还是魔法攻击
+	// 默认使用物理攻击，除非技能明确指定为魔法伤害
+	isMagic := skill.DamageType == "magic" || skill.DamageType == "fire" || skill.DamageType == "frost" || skill.DamageType == "shadow" || skill.DamageType == "holy"
+	
+	var baseAttack int
+	var baseDefense int
+	if isMagic {
+		baseAttack = character.MagicAttack
+		baseDefense = target.MagicDefense
+	} else {
+		baseAttack = character.PhysicalAttack
+		baseDefense = target.PhysicalDefense
+	}
+
 	// 计算实际攻击力（应用被动技能加成）
-	actualAttack := float64(character.Attack)
+	actualAttack := float64(baseAttack)
 	if passiveSkillManager != nil {
 		// 应用被动技能的攻击力加成（百分比）
 		attackModifier := passiveSkillManager.GetPassiveModifier(character.ID, "attack")
@@ -249,7 +263,7 @@ func (sm *SkillManager) CalculateSkillDamage(skillState *CharacterSkillState, ch
 
 	switch skill.ID {
 	case "warrior_shield_slam":
-		// 盾牌猛击：基于攻击力和防御力
+		// 盾牌猛击：基于物理攻击力和物理防御力
 		attackMult := 1.0
 		defenseMult := 0.5
 		if m, ok := effect["attackMultiplier"].(float64); ok {
@@ -259,7 +273,7 @@ func (sm *SkillManager) CalculateSkillDamage(skillState *CharacterSkillState, ch
 			defenseMult = m
 		}
 		// 计算实际防御力（应用被动技能加成）
-		actualDefense := float64(character.Defense)
+		actualDefense := float64(character.PhysicalDefense)
 		if passiveSkillManager != nil {
 			defenseModifier := passiveSkillManager.GetPassiveModifier(character.ID, "defense")
 			actualDefense = actualDefense * (1.0 + defenseModifier/100.0)
@@ -281,7 +295,7 @@ func (sm *SkillManager) CalculateSkillDamage(skillState *CharacterSkillState, ch
 	}
 
 	// 计算目标实际防御力（应用Debuff效果）
-	actualDefense := float64(target.Defense)
+	actualDefense := float64(baseDefense)
 	if buffManager != nil {
 		defenseDebuffValue := buffManager.GetEnemyDebuffValue(target.ID, "defense")
 		if defenseDebuffValue > 0 {

@@ -272,7 +272,7 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 		if !session.IsResting {
 			// 休息结束，保存角色数据
 			m.charRepo.UpdateAfterBattle(char.ID, char.HP, char.Resource, char.Exp, char.Level,
-				char.ExpToNext, char.MaxHP, char.MaxResource, char.Attack, char.Defense,
+				char.ExpToNext, char.MaxHP, char.MaxResource, char.PhysicalAttack, char.MagicAttack, char.PhysicalDefense, char.MagicDefense,
 				char.Strength, char.Agility, char.Stamina, char.TotalKills)
 
 			// 休息结束后，确保返回角色数据，让前端知道休息已结束
@@ -306,7 +306,7 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 		// 保存角色数据更新
 		if char.HP != initialHP || char.Resource != initialMP {
 			m.charRepo.UpdateAfterBattle(char.ID, char.HP, char.Resource, char.Exp, char.Level,
-				char.ExpToNext, char.MaxHP, char.MaxResource, char.Attack, char.Defense,
+				char.ExpToNext, char.MaxHP, char.MaxResource, char.PhysicalAttack, char.MagicAttack, char.PhysicalDefense, char.MagicDefense,
 				char.Strength, char.Agility, char.Stamina, char.TotalKills)
 		}
 
@@ -501,8 +501,8 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 							if enemy != target && enemy.HP > 0 && adjacentCount < 2 {
 								// 计算相邻目标伤害
 								if effect, ok := skillState.Effect["adjacentMultiplier"].(float64); ok {
-									adjacentDamage := int(float64(char.Attack) * effect)
-									adjacentDamage = adjacentDamage - enemy.Defense/2
+									adjacentDamage := int(float64(char.PhysicalAttack) * effect)
+									adjacentDamage = adjacentDamage - enemy.PhysicalDefense/2
 									if adjacentDamage < 1 {
 										adjacentDamage = 1
 									}
@@ -532,8 +532,8 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 			// 如果没有使用技能或资源不足，使用普通攻击
 			if skillState == nil {
 				skillName = "普通攻击"
-				// 计算实际攻击力（应用被动技能加成）
-				actualAttack := float64(char.Attack)
+				// 计算实际物理攻击力（应用被动技能加成）
+				actualAttack := float64(char.PhysicalAttack)
 				if m.passiveSkillManager != nil {
 					attackModifier := m.passiveSkillManager.GetPassiveModifier(char.ID, "attack")
 					actualAttack = actualAttack * (1.0 + attackModifier/100.0)
@@ -563,7 +563,7 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 						actualAttack = actualAttack * (1.0 + attackBuffValue/100.0)
 					}
 				}
-				baseDamage := m.calculateDamage(int(actualAttack), target.Defense)
+				baseDamage := m.calculatePhysicalDamage(int(actualAttack), target.PhysicalDefense)
 				// 计算暴击率（应用被动技能和Buff加成）
 				actualCritRate := char.CritRate
 				if m.passiveSkillManager != nil {
@@ -707,8 +707,12 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 					char.Strength += 2
 					char.Agility += 1
 					char.Stamina += 2
-					char.Attack = char.Strength / 2
-					char.Defense = char.Stamina / 3
+					char.Intellect += 1
+					char.Spirit += 1
+					char.PhysicalAttack = char.Strength / 2
+					char.MagicAttack = char.Intellect / 2
+					char.PhysicalDefense = char.Stamina / 3
+					char.MagicDefense = (char.Intellect + char.Spirit) / 4
 
 					m.addLog(session, "levelup", fmt.Sprintf("🎉【升级】恭喜！%s 升到了 %d 级！", char.Name, char.Level), "#ffd700")
 					logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
@@ -722,7 +726,8 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 		// 敌人回合：当前索引的敌人攻击玩家
 		if session.CurrentTurnIndex < len(aliveEnemies) {
 			enemy := aliveEnemies[session.CurrentTurnIndex]
-			enemyDamage := m.calculateDamage(enemy.Attack, char.Defense)
+			// 敌人默认使用物理攻击
+			enemyDamage := m.calculatePhysicalDamage(enemy.PhysicalAttack, char.PhysicalDefense)
 
 			// 应用buff/debuff效果（如盾牌格挡的减伤等）
 			enemyDamage = m.buffManager.CalculateDamageTakenWithBuffs(enemyDamage, char.ID, true)
@@ -916,7 +921,7 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 			}
 			// 保存所有角色的数据（包括战士的怒气归0）
 			m.charRepo.UpdateAfterBattle(c.ID, c.HP, c.Resource, c.Exp, c.Level,
-				c.ExpToNext, c.MaxHP, c.MaxResource, c.Attack, c.Defense,
+				c.ExpToNext, c.MaxHP, c.MaxResource, c.PhysicalAttack, c.MagicAttack, c.PhysicalDefense, c.MagicDefense,
 				c.Strength, c.Agility, c.Stamina, c.TotalKills)
 		}
 
@@ -972,7 +977,7 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 
 	// 保存角色数据更新
 	m.charRepo.UpdateAfterBattle(char.ID, char.HP, char.Resource, char.Exp, char.Level,
-		char.ExpToNext, char.MaxHP, char.MaxResource, char.Attack, char.Defense,
+		char.ExpToNext, char.MaxHP, char.MaxResource, char.PhysicalAttack, char.MagicAttack, char.PhysicalDefense, char.MagicDefense,
 		char.Strength, char.Agility, char.Stamina, char.TotalKills)
 
 	return &BattleTickResult{
@@ -1030,18 +1035,20 @@ func (m *BattleManager) spawnEnemies(session *BattleSession, playerLevel int) er
 		template := monsters[rand.Intn(len(monsters))]
 
 		enemy := &models.Monster{
-			ID:        template.ID,
-			ZoneID:    template.ZoneID,
-			Name:      template.Name,
-			Level:     template.Level,
-			Type:      template.Type,
-			HP:        template.HP,
-			MaxHP:     template.HP,
-			Attack:    template.Attack,
-			Defense:   template.Defense,
-			ExpReward: template.ExpReward,
-			GoldMin:   template.GoldMin,
-			GoldMax:   template.GoldMax,
+			ID:              template.ID,
+			ZoneID:          template.ZoneID,
+			Name:            template.Name,
+			Level:           template.Level,
+			Type:            template.Type,
+			HP:              template.HP,
+			MaxHP:           template.HP,
+			PhysicalAttack:  template.PhysicalAttack,
+			MagicAttack:     template.MagicAttack,
+			PhysicalDefense: template.PhysicalDefense,
+			MagicDefense:    template.MagicDefense,
+			ExpReward:       template.ExpReward,
+			GoldMin:         template.GoldMin,
+			GoldMax:         template.GoldMax,
 		}
 		session.CurrentEnemies = append(session.CurrentEnemies, enemy)
 		enemyNames = append(enemyNames, fmt.Sprintf("%s (Lv.%d)", enemy.Name, enemy.Level))
@@ -1135,8 +1142,8 @@ func (m *BattleManager) GetBattleLogs(userID int, limit int) []models.BattleLog 
 	return logs
 }
 
-// calculateDamage 计算伤害
-func (m *BattleManager) calculateDamage(attack, defense int) int {
+// calculateDamage 计算物理伤害
+func (m *BattleManager) calculatePhysicalDamage(attack, defense int) int {
 	baseDamage := attack - defense/2
 	if baseDamage < 1 {
 		baseDamage = 1
@@ -1145,6 +1152,23 @@ func (m *BattleManager) calculateDamage(attack, defense int) int {
 	variance := float64(baseDamage) * 0.2
 	damage := float64(baseDamage) + (rand.Float64()*2-1)*variance
 	return int(damage)
+}
+
+// calculateMagicDamage 计算魔法伤害
+func (m *BattleManager) calculateMagicDamage(attack, defense int) int {
+	baseDamage := attack - defense/2
+	if baseDamage < 1 {
+		baseDamage = 1
+	}
+	// 添加随机波动 ±20%
+	variance := float64(baseDamage) * 0.2
+	damage := float64(baseDamage) + (rand.Float64()*2-1)*variance
+	return int(damage)
+}
+
+// calculateDamage 计算伤害（兼容旧代码，默认使用物理）
+func (m *BattleManager) calculateDamage(attack, defense int) int {
+	return m.calculatePhysicalDamage(attack, defense)
 }
 
 // addLog 添加日志
@@ -1413,7 +1437,7 @@ func (m *BattleManager) processRest(session *BattleSession, char *models.Charact
 
 			// 更新角色HP
 			m.charRepo.UpdateAfterBattle(char.ID, char.HP, char.Resource, char.Exp, char.Level,
-				char.ExpToNext, char.MaxHP, char.MaxResource, char.Attack, char.Defense,
+				char.ExpToNext, char.MaxHP, char.MaxResource, char.PhysicalAttack, char.MagicAttack, char.PhysicalDefense, char.MagicDefense,
 				char.Strength, char.Agility, char.Stamina, char.TotalKills)
 
 			// 记录复活日志
@@ -1681,7 +1705,7 @@ func (m *BattleManager) handleCounterAttacks(character *models.Character, attack
 	for _, buff := range buffs {
 		if buff.StatAffected == "counter_attack" && buff.IsBuff {
 			// 反击风暴：对攻击者造成反击伤害
-			counterDamage := int(float64(character.Attack) * buff.Value / 100.0)
+			counterDamage := int(float64(character.PhysicalAttack) * buff.Value / 100.0)
 			attacker.HP -= counterDamage
 			if attacker.HP < 0 {
 				attacker.HP = 0
@@ -1703,7 +1727,7 @@ func (m *BattleManager) handleCounterAttacks(character *models.Character, attack
 					// 计算反击伤害（根据等级：1级100%，5级180%）
 					counterDamagePercent := 100.0 + float64(passive.Level-1)*20.0
 					// 计算实际攻击力（应用被动技能和Buff加成）
-					actualAttack := float64(character.Attack)
+					actualAttack := float64(character.PhysicalAttack)
 					if m.passiveSkillManager != nil {
 						attackModifier := m.passiveSkillManager.GetPassiveModifier(character.ID, "attack")
 						actualAttack = actualAttack * (1.0 + attackModifier/100.0)
@@ -1715,7 +1739,7 @@ func (m *BattleManager) handleCounterAttacks(character *models.Character, attack
 						}
 					}
 					counterDamage := int(actualAttack * counterDamagePercent / 100.0)
-					counterDamage = counterDamage - attacker.Defense/2
+					counterDamage = counterDamage - attacker.PhysicalDefense/2
 					if counterDamage < 1 {
 						counterDamage = 1
 					}

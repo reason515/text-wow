@@ -168,7 +168,7 @@ func (r *GameRepository) GetZoneByID(id string) (*models.Zone, error) {
 // GetMonstersByZone 获取区域内的怪物
 func (r *GameRepository) GetMonstersByZone(zoneID string) ([]models.Monster, error) {
 	rows, err := database.DB.Query(`
-		SELECT id, zone_id, name, level, type, hp, attack, defense, exp_reward, gold_min, gold_max, spawn_weight
+		SELECT id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense, exp_reward, gold_min, gold_max, spawn_weight
 		FROM monsters WHERE zone_id = ? ORDER BY level`, zoneID)
 	if err != nil {
 		return nil, err
@@ -179,7 +179,7 @@ func (r *GameRepository) GetMonstersByZone(zoneID string) ([]models.Monster, err
 	for rows.Next() {
 		m := models.Monster{}
 		err := rows.Scan(
-			&m.ID, &m.ZoneID, &m.Name, &m.Level, &m.Type, &m.HP, &m.Attack, &m.Defense,
+			&m.ID, &m.ZoneID, &m.Name, &m.Level, &m.Type, &m.HP, &m.PhysicalAttack, &m.MagicAttack, &m.PhysicalDefense, &m.MagicDefense,
 			&m.ExpReward, &m.GoldMin, &m.GoldMax, &m.SpawnWeight,
 		)
 		if err != nil {

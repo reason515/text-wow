@@ -374,9 +374,13 @@ func (h *Handler) CreateCharacter(c *gin.Context) {
 		char.Resource = char.MaxResource
 	}
 
-	// 计算攻击和防御
-	char.Attack = char.Strength / 2
-	char.Defense = char.Stamina / 3
+	// 计算物理和魔法攻击/防御
+	// 物理攻击主要基于力量，魔法攻击主要基于智力
+	char.PhysicalAttack = char.Strength / 2
+	char.MagicAttack = char.Intellect / 2
+	// 物理防御主要基于耐力，魔法防御主要基于精神和智力
+	char.PhysicalDefense = char.Stamina / 3
+	char.MagicDefense = (char.Intellect + char.Spirit) / 4
 
 	// 创建角色
 	char, err = h.charRepo.Create(char)

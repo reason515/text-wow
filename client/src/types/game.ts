@@ -61,8 +61,10 @@ export interface Character {
   intellect: number
   stamina: number
   spirit: number
-  attack: number
-  defense: number
+  physicalAttack: number
+  magicAttack: number
+  physicalDefense: number
+  magicDefense: number
   critRate: number
   critDamage: number
   totalKills: number
@@ -140,8 +142,10 @@ export interface Monster {
   type: string
   hp: number
   maxHp: number
-  attack: number
-  defense: number
+  physicalAttack: number
+  magicAttack: number
+  physicalDefense: number
+  magicDefense: number
   expReward: number
   goldMin: number
   goldMax: number

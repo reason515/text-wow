@@ -210,11 +210,11 @@ VALUES
     ('elwynn', '艾尔文森林', '暴风城周边的和平森林', 1, 10, 'alliance', 1.0, 1.0),
     ('durotar', '杜隆塔尔', '兽人的荒芜家园', 1, 10, 'horde', 1.0, 1.0);
 
-INSERT OR IGNORE INTO monsters (id, zone_id, name, level, type, hp, attack, defense, exp_reward, gold_min, gold_max, spawn_weight)
+INSERT OR IGNORE INTO monsters (id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense, exp_reward, gold_min, gold_max, spawn_weight)
 VALUES 
-    ('wolf', 'elwynn', '森林狼', 2, 'normal', 30, 8, 2, 15, 1, 5, 100),
-    ('kobold', 'elwynn', '狗头人', 3, 'normal', 40, 10, 3, 20, 2, 8, 80),
-    ('boar', 'durotar', '野猪', 2, 'normal', 35, 9, 3, 18, 2, 6, 100);
+    ('wolf', 'elwynn', '森林狼', 2, 'normal', 30, 8, 4, 2, 1, 15, 1, 5, 100),
+    ('kobold', 'elwynn', '狗头人', 3, 'normal', 40, 10, 5, 3, 2, 20, 2, 8, 80),
+    ('boar', 'durotar', '野猪', 2, 'normal', 35, 9, 4, 3, 2, 18, 2, 6, 100);
 `
 }
 
@@ -306,8 +306,10 @@ CREATE TABLE IF NOT EXISTS characters (
     intellect INTEGER DEFAULT 10,
     stamina INTEGER DEFAULT 10,
     spirit INTEGER DEFAULT 10,
-    attack INTEGER DEFAULT 5,
-    defense INTEGER DEFAULT 5,
+    physical_attack INTEGER DEFAULT 5,
+    magic_attack INTEGER DEFAULT 5,
+    physical_defense INTEGER DEFAULT 5,
+    magic_defense INTEGER DEFAULT 5,
     crit_rate REAL DEFAULT 0.05,
     crit_damage REAL DEFAULT 1.5,
     total_kills INTEGER DEFAULT 0,
@@ -339,8 +341,10 @@ CREATE TABLE IF NOT EXISTS monsters (
     level INTEGER DEFAULT 1,
     type TEXT DEFAULT 'normal',
     hp INTEGER DEFAULT 50,
-    attack INTEGER DEFAULT 10,
-    defense INTEGER DEFAULT 5,
+    physical_attack INTEGER DEFAULT 10,
+    magic_attack INTEGER DEFAULT 5,
+    physical_defense INTEGER DEFAULT 5,
+    magic_defense INTEGER DEFAULT 3,
     exp_reward INTEGER DEFAULT 20,
     gold_min INTEGER DEFAULT 1,
     gold_max INTEGER DEFAULT 10,
@@ -364,10 +368,10 @@ VALUES
     ('elwynn', '艾尔文森林', '暴风城周边的和平森林', 1, 10, 'alliance', 1.0, 1.0),
     ('durotar', '杜隆塔尔', '兽人的荒芜家园', 1, 10, 'horde', 1.0, 1.0);
 
-INSERT INTO monsters (id, zone_id, name, level, type, hp, attack, defense, exp_reward, gold_min, gold_max, spawn_weight)
+INSERT INTO monsters (id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense, exp_reward, gold_min, gold_max, spawn_weight)
 VALUES 
-    ('wolf', 'elwynn', '森林狼', 2, 'normal', 30, 8, 2, 15, 1, 5, 100),
-    ('kobold', 'elwynn', '狗头人', 3, 'normal', 40, 10, 3, 20, 2, 8, 80),
-    ('boar', 'durotar', '野猪', 2, 'normal', 35, 9, 3, 18, 2, 6, 100);
+    ('wolf', 'elwynn', '森林狼', 2, 'normal', 30, 8, 4, 2, 1, 15, 1, 5, 100),
+    ('kobold', 'elwynn', '狗头人', 3, 'normal', 40, 10, 5, 3, 2, 20, 2, 8, 80),
+    ('boar', 'durotar', '野猪', 2, 'normal', 35, 9, 4, 3, 2, 18, 2, 6, 100);
 `
 }

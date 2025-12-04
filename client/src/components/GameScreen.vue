@@ -621,21 +621,29 @@ function escapeRegex(str: string): string {
 
         <!-- 战斗统计 -->
         <div class="character-detail-combat-stats">
-          <div class="character-detail-combat-stat">
-            <span class="character-detail-combat-stat-label">攻击力</span>
-            <span class="character-detail-combat-stat-value">{{ selectedCharacter.attack || 0 }}</span>
+          <div class="character-detail-combat-stat" :title="`物理攻击力 = 力量 / 2\n当前: ${selectedCharacter.strength || 0} / 2 = ${selectedCharacter.physicalAttack || 0}`">
+            <span class="character-detail-combat-stat-label">物理攻击</span>
+            <span class="character-detail-combat-stat-value">{{ selectedCharacter.physicalAttack || 0 }}</span>
           </div>
-          <div class="character-detail-combat-stat">
-            <span class="character-detail-combat-stat-label">防御力</span>
-            <span class="character-detail-combat-stat-value">{{ selectedCharacter.defense || 0 }}</span>
+          <div class="character-detail-combat-stat" :title="`魔法攻击力 = 智力 / 2\n当前: ${selectedCharacter.intellect || 0} / 2 = ${selectedCharacter.magicAttack || 0}`">
+            <span class="character-detail-combat-stat-label">魔法攻击</span>
+            <span class="character-detail-combat-stat-value">{{ selectedCharacter.magicAttack || 0 }}</span>
           </div>
-          <div class="character-detail-combat-stat">
+          <div class="character-detail-combat-stat" :title="`物理防御力 = 耐力 / 3\n当前: ${selectedCharacter.stamina || 0} / 3 = ${selectedCharacter.physicalDefense || 0}`">
+            <span class="character-detail-combat-stat-label">物理防御</span>
+            <span class="character-detail-combat-stat-value">{{ selectedCharacter.physicalDefense || 0 }}</span>
+          </div>
+          <div class="character-detail-combat-stat" :title="`魔法防御力 = (智力 + 精神) / 4\n当前: (${selectedCharacter.intellect || 0} + ${selectedCharacter.spirit || 0}) / 4 = ${selectedCharacter.magicDefense || 0}`">
+            <span class="character-detail-combat-stat-label">魔法防御</span>
+            <span class="character-detail-combat-stat-value">{{ selectedCharacter.magicDefense || 0 }}</span>
+          </div>
+          <div class="character-detail-combat-stat" :title="`暴击率 = 基础值 + 被动技能加成 + Buff加成\n基础值: 5%\n当前: ${((selectedCharacter.critRate || 0.05) * 100).toFixed(1)}%`">
             <span class="character-detail-combat-stat-label">暴击率</span>
-            <span class="character-detail-combat-stat-value">{{ ((selectedCharacter.critRate || 0).toFixed(1)) }}%</span>
+            <span class="character-detail-combat-stat-value">{{ ((selectedCharacter.critRate || 0.05) * 100).toFixed(1) }}%</span>
           </div>
-          <div class="character-detail-combat-stat">
+          <div class="character-detail-combat-stat" :title="`暴击伤害 = 基础值 × 暴击伤害倍率\n基础值: 150%\n当前: ${((selectedCharacter.critDamage || 1.5) * 100).toFixed(0)}%`">
             <span class="character-detail-combat-stat-label">暴击伤害</span>
-            <span class="character-detail-combat-stat-value">{{ ((selectedCharacter.critDamage || 150).toFixed(0)) }}%</span>
+            <span class="character-detail-combat-stat-value">{{ ((selectedCharacter.critDamage || 1.5) * 100).toFixed(0) }}%</span>
           </div>
         </div>
 
@@ -1114,6 +1122,12 @@ function escapeRegex(str: string): string {
 .character-detail-combat-stat {
   display: flex;
   justify-content: space-between;
+  cursor: help;
+  position: relative;
+}
+
+.character-detail-combat-stat:hover {
+  color: var(--terminal-cyan);
 }
 
 .character-detail-combat-stat-label {

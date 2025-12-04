@@ -47,36 +47,38 @@ type AuthResponse struct {
 
 // Character 角色
 type Character struct {
-	ID           int        `json:"id"`
-	UserID       int        `json:"userId"`
-	Name         string     `json:"name"`
-	RaceID       string     `json:"raceId"`
-	ClassID      string     `json:"classId"`
-	Faction      string     `json:"faction"`  // alliance, horde
-	TeamSlot     int        `json:"teamSlot"` // 1-5
-	IsActive     bool       `json:"isActive"`
-	IsDead       bool       `json:"isDead"`
-	ReviveAt     *time.Time `json:"reviveAt,omitempty"`
-	Level        int        `json:"level"`
-	Exp          int        `json:"exp"`
-	ExpToNext    int        `json:"expToNext"`
-	HP           int        `json:"hp"`
-	MaxHP        int        `json:"maxHp"`
-	Resource     int        `json:"resource"`     // 当前能量
-	MaxResource  int        `json:"maxResource"`  // 最大能量
-	ResourceType string     `json:"resourceType"` // mana/rage/energy
-	Strength     int        `json:"strength"`
-	Agility      int        `json:"agility"`
-	Intellect    int        `json:"intellect"`
-	Stamina      int        `json:"stamina"`
-	Spirit       int        `json:"spirit"`
-	Attack       int        `json:"attack"`
-	Defense      int        `json:"defense"`
-	CritRate     float64    `json:"critRate"`
-	CritDamage   float64    `json:"critDamage"`
-	TotalKills   int        `json:"totalKills"`
-	TotalDeaths  int        `json:"totalDeaths"`
-	CreatedAt    time.Time  `json:"createdAt"`
+	ID              int        `json:"id"`
+	UserID          int        `json:"userId"`
+	Name            string     `json:"name"`
+	RaceID          string     `json:"raceId"`
+	ClassID         string     `json:"classId"`
+	Faction         string     `json:"faction"`  // alliance, horde
+	TeamSlot        int        `json:"teamSlot"` // 1-5
+	IsActive        bool       `json:"isActive"`
+	IsDead          bool       `json:"isDead"`
+	ReviveAt        *time.Time `json:"reviveAt,omitempty"`
+	Level           int        `json:"level"`
+	Exp             int        `json:"exp"`
+	ExpToNext       int        `json:"expToNext"`
+	HP              int        `json:"hp"`
+	MaxHP           int        `json:"maxHp"`
+	Resource        int        `json:"resource"`     // 当前能量
+	MaxResource     int        `json:"maxResource"`  // 最大能量
+	ResourceType    string     `json:"resourceType"` // mana/rage/energy
+	Strength        int        `json:"strength"`
+	Agility         int        `json:"agility"`
+	Intellect       int        `json:"intellect"`
+	Stamina         int        `json:"stamina"`
+	Spirit          int        `json:"spirit"`
+	PhysicalAttack  int        `json:"physicalAttack"`
+	MagicAttack     int        `json:"magicAttack"`
+	PhysicalDefense int        `json:"physicalDefense"`
+	MagicDefense    int        `json:"magicDefense"`
+	CritRate        float64    `json:"critRate"`
+	CritDamage      float64    `json:"critDamage"`
+	TotalKills      int        `json:"totalKills"`
+	TotalDeaths     int        `json:"totalDeaths"`
+	CreatedAt       time.Time  `json:"createdAt"`
 }
 
 // CharacterCreate 创建角色请求
@@ -159,19 +161,21 @@ type Zone struct {
 
 // Monster 怪物
 type Monster struct {
-	ID          string `json:"id"`
-	ZoneID      string `json:"zoneId"`
-	Name        string `json:"name"`
-	Level       int    `json:"level"`
-	Type        string `json:"type"` // normal/elite/boss
-	HP          int    `json:"hp"`
-	MaxHP       int    `json:"maxHp"`
-	Attack      int    `json:"attack"`
-	Defense     int    `json:"defense"`
-	ExpReward   int    `json:"expReward"`
-	GoldMin     int    `json:"goldMin"`
-	GoldMax     int    `json:"goldMax"`
-	SpawnWeight int    `json:"spawnWeight"`
+	ID              string `json:"id"`
+	ZoneID          string `json:"zoneId"`
+	Name            string `json:"name"`
+	Level           int    `json:"level"`
+	Type            string `json:"type"` // normal/elite/boss
+	HP              int    `json:"hp"`
+	MaxHP           int    `json:"maxHp"`
+	PhysicalAttack  int    `json:"physicalAttack"`
+	MagicAttack     int    `json:"magicAttack"`
+	PhysicalDefense int    `json:"physicalDefense"`
+	MagicDefense    int    `json:"magicDefense"`
+	ExpReward       int    `json:"expReward"`
+	GoldMin         int    `json:"goldMin"`
+	GoldMax         int    `json:"goldMax"`
+	SpawnWeight     int    `json:"spawnWeight"`
 }
 
 // ═══════════════════════════════════════════════════════════

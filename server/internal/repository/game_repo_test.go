@@ -114,8 +114,8 @@ func TestGameRepository_GetMonstersByZone_ValidZone(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to insert test zone: %v", err)
 	}
-	_, err = testDB.Exec(`INSERT OR IGNORE INTO monsters (id, zone_id, name, level, type, hp, attack, defense, exp_reward, gold_min, gold_max, spawn_weight)
-		VALUES ('wolf', 'elwynn', '森林狼', 2, 'normal', 30, 8, 2, 15, 1, 5, 100)`)
+	_, err = testDB.Exec(`INSERT OR IGNORE INTO monsters (id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense, exp_reward, gold_min, gold_max, spawn_weight)
+		VALUES ('wolf', 'elwynn', '森林狼', 2, 'normal', 30, 8, 4, 2, 1, 15, 1, 5, 100)`)
 	if err != nil {
 		t.Fatalf("Failed to insert test monster: %v", err)
 	}

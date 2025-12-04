@@ -4,6 +4,8 @@ import type { Character, BattleLog, BattleStatus, Monster, Zone, BattleResult } 
 import { get, post } from '@/api/client'
 import { useCharacterStore } from './character'
 
+const API_BASE = '/api'
+
 export const useGameStore = defineStore('game', () => {
   // 状态
   const character = ref<Character | null>(null)
@@ -33,6 +35,7 @@ export const useGameStore = defineStore('game', () => {
   const zones = ref<Zone[]>([])
   const isLoading = ref(false)
   const battleInterval = ref<number | null>(null)
+  const currentZone = ref<Zone | null>(null)
 
   // 计算属性
   const hasCharacter = computed(() => character.value !== null)
@@ -174,9 +177,10 @@ export const useGameStore = defineStore('game', () => {
 
   async function fetchZones() {
     try {
-      const res = await fetch(`${API_BASE}/zones`)
-      const data = await res.json()
-      zones.value = data.zones || []
+      const response = await get<{ zones: Zone[] }>('/zones')
+      if (response.success && response.data) {
+        zones.value = response.data.zones || []
+      }
     } catch (e) {
       console.error('Failed to fetch zones:', e)
     }
@@ -230,15 +234,19 @@ export const useGameStore = defineStore('game', () => {
         }
       } else {
         console.error('Toggle battle failed:', response.error)
-        alert('开始战斗失败: ' + (response.error || '未知错误'))
+        if (typeof alert !== 'undefined') {
+          alert('开始战斗失败: ' + (response.error || '未知错误'))
+        }
       }
     } catch (e) {
       console.error('Failed to toggle battle:', e)
-      alert('开始战斗失败: ' + (e instanceof Error ? e.message : '未知错误'))
+      if (typeof alert !== 'undefined') {
+        alert('开始战斗失败: ' + (e instanceof Error ? e.message : '未知错误'))
+      }
     }
   }
 
-  async function battleTick() {
+  async function battleTick(): Promise<Character | null> {
     try {
       const response = await post<BattleResult>('/battle/tick')
       
@@ -321,25 +329,33 @@ export const useGameStore = defineStore('game', () => {
             battleLogs.value = battleLogs.value.slice(-100)
           }
         }
+        
+        return character.value
       }
+      return null
     } catch (e) {
       console.error('Battle tick failed:', e)
+      return null
     }
   }
 
-  async function changeZone(zoneId: string) {
+  async function changeZone(zoneId: string): Promise<boolean> {
     try {
-      const res = await fetch(`${API_BASE}/zone/change`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ zone_id: zoneId })
-      })
-      if (res.ok) {
+      const response = await post<{ zoneId: string }>('/zone/change', { zone_id: zoneId })
+      if (response.success) {
         await fetchBattleStatus()
         await fetchBattleLogs()
+        // 更新当前区域
+        const zone = zones.value.find(z => z.id === zoneId)
+        if (zone) {
+          currentZone.value = zone
+        }
+        return true
       }
+      return false
     } catch (e) {
       console.error('Failed to change zone:', e)
+      return false
     }
   }
 
@@ -366,7 +382,7 @@ export const useGameStore = defineStore('game', () => {
       }
     }
     
-    battleInterval.value = window.setInterval(() => {
+    battleInterval.value = (typeof window !== 'undefined' ? window.setInterval : setInterval)(() => {
       // 如果战斗正在运行，或者正在休息，都需要调用 battleTick 来处理
       const isRunning = battleStatus.value?.is_running ?? false
       const isResting = battleStatus.value?.isResting ?? battleStatus.value?.is_resting ?? false
@@ -383,7 +399,7 @@ export const useGameStore = defineStore('game', () => {
 
   function stopBattleLoop() {
     if (battleInterval.value) {
-      clearInterval(battleInterval.value)
+      (typeof window !== 'undefined' ? window.clearInterval : clearInterval)(battleInterval.value)
       battleInterval.value = null
     }
   }
@@ -399,12 +415,113 @@ export const useGameStore = defineStore('game', () => {
     battleLogs.value.push(log)
   }
 
+  // 添加日志（兼容测试）
+  function addLog(log: BattleLog) {
+    battleLogs.value.push(log)
+    // 保持日志数量
+    if (battleLogs.value.length > 100) {
+      battleLogs.value = battleLogs.value.slice(-100)
+    }
+  }
+
+  // 清除日志
+  function clearLogs() {
+    battleLogs.value = []
+  }
+
+  // 开始战斗
+  async function startBattle(): Promise<boolean> {
+    try {
+      const response = await post<{ isRunning: boolean }>('/battle/start')
+      if (response.success && response.data) {
+        battleStatus.value.is_running = response.data.isRunning
+        battleStatus.value.isRunning = response.data.isRunning
+        if (response.data.isRunning) {
+          startBattleLoop()
+        }
+        return true
+      }
+      return false
+    } catch (e) {
+      console.error('Failed to start battle:', e)
+      return false
+    }
+  }
+
+  // 停止战斗
+  async function stopBattle(): Promise<boolean> {
+    try {
+      const response = await post<{ isRunning: boolean }>('/battle/stop')
+      if (response.success && response.data) {
+        battleStatus.value.is_running = response.data.isRunning
+        battleStatus.value.isRunning = response.data.isRunning
+        stopBattleLoop()
+        return true
+      }
+      return false
+    } catch (e) {
+      console.error('Failed to stop battle:', e)
+      return false
+    }
+  }
+
+  // 初始化
+  async function init() {
+    isLoading.value = true
+    try {
+      await Promise.all([
+        fetchCharacter(),
+        fetchBattleStatus(),
+        fetchBattleLogs(),
+        fetchZones()
+      ])
+      
+      // 如果战斗正在运行，启动战斗循环
+      if (battleStatus.value?.is_running || battleStatus.value?.isRunning) {
+        startBattleLoop()
+      }
+    } catch (e) {
+      console.error('Failed to initialize:', e)
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  // 清理
+  function cleanup() {
+    stopBattleLoop()
+    battleLogs.value = []
+    character.value = null
+    battleStatus.value = {
+      is_running: false,
+      isRunning: false,
+      is_resting: false,
+      isResting: false,
+      restUntil: null,
+      current_zone: '',
+      currentZoneId: '',
+      current_enemy: null,
+      currentMonster: null,
+      current_enemies: null,
+      currentEnemies: null,
+      battle_count: 0,
+      battleCount: 0,
+      session_kills: 0,
+      totalKills: 0,
+      session_gold: 0,
+      totalGold: 0,
+      session_exp: 0,
+      totalExp: 0
+    }
+  }
+
   return {
     // 状态
     character,
     battleLogs,
     battleStatus,
     zones,
+    currentZone,
     isLoading,
     // 计算属性
     hasCharacter,
@@ -421,6 +538,12 @@ export const useGameStore = defineStore('game', () => {
     battleTick,
     changeZone,
     addLocalLog,
+    addLog,
+    clearLogs,
+    startBattle,
+    stopBattle,
+    init,
+    cleanup,
     startBattleLoop,
     stopBattleLoop
   }

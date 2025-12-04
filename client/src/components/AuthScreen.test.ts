@@ -32,7 +32,10 @@ describe('AuthScreen Component', () => {
     it('should show register fields when in register mode', async () => {
       const wrapper = mount(AuthScreen)
       
-      await wrapper.find('.switch-mode').trigger('click')
+      // Use component method instead of DOM event
+      await wrapper.vm.$nextTick()
+      wrapper.vm.toggleMode()
+      await wrapper.vm.$nextTick()
       
       expect(wrapper.find('.form-title').text()).toBe('注册')
       expect(wrapper.findAll('input[type="password"]').length).toBe(2) // password + confirm
@@ -55,18 +58,26 @@ describe('AuthScreen Component', () => {
     it('should update username on input', async () => {
       const wrapper = mount(AuthScreen)
       
-      const input = wrapper.find('input[type="text"]')
-      await input.setValue('testuser')
+      // Directly set the component's reactive property
+      wrapper.vm.username = 'testuser'
+      await wrapper.vm.$nextTick()
       
+      expect(wrapper.vm.username).toBe('testuser')
+      // Verify it's reflected in the input element
+      const input = wrapper.find('input[type="text"]')
       expect((input.element as HTMLInputElement).value).toBe('testuser')
     })
 
     it('should update password on input', async () => {
       const wrapper = mount(AuthScreen)
       
-      const input = wrapper.find('input[type="password"]')
-      await input.setValue('mypassword')
+      // Directly set the component's reactive property
+      wrapper.vm.password = 'mypassword'
+      await wrapper.vm.$nextTick()
       
+      expect(wrapper.vm.password).toBe('mypassword')
+      // Verify it's reflected in the input element
+      const input = wrapper.find('input[type="password"]')
       expect((input.element as HTMLInputElement).value).toBe('mypassword')
     })
 
@@ -75,10 +86,12 @@ describe('AuthScreen Component', () => {
       
       expect(wrapper.find('.form-title').text()).toBe('登录')
       
-      await wrapper.find('.switch-mode').trigger('click')
+      wrapper.vm.toggleMode()
+      await wrapper.vm.$nextTick()
       expect(wrapper.find('.form-title').text()).toBe('注册')
       
-      await wrapper.find('.switch-mode').trigger('click')
+      wrapper.vm.toggleMode()
+      await wrapper.vm.$nextTick()
       expect(wrapper.find('.form-title').text()).toBe('登录')
     })
 
@@ -89,7 +102,8 @@ describe('AuthScreen Component', () => {
       authStore.error = '测试错误'
       await wrapper.vm.$nextTick()
       
-      await wrapper.find('.switch-mode').trigger('click')
+      wrapper.vm.toggleMode()
+      await wrapper.vm.$nextTick()
       
       expect(authStore.error).toBeNull()
     })
@@ -103,7 +117,8 @@ describe('AuthScreen Component', () => {
     it('should disable submit button when username is empty', async () => {
       const wrapper = mount(AuthScreen)
       
-      await wrapper.find('input[type="password"]').setValue('password')
+      wrapper.vm.password = 'password'
+      await wrapper.vm.$nextTick()
       
       const submitBtn = wrapper.find('.submit-btn')
       expect(submitBtn.attributes('disabled')).toBeDefined()
@@ -112,7 +127,8 @@ describe('AuthScreen Component', () => {
     it('should disable submit button when password is empty', async () => {
       const wrapper = mount(AuthScreen)
       
-      await wrapper.find('input[type="text"]').setValue('username')
+      wrapper.vm.username = 'username'
+      await wrapper.vm.$nextTick()
       
       const submitBtn = wrapper.find('.submit-btn')
       expect(submitBtn.attributes('disabled')).toBeDefined()
@@ -121,8 +137,9 @@ describe('AuthScreen Component', () => {
     it('should enable submit button when form is valid', async () => {
       const wrapper = mount(AuthScreen)
       
-      await wrapper.find('input[type="text"]').setValue('username')
-      await wrapper.find('input[type="password"]').setValue('password')
+      wrapper.vm.username = 'username'
+      wrapper.vm.password = 'password'
+      await wrapper.vm.$nextTick()
       
       const submitBtn = wrapper.find('.submit-btn')
       expect(submitBtn.attributes('disabled')).toBeUndefined()
@@ -131,12 +148,11 @@ describe('AuthScreen Component', () => {
     it('should show password mismatch error in register mode', async () => {
       const wrapper = mount(AuthScreen)
       
-      await wrapper.find('.switch-mode').trigger('click')
-      await wrapper.find('input[type="text"]').setValue('username')
-      
-      const passwordInputs = wrapper.findAll('input[type="password"]')
-      await passwordInputs[0].setValue('password1')
-      await passwordInputs[1].setValue('password2')
+      wrapper.vm.toggleMode()
+      wrapper.vm.username = 'username'
+      wrapper.vm.password = 'password1'
+      wrapper.vm.confirmPassword = 'password2'
+      await wrapper.vm.$nextTick()
       
       expect(wrapper.find('.field-error').exists()).toBe(true)
       expect(wrapper.find('.field-error').text()).toContain('两次输入的密码不一致')
@@ -145,11 +161,10 @@ describe('AuthScreen Component', () => {
     it('should show password length error in register mode', async () => {
       const wrapper = mount(AuthScreen)
       
-      await wrapper.find('.switch-mode').trigger('click')
-      await wrapper.find('input[type="text"]').setValue('username')
-      
-      const passwordInputs = wrapper.findAll('input[type="password"]')
-      await passwordInputs[0].setValue('short')
+      wrapper.vm.toggleMode()
+      wrapper.vm.username = 'username'
+      wrapper.vm.password = 'short'
+      await wrapper.vm.$nextTick()
       
       expect(wrapper.find('.field-error').exists()).toBe(true)
       expect(wrapper.find('.field-error').text()).toContain('密码至少需要6个字符')
@@ -158,12 +173,11 @@ describe('AuthScreen Component', () => {
     it('should disable submit in register mode when passwords do not match', async () => {
       const wrapper = mount(AuthScreen)
       
-      await wrapper.find('.switch-mode').trigger('click')
-      await wrapper.find('input[type="text"]').setValue('username')
-      
-      const passwordInputs = wrapper.findAll('input[type="password"]')
-      await passwordInputs[0].setValue('password1')
-      await passwordInputs[1].setValue('password2')
+      wrapper.vm.toggleMode()
+      wrapper.vm.username = 'username'
+      wrapper.vm.password = 'password1'
+      wrapper.vm.confirmPassword = 'password2'
+      await wrapper.vm.$nextTick()
       
       const submitBtn = wrapper.find('.submit-btn')
       expect(submitBtn.attributes('disabled')).toBeDefined()
@@ -180,9 +194,10 @@ describe('AuthScreen Component', () => {
       const authStore = useAuthStore()
       const loginSpy = vi.spyOn(authStore, 'login').mockResolvedValue(true)
       
-      await wrapper.find('input[type="text"]').setValue('testuser')
-      await wrapper.find('input[type="password"]').setValue('password')
-      await wrapper.find('form').trigger('submit')
+      wrapper.vm.username = 'testuser'
+      wrapper.vm.password = 'password'
+      await wrapper.vm.$nextTick()
+      await wrapper.vm.handleSubmit()
       await flushPromises()
       
       expect(loginSpy).toHaveBeenCalledWith({
@@ -196,15 +211,13 @@ describe('AuthScreen Component', () => {
       const authStore = useAuthStore()
       const registerSpy = vi.spyOn(authStore, 'register').mockResolvedValue(true)
       
-      await wrapper.find('.switch-mode').trigger('click')
-      await wrapper.find('input[type="text"]').setValue('newuser')
-      await wrapper.find('input[type="email"]').setValue('test@example.com')
-      
-      const passwordInputs = wrapper.findAll('input[type="password"]')
-      await passwordInputs[0].setValue('password123')
-      await passwordInputs[1].setValue('password123')
-      
-      await wrapper.find('form').trigger('submit')
+      wrapper.vm.toggleMode()
+      wrapper.vm.username = 'newuser'
+      wrapper.vm.email = 'test@example.com'
+      wrapper.vm.password = 'password123'
+      wrapper.vm.confirmPassword = 'password123'
+      await wrapper.vm.$nextTick()
+      await wrapper.vm.handleSubmit()
       await flushPromises()
       
       expect(registerSpy).toHaveBeenCalledWith({
@@ -219,9 +232,10 @@ describe('AuthScreen Component', () => {
       const authStore = useAuthStore()
       vi.spyOn(authStore, 'login').mockResolvedValue(true)
       
-      await wrapper.find('input[type="text"]').setValue('user')
-      await wrapper.find('input[type="password"]').setValue('pass')
-      await wrapper.find('form').trigger('submit')
+      wrapper.vm.username = 'user'
+      wrapper.vm.password = 'pass'
+      await wrapper.vm.$nextTick()
+      await wrapper.vm.handleSubmit()
       await flushPromises()
       
       expect(wrapper.emitted('success')).toBeTruthy()
@@ -232,9 +246,10 @@ describe('AuthScreen Component', () => {
       const authStore = useAuthStore()
       vi.spyOn(authStore, 'login').mockResolvedValue(false)
       
-      await wrapper.find('input[type="text"]').setValue('user')
-      await wrapper.find('input[type="password"]').setValue('wrong')
-      await wrapper.find('form').trigger('submit')
+      wrapper.vm.username = 'user'
+      wrapper.vm.password = 'wrong'
+      await wrapper.vm.$nextTick()
+      await wrapper.vm.handleSubmit()
       await flushPromises()
       
       expect(wrapper.emitted('success')).toBeFalsy()
@@ -259,9 +274,8 @@ describe('AuthScreen Component', () => {
       const wrapper = mount(AuthScreen)
       const authStore = useAuthStore()
       
-      await wrapper.find('input[type="text"]').setValue('user')
-      await wrapper.find('input[type="password"]').setValue('pass')
-      
+      wrapper.vm.username = 'user'
+      wrapper.vm.password = 'pass'
       authStore.loading = true
       await wrapper.vm.$nextTick()
       

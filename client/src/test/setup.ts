@@ -60,18 +60,72 @@ beforeEach(() => {
 })
 
 // ═══════════════════════════════════════════════════════════
+// Mock alert
+// ═══════════════════════════════════════════════════════════
+
+global.alert = vi.fn()
+
+// ═══════════════════════════════════════════════════════════
+// Mock window
+// ═══════════════════════════════════════════════════════════
+
+// Fix for Vue Test Utils event handling in happy-dom
+if (typeof window !== 'undefined') {
+  // Ensure Event constructors exist
+  if (!window.Event) {
+    (window as any).Event = class Event {
+      constructor(public type: string, public eventInitDict?: any) {}
+    }
+  }
+  if (!window.MouseEvent) {
+    (window as any).MouseEvent = class MouseEvent extends (window as any).Event {
+      constructor(type: string, eventInitDict?: any) {
+        super(type, eventInitDict)
+      }
+    }
+  }
+  if (!window.KeyboardEvent) {
+    (window as any).KeyboardEvent = class KeyboardEvent extends (window as any).Event {
+      constructor(type: string, eventInitDict?: any) {
+        super(type, eventInitDict)
+      }
+    }
+  }
+}
+
+global.window = {
+  ...global.window,
+  setInterval: vi.fn((fn: () => void, delay: number) => {
+    return 1 as any
+  }),
+  clearInterval: vi.fn(),
+} as any
+
+// ═══════════════════════════════════════════════════════════
 // 辅助函数
 // ═══════════════════════════════════════════════════════════
 
 export function createMockResponse<T>(data: T, success = true, error?: string) {
+  const responseText = JSON.stringify({
+    success,
+    data,
+    error,
+  })
+  
   return Promise.resolve({
-    json: () => Promise.resolve({
-      success,
-      data,
-      error,
-    }),
+    json: async () => JSON.parse(responseText),
+    text: async () => responseText,
     ok: success,
     status: success ? 200 : 400,
+    statusText: success ? 'OK' : 'Bad Request',
+    headers: {
+      get: (name: string) => {
+        if (name.toLowerCase() === 'content-type') {
+          return 'application/json'
+        }
+        return null
+      },
+    },
   })
 }
 

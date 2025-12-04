@@ -94,7 +94,7 @@ async function request<T>(
       console.error('JSON Parse Error:', parseError, 'Response text:', text)
       return {
         success: false,
-        error: `JSON解析错误: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`,
+        error: `网络错误: JSON解析错误 - ${parseError instanceof Error ? parseError.message : 'Unknown error'}`,
       }
     }
   } catch (error) {

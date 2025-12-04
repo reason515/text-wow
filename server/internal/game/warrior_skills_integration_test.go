@@ -28,8 +28,10 @@ func setupWarriorSkillsTest(t *testing.T) (*BattleManager, *models.Character, *m
 		Resource:     50,
 		MaxResource:  100,
 		ResourceType: "rage",
-		Attack:       100,
-		Defense:      50,
+		PhysicalAttack:  100,
+		MagicAttack:     50,
+		PhysicalDefense: 50,
+		MagicDefense:    30,
 		CritRate:     0.1,
 		CritDamage:   1.5,
 		Exp:          0,
@@ -46,8 +48,10 @@ func setupWarriorSkillsTest(t *testing.T) (*BattleManager, *models.Character, *m
 		Type:      "normal",
 		HP:        500,
 		MaxHP:     500,
-		Attack:    80,
-		Defense:   30,
+		PhysicalAttack:  80,
+		MagicAttack:     40,
+		PhysicalDefense: 30,
+		MagicDefense:    20,
 		ExpReward: 50,
 		GoldMin:   10,
 		GoldMax:   20,
@@ -378,7 +382,7 @@ func TestEnemyDebuff_DemoralizingShout(t *testing.T) {
 	assert.Equal(t, 15.0, debuffValue)
 	
 	// 计算实际攻击力
-	originalAttack := float64(enemy.Attack)
+	originalAttack := float64(enemy.PhysicalAttack)
 	actualAttack := originalAttack * (1.0 - debuffValue/100.0)
 	
 	// 80 * (1 - 0.15) = 68
@@ -397,7 +401,7 @@ func TestEnemyDebuff_Whirlwind(t *testing.T) {
 	assert.Equal(t, 10.0, debuffValue)
 	
 	// 计算实际防御力
-	originalDefense := float64(enemy.Defense)
+	originalDefense := float64(enemy.PhysicalDefense)
 	actualDefense := originalDefense * (1.0 - debuffValue/100.0)
 	
 	// 30 * (1 - 0.10) = 27
