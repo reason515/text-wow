@@ -1177,6 +1177,8 @@ func (m *BattleManager) getBuffDescription(buff *BuffInstance) string {
 		return fmt.Sprintf("降低%.0f%%物理防御", -buff.Value)
 	case "physical_damage_taken":
 		return fmt.Sprintf("减少%.0f%%受到的物理伤害", -buff.Value)
+	case "damage_taken":
+		return fmt.Sprintf("减少%.0f%%受到的伤害", -buff.Value)
 	case "crit_rate":
 		if buff.IsBuff {
 			return fmt.Sprintf("提升%.0f%%暴击率", buff.Value)
@@ -1184,7 +1186,16 @@ func (m *BattleManager) getBuffDescription(buff *BuffInstance) string {
 		return fmt.Sprintf("降低%.0f%%暴击率", -buff.Value)
 	case "healing_received":
 		return fmt.Sprintf("降低%.0f%%治疗效果", buff.Value)
+	case "shield":
+		return fmt.Sprintf("获得相当于最大HP %.0f%%的护盾", buff.Value/float64(100))
+	case "reflect":
+		return fmt.Sprintf("反射%.0f%%受到的伤害", buff.Value)
+	case "counter_attack":
+		return fmt.Sprintf("受到攻击时反击，造成%.0f%%物理攻击力伤害", buff.Value)
+	case "cc_immune":
+		return "免疫控制效果"
 	default:
+		// 如果没有匹配的类型，返回buff名称
 		return buff.Name
 	}
 }

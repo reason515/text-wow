@@ -60,6 +60,63 @@ function closeDetail() {
   selectedCharacter.value = null
   characterSkills.value = []
   hideSkillTooltip() // 关闭时也隐藏tooltip
+  hideBuffTooltip() // 关闭时也隐藏buff tooltip
+}
+
+// 获取buff tooltip文本
+function getBuffTooltip(buff: any): string {
+  if (!buff) return ''
+  
+  const parts: string[] = []
+  // Buff名称
+  const buffName = buff.name || '未知效果'
+  parts.push(`【${buffName}】`)
+  
+  // Buff描述 - 优先使用后端返回的description
+  const description = buff.description || ''
+  if (description && description.trim()) {
+    parts.push(description)
+  } else {
+    // 如果没有描述，根据类型生成描述
+    const statAffected = buff.statAffected || ''
+    const isBuff = buff.isBuff !== undefined ? buff.isBuff : true
+    const value = buff.value !== undefined ? buff.value : 0
+    
+    if (statAffected === 'attack' && isBuff) {
+      parts.push(`提升 ${Math.round(value)}% 物理攻击力`)
+    } else if (statAffected === 'attack' && !isBuff) {
+      parts.push(`降低 ${Math.round(Math.abs(value))}% 物理攻击力`)
+    } else if (statAffected === 'defense' && isBuff) {
+      parts.push(`提升 ${Math.round(value)}% 物理防御`)
+    } else if (statAffected === 'physical_damage_taken' || statAffected === 'damage_taken') {
+      parts.push(`减少 ${Math.round(Math.abs(value))}% 受到的物理伤害`)
+    } else if (statAffected === 'crit_rate' && isBuff) {
+      parts.push(`提升 ${Math.round(value)}% 暴击率`)
+    } else if (statAffected === 'shield') {
+      parts.push(`获得相当于最大HP ${Math.round(value)} 点的护盾`)
+    } else if (statAffected === 'reflect') {
+      parts.push(`反射 ${Math.round(value)}% 受到的伤害`)
+    } else if (statAffected === 'counter_attack') {
+      parts.push(`受到攻击时反击，造成 ${Math.round(value)}% 物理攻击力伤害`)
+    } else if (statAffected === 'cc_immune') {
+      parts.push('免疫控制效果')
+    } else if (statAffected === 'healing_received') {
+      parts.push(`降低 ${Math.round(value)}% 治疗效果`)
+    } else {
+      // 如果无法识别类型，至少显示buff名称
+      parts.push(buffName)
+    }
+  }
+  
+  // 持续时间
+  const duration = buff.duration !== undefined ? buff.duration : null
+  if (duration !== undefined && duration !== null && duration > 0) {
+    parts.push(`━━━━━━━━━━━━━━━━`)
+    parts.push(`剩余: ${duration} 回合`)
+  }
+  
+  const result = parts.join('\n')
+  return result || `【${buffName}】` // 至少返回buff名称
 }
 
 // 获取技能tooltip文本
@@ -101,6 +158,66 @@ function getSkillTooltip(skill: any): string {
   
   const result = parts.join('\n')
   return result || skillName // 至少返回技能名称
+}
+
+// 处理buff tooltip显示（使用fixed定位，智能调整位置避免超出屏幕）
+let buffTooltipEl: HTMLElement | null = null
+
+function handleBuffTooltip(event: MouseEvent, buff: any) {
+  const tooltipText = getBuffTooltip(buff)
+  if (!tooltipText) return
+  
+  // 移除旧的tooltip
+  if (buffTooltipEl) {
+    buffTooltipEl.remove()
+  }
+  
+  // 创建新的tooltip元素
+  buffTooltipEl = document.createElement('div')
+  buffTooltipEl.className = 'buff-tooltip-fixed'
+  buffTooltipEl.textContent = tooltipText
+  document.body.appendChild(buffTooltipEl)
+  
+  // 计算位置
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+  const tooltipRect = buffTooltipEl.getBoundingClientRect()
+  
+  // 默认显示在右侧
+  let left = rect.right + 8
+  let top = rect.top + (rect.height / 2) - (tooltipRect.height / 2)
+  
+  // 如果右侧空间不够，显示在左侧
+  if (left + tooltipRect.width > window.innerWidth - 10) {
+    left = rect.left - tooltipRect.width - 8
+  }
+  
+  // 如果左侧也不够，显示在上方
+  if (left < 10) {
+    left = rect.left + (rect.width / 2) - (tooltipRect.width / 2)
+    top = rect.top - tooltipRect.height - 8
+  }
+  
+  // 确保不超出视口
+  if (left < 10) left = 10
+  if (left + tooltipRect.width > window.innerWidth - 10) {
+    left = window.innerWidth - tooltipRect.width - 10
+  }
+  if (top < 10) {
+    top = rect.bottom + 8
+  }
+  if (top + tooltipRect.height > window.innerHeight - 10) {
+    top = window.innerHeight - tooltipRect.height - 10
+  }
+  
+  buffTooltipEl.style.left = left + 'px'
+  buffTooltipEl.style.top = top + 'px'
+}
+
+function hideBuffTooltip() {
+  if (buffTooltipEl) {
+    buffTooltipEl.remove()
+    buffTooltipEl = null
+  }
 }
 
 // 处理技能tooltip显示（使用fixed定位避免被overflow裁剪）
@@ -570,9 +687,12 @@ function escapeRegex(str: string): string {
                     :key="buff.effectId"
                     class="buff-icon"
                     :class="{ 'buff-positive': buff.isBuff, 'buff-negative': !buff.isBuff }"
-                    :data-tooltip="buff.name + '\n' + (buff.description || '') + '\n剩余 ' + buff.duration + ' 回合'"
+                    :data-tooltip="getBuffTooltip(buff)"
+                    data-tooltip-right
+                    @mouseenter="handleBuffTooltip($event, buff)"
+                    @mouseleave="hideBuffTooltip"
                   >
-                    {{ buff.name.charAt(0) }}
+                    {{ (buff.name || '?').charAt(0) }}
                   </div>
                 </div>
                 <div v-if="char.isDead" class="team-character-dead">
