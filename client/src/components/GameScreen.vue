@@ -1563,6 +1563,10 @@ function escapeRegex(str: string): string {
   gap: 6px;
   max-height: 250px;
   overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 2px;
+  box-sizing: border-box;
+  width: 100%;
 }
 
 .character-detail-skill-item {
@@ -1573,6 +1577,9 @@ function escapeRegex(str: string): string {
   font-size: 11px;
   cursor: help;
   transition: all 0.2s;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .character-detail-skill-item:hover {

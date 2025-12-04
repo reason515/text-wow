@@ -248,6 +248,55 @@ body, body *, input, button, select, textarea {
   background: var(--text-secondary);
 }
 
+/* 角色详情弹窗滚动条样式 */
+.character-detail-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.character-detail-content::-webkit-scrollbar-track {
+  background: var(--bg-color);
+  border-left: 1px solid var(--text-dim);
+}
+
+.character-detail-content::-webkit-scrollbar-thumb {
+  background: var(--text-dim);
+  border: 1px solid var(--text-dim);
+}
+
+.character-detail-content::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+  border-color: var(--terminal-green);
+  box-shadow: 0 0 5px rgba(85, 255, 85, 0.3);
+}
+
+/* 技能列表滚动条样式 - 终端风格 */
+.character-detail-skills-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.character-detail-skills-list::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.3);
+  border-left: 1px solid var(--text-dim);
+}
+
+.character-detail-skills-list::-webkit-scrollbar-thumb {
+  background: var(--text-dim);
+  border: 1px solid var(--text-dim);
+  border-radius: 2px;
+}
+
+.character-detail-skills-list::-webkit-scrollbar-thumb:hover {
+  background: var(--terminal-green);
+  border-color: var(--terminal-green);
+  box-shadow: 0 0 5px rgba(85, 255, 85, 0.5);
+}
+
+/* 只在内容超出时才显示滚动条（非hover时隐藏） */
+.character-detail-skills-list:not(:hover)::-webkit-scrollbar {
+  width: 0;
+  display: none;
+}
+
 /* ═══════════════════════════════════════════════════════════
    战斗日志
    ═══════════════════════════════════════════════════════════ */
