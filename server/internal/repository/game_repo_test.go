@@ -149,3 +149,63 @@ func TestGameRepository_GetMonstersByZone_InvalidZone(t *testing.T) {
 	assert.Equal(t, 0, len(monsters), "Should return empty list for non-existent zone")
 }
 
+func TestGameRepository_GetMonstersByZone_FieldNames(t *testing.T) {
+	// 测试：验证怪物查询使用正确的字段名（physical_attack, magic_attack等）
+	// 这个测试确保不会因为字段名不匹配而失败
+	testDB, err := database.SetupTestDB()
+	if err != nil {
+		t.Fatalf("Failed to setup test database: %v", err)
+	}
+	defer database.TeardownTestDB(testDB)
+
+	// 确保有怪物数据（使用正确的字段名）
+	_, err = testDB.Exec(`INSERT OR IGNORE INTO zones (id, name, description, min_level, max_level, faction, exp_modifier, gold_modifier)
+		VALUES ('test_zone', '测试区域', '测试', 1, 10, NULL, 1.0, 1.0)`)
+	if err != nil {
+		t.Fatalf("Failed to insert test zone: %v", err)
+	}
+	
+	_, err = testDB.Exec(`INSERT OR IGNORE INTO monsters (id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense, exp_reward, gold_min, gold_max, spawn_weight)
+		VALUES ('test_monster', 'test_zone', '测试怪物', 1, 'normal', 20, 5, 2, 3, 1, 10, 1, 3, 100)`)
+	if err != nil {
+		t.Fatalf("Failed to insert test monster: %v", err)
+	}
+
+	repo := NewGameRepository()
+
+	monsters, err := repo.GetMonstersByZone("test_zone")
+	assert.NoError(t, err, "Should successfully query monsters with correct field names")
+	assert.Greater(t, len(monsters), 0, "Should have at least one monster")
+
+	// 验证怪物数据字段都正确加载
+	for _, monster := range monsters {
+		assert.Greater(t, monster.PhysicalAttack, 0, "PhysicalAttack should be loaded correctly")
+		assert.GreaterOrEqual(t, monster.MagicAttack, 0, "MagicAttack should be loaded correctly")
+		assert.Greater(t, monster.PhysicalDefense, 0, "PhysicalDefense should be loaded correctly")
+		assert.Greater(t, monster.MagicDefense, 0, "MagicDefense should be loaded correctly")
+		assert.Equal(t, monster.HP, monster.MaxHP, "MaxHP should be set to HP")
+	}
+}
+
+func TestGameRepository_GetMonstersByZone_EmptyZone(t *testing.T) {
+	// 测试：区域存在但没有怪物（应该返回空列表，不应该报错）
+	testDB, err := database.SetupTestDB()
+	if err != nil {
+		t.Fatalf("Failed to setup test database: %v", err)
+	}
+	defer database.TeardownTestDB(testDB)
+
+	// 创建一个没有怪物的区域
+	_, err = testDB.Exec(`INSERT OR IGNORE INTO zones (id, name, description, min_level, max_level, faction, exp_modifier, gold_modifier)
+		VALUES ('empty_zone', '空区域', '没有怪物的区域', 1, 10, NULL, 1.0, 1.0)`)
+	if err != nil {
+		t.Fatalf("Failed to insert test zone: %v", err)
+	}
+
+	repo := NewGameRepository()
+
+	monsters, err := repo.GetMonstersByZone("empty_zone")
+	assert.NoError(t, err, "Should not error for zone with no monsters")
+	assert.Equal(t, 0, len(monsters), "Should return empty list for zone with no monsters")
+}
+

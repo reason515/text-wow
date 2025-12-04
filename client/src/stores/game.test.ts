@@ -278,10 +278,18 @@ describe('Game Store', () => {
       const store = useGameStore()
 
       mockFetch.mockResolvedValueOnce(createMockResponse({ isRunning: true }))
+      // Mock battleTick call (should be called immediately after starting)
+      mockFetch.mockResolvedValueOnce(createMockResponse({
+        character: createMockCharacter(),
+        logs: [],
+        isRunning: true
+      }))
 
       await store.toggleBattle()
 
       expect(store.battleStatus.isRunning).toBe(true)
+      // Verify that battleTick was called immediately (not waiting for interval)
+      expect(mockFetch).toHaveBeenCalledTimes(2) // toggle + immediate battleTick
     })
 
     it('should toggle battle off', async () => {
@@ -293,6 +301,40 @@ describe('Game Store', () => {
       await store.toggleBattle()
 
       expect(store.battleStatus.isRunning).toBe(false)
+    })
+
+    it('should start battle loop when toggling on', async () => {
+      const store = useGameStore()
+      store.battleStatus.isRunning = false
+
+      mockFetch.mockResolvedValueOnce(createMockResponse({ isRunning: true }))
+      mockFetch.mockResolvedValueOnce(createMockResponse({
+        character: createMockCharacter(),
+        logs: [],
+        isRunning: true
+      }))
+
+      await store.toggleBattle()
+
+      expect(store.battleStatus.isRunning).toBe(true)
+      // Verify battle loop is started (battleInterval should be set)
+      // Note: We can't directly check the interval, but we can verify battleTick was called
+      expect(mockFetch).toHaveBeenCalledTimes(2)
+    })
+
+    it('should handle toggle battle errors gracefully', async () => {
+      const store = useGameStore()
+      const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {})
+
+      mockFetch.mockResolvedValueOnce(createMockResponse({
+        success: false,
+        error: 'Failed to toggle battle'
+      }))
+
+      await store.toggleBattle()
+
+      expect(alertSpy).toHaveBeenCalledWith('开始战斗失败: Failed to toggle battle')
+      alertSpy.mockRestore()
     })
   })
 

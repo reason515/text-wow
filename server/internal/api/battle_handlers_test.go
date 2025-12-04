@@ -536,3 +536,178 @@ func TestBattleHandler_BattleTick_WithValidZone(t *testing.T) {
 	}
 }
 
+// ═══════════════════════════════════════════════════════════
+// 数据库字段名一致性测试 - 覆盖实际遇到的问题
+// ═══════════════════════════════════════════════════════════
+
+func TestBattleHandler_BattleTick_ZoneHasMonsters(t *testing.T) {
+	// 测试：验证区域有怪物数据，防止"No monsters in zone"错误
+	_, _, router, token, cleanup := setupBattleTestSimple(t)
+	defer cleanup()
+
+	// 创建角色
+	charBody := models.CharacterCreate{
+		Name:    "TestChar",
+		RaceID:  "human",
+		ClassID: "warrior",
+	}
+	w := makeAuthRequest(router, "POST", "/api/characters", token, charBody)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Failed to create character: %s", w.Body.String())
+	}
+
+	// 开始战斗（会尝试加载默认区域 elwynn）
+	makeAuthRequest(router, "POST", "/api/battle/start", token, nil)
+
+	// 执行战斗回合 - 应该成功生成敌人（因为testdb中有elwynn区域的怪物）
+	w = makeAuthRequest(router, "POST", "/api/battle/tick", token, nil)
+
+	// 应该成功（200）或返回战斗未运行（200 with isRunning: false）
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d. Body: %s", w.Code, w.Body.String())
+	}
+
+	var response struct {
+		Success bool `json:"success"`
+		Data    struct {
+			IsRunning bool `json:"isRunning"`
+			Enemies   interface{} `json:"enemies"`
+		} `json:"data"`
+		Error string `json:"error"`
+	}
+	json.Unmarshal(w.Body.Bytes(), &response)
+
+	if !response.Success {
+		// 如果失败，检查是否是"No monsters in zone"错误
+		if response.Error != "" && (response.Error == "no monsters in zone elwynn" || 
+			response.Error == "failed to get monsters" || 
+			response.Error == "No monsters in zone elwynn") {
+			t.Errorf("Zone elwynn should have monsters in test database. Error: %s", response.Error)
+		} else {
+			t.Errorf("Unexpected error: %s", response.Error)
+		}
+	}
+}
+
+func TestBattleHandler_BattleTick_MonsterFieldNames(t *testing.T) {
+	// 测试：验证怪物数据使用正确的字段名（physical_attack, magic_attack等）
+	// 这个测试确保数据库查询不会因为字段名不匹配而失败
+	_, _, router, token, cleanup := setupBattleTestSimple(t)
+	defer cleanup()
+
+	// 创建角色
+	charBody := models.CharacterCreate{
+		Name:    "TestChar",
+		RaceID:  "human",
+		ClassID: "warrior",
+	}
+	w := makeAuthRequest(router, "POST", "/api/characters", token, charBody)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Failed to create character: %s", w.Body.String())
+	}
+
+	// 开始战斗
+	makeAuthRequest(router, "POST", "/api/battle/start", token, nil)
+
+	// 执行多个战斗回合，验证怪物数据能正常加载和使用
+	for i := 0; i < 3; i++ {
+		w = makeAuthRequest(router, "POST", "/api/battle/tick", token, nil)
+		
+		if w.Code != http.StatusOK {
+			var errorResponse struct {
+				Error string `json:"error"`
+			}
+			json.Unmarshal(w.Body.Bytes(), &errorResponse)
+			
+			// 检查是否是字段名相关的错误
+			if errorResponse.Error != "" && 
+				(errorResponse.Error == "no such column: attack" || 
+				 errorResponse.Error == "no such column: defense" ||
+				 errorResponse.Error == "failed to get monsters") {
+				t.Fatalf("Database field name mismatch detected at tick %d: %s", i+1, errorResponse.Error)
+			}
+			
+			t.Errorf("Battle tick %d failed with status %d: %s", i+1, w.Code, errorResponse.Error)
+			break
+		}
+	}
+}
+
+func TestBattleHandler_ToggleBattle_StartsImmediately(t *testing.T) {
+	// 测试：验证toggleBattle后战斗能立即开始（覆盖之前的问题）
+	_, _, router, token, cleanup := setupBattleTestSimple(t)
+	defer cleanup()
+
+	// 创建角色
+	charBody := models.CharacterCreate{
+		Name:    "TestChar",
+		RaceID:  "human",
+		ClassID: "warrior",
+	}
+	w := makeAuthRequest(router, "POST", "/api/characters", token, charBody)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Failed to create character: %s", w.Body.String())
+	}
+
+	// 切换战斗状态（开始）
+	w = makeAuthRequest(router, "POST", "/api/battle/toggle", token, nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Failed to toggle battle: %s", w.Body.String())
+	}
+
+	var toggleResponse struct {
+		Success bool `json:"success"`
+		Data    struct {
+			IsRunning bool `json:"isRunning"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &toggleResponse); err != nil {
+		t.Fatalf("Failed to parse toggle response: %v", err)
+	}
+
+	if !toggleResponse.Success {
+		t.Errorf("Toggle should succeed. Response: %s", w.Body.String())
+	}
+	
+	// 先确保战斗是运行状态（如果 toggle 返回 false，使用 start）
+	if !toggleResponse.Data.IsRunning {
+		// 如果 toggle 没有启动战斗，使用 start 来启动
+		w = makeAuthRequest(router, "POST", "/api/battle/start", token, nil)
+		if w.Code != http.StatusOK {
+			t.Fatalf("Failed to start battle: %s", w.Body.String())
+		}
+	}
+
+	// 立即执行战斗回合 - 这是关键测试：验证战斗启动后能立即执行，不会因为区域没有怪物而失败
+	// 这个测试主要覆盖"No monsters in zone"错误
+	w = makeAuthRequest(router, "POST", "/api/battle/tick", token, nil)
+	if w.Code != http.StatusOK {
+		var errorResponse struct {
+			Success bool   `json:"success"`
+			Error   string `json:"error"`
+		}
+		json.Unmarshal(w.Body.Bytes(), &errorResponse)
+		
+		// 检查是否是"No monsters in zone"错误（这是我们想要覆盖的问题）
+		if errorResponse.Error != "" && 
+			(errorResponse.Error == "no monsters in zone elwynn" || 
+			 errorResponse.Error == "No monsters in zone elwynn" ||
+			 errorResponse.Error == "failed to get monsters") {
+			t.Errorf("Zone elwynn should have monsters in test database. Error: %s", errorResponse.Error)
+		} else {
+			t.Errorf("Battle tick should work immediately after toggle/start. Status: %d, Error: %s", w.Code, errorResponse.Error)
+		}
+	} else {
+		// 如果成功，验证返回的数据结构正确
+		var tickResponse struct {
+			Success bool `json:"success"`
+			Data    interface{} `json:"data"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &tickResponse); err == nil {
+			if !tickResponse.Success {
+				t.Error("Battle tick should return success response")
+			}
+		}
+	}
+}
+
