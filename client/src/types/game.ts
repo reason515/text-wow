@@ -70,6 +70,18 @@ export interface Character {
   totalKills: number
   totalDeaths: number
   createdAt: string
+  buffs?: BuffInfo[]
+}
+
+export interface BuffInfo {
+  effectId: string
+  name: string
+  type: string
+  isBuff: boolean
+  duration: number
+  value: number
+  statAffected: string
+  description?: string
 }
 
 export interface CharacterCreate {

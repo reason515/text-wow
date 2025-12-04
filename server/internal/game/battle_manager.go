@@ -408,7 +408,7 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 			// 使用技能管理器选择技能
 			var skillState *CharacterSkillState
 			if m.skillManager != nil {
-				skillState = m.skillManager.SelectBestSkill(char.ID, char.Resource, targetHPPercent, hasMultipleEnemies)
+				skillState = m.skillManager.SelectBestSkill(char.ID, char.Resource, targetHPPercent, hasMultipleEnemies, m.buffManager)
 			}
 
 			var skillName string
@@ -1133,6 +1133,60 @@ func (m *BattleManager) GetBattleStatus(userID int) *models.BattleStatus {
 	}
 
 	return status
+}
+
+// GetCharacterBuffs 获取角色的所有Buff/Debuff信息（用于API返回）
+func (m *BattleManager) GetCharacterBuffs(characterID int) []*models.BuffInfo {
+	if m.buffManager == nil {
+		return []*models.BuffInfo{}
+	}
+	
+	buffInstances := m.buffManager.GetBuffs(characterID)
+	buffs := make([]*models.BuffInfo, 0, len(buffInstances))
+	
+	for _, buff := range buffInstances {
+		description := m.getBuffDescription(buff)
+		buffInfo := &models.BuffInfo{
+			EffectID:     buff.EffectID,
+			Name:         buff.Name,
+			Type:         buff.Type,
+			IsBuff:       buff.IsBuff,
+			Duration:     buff.Duration,
+			Value:        buff.Value,
+			StatAffected: buff.StatAffected,
+			Description:  description,
+		}
+		buffs = append(buffs, buffInfo)
+	}
+	
+	return buffs
+}
+
+// getBuffDescription 获取Buff的描述文本
+func (m *BattleManager) getBuffDescription(buff *BuffInstance) string {
+	switch buff.StatAffected {
+	case "attack":
+		if buff.IsBuff {
+			return fmt.Sprintf("提升%.0f%%物理攻击力", buff.Value)
+		}
+		return fmt.Sprintf("降低%.0f%%物理攻击力", -buff.Value)
+	case "defense":
+		if buff.IsBuff {
+			return fmt.Sprintf("提升%.0f%%物理防御", buff.Value)
+		}
+		return fmt.Sprintf("降低%.0f%%物理防御", -buff.Value)
+	case "physical_damage_taken":
+		return fmt.Sprintf("减少%.0f%%受到的物理伤害", -buff.Value)
+	case "crit_rate":
+		if buff.IsBuff {
+			return fmt.Sprintf("提升%.0f%%暴击率", buff.Value)
+		}
+		return fmt.Sprintf("降低%.0f%%暴击率", -buff.Value)
+	case "healing_received":
+		return fmt.Sprintf("降低%.0f%%治疗效果", buff.Value)
+	default:
+		return buff.Name
+	}
 }
 
 // GetBattleLogs 获取战斗日志

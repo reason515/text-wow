@@ -1105,4 +1105,202 @@ body, body *, input, button, select, textarea {
   to { transform: rotate(360deg); }
 }
 
+/* ═══════════════════════════════════════════════════════════
+   终端风格 Tooltip
+   ═══════════════════════════════════════════════════════════ */
+
+/* 禁用浏览器默认tooltip */
+[data-tooltip] {
+  position: relative;
+  cursor: help;
+}
+
+[data-tooltip]:hover::before,
+[data-tooltip]:hover::after {
+  opacity: 1;
+  pointer-events: auto;
+  z-index: 10001;
+}
+
+/* Tooltip 容器 */
+[data-tooltip]::before {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-8px);
+  padding: 10px 14px;
+  background: rgba(10, 10, 10, 0.98);
+  border: 2px solid var(--terminal-green);
+  color: var(--terminal-green);
+  font-family: var(--font-pixel);
+  font-size: 11px;
+  line-height: 1.8;
+  white-space: pre-line;
+  text-align: left;
+  min-width: 180px;
+  max-width: 350px;
+  box-shadow: 
+    0 0 15px rgba(85, 255, 85, 0.6),
+    inset 0 0 25px rgba(85, 255, 85, 0.15);
+  text-shadow: 0 0 10px rgba(85, 255, 85, 0.9);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 10000;
+  word-wrap: break-word;
+  letter-spacing: 0.5px;
+}
+
+/* Tooltip 箭头 */
+[data-tooltip]::after {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-2px);
+  border: 6px solid transparent;
+  border-top-color: var(--terminal-green);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 10001;
+}
+
+/* 右侧tooltip */
+[data-tooltip-right]::before {
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%) translateX(8px);
+  bottom: auto;
+}
+
+[data-tooltip-right]::after {
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%) translateX(2px);
+  bottom: auto;
+  border-top-color: transparent;
+  border-right-color: var(--terminal-green);
+  border-left: none;
+}
+
+/* 左侧tooltip */
+[data-tooltip-left]::before {
+  right: 100%;
+  left: auto;
+  top: 50%;
+  transform: translateY(-50%) translateX(-8px);
+  bottom: auto;
+}
+
+[data-tooltip-left]::after {
+  right: 100%;
+  left: auto;
+  top: 50%;
+  transform: translateY(-50%) translateX(-2px);
+  bottom: auto;
+  border-top-color: transparent;
+  border-left-color: var(--terminal-green);
+  border-right: none;
+}
+
+/* 顶部tooltip（默认） */
+[data-tooltip-top]::before {
+  top: 100%;
+  bottom: auto;
+  transform: translateX(-50%) translateY(8px);
+}
+
+[data-tooltip-top]::after {
+  top: 100%;
+  bottom: auto;
+  transform: translateX(-50%) translateY(2px);
+  border-top-color: transparent;
+  border-bottom-color: var(--terminal-green);
+}
+
+/* 空tooltip不显示 - 只隐藏空字符串的tooltip */
+[data-tooltip=""]::before,
+[data-tooltip=""]::after {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* 确保tooltip在弹窗中正确显示 */
+.character-detail-content [data-tooltip]::before,
+.character-detail-content [data-tooltip]::after {
+  z-index: 10002;
+}
+
+/* 技能列表中的tooltip使用fixed定位的独立元素 */
+.skill-tooltip-fixed {
+  position: fixed;
+  padding: 10px 14px;
+  background: rgba(10, 10, 10, 0.98);
+  border: 2px solid var(--terminal-green);
+  color: var(--terminal-green);
+  font-family: var(--font-pixel);
+  font-size: 11px;
+  line-height: 1.8;
+  white-space: pre-line;
+  text-align: left;
+  min-width: 180px;
+  max-width: 350px;
+  box-shadow: 
+    0 0 15px rgba(85, 255, 85, 0.6),
+    inset 0 0 25px rgba(85, 255, 85, 0.15);
+  text-shadow: 0 0 10px rgba(85, 255, 85, 0.9);
+  z-index: 10005;
+  word-wrap: break-word;
+  letter-spacing: 0.5px;
+  pointer-events: none;
+}
+
+/* 确保tooltip不会被overflow隐藏 */
+.character-detail-skills-list {
+  position: relative;
+}
+
+/* 特殊颜色变体 */
+[data-tooltip-cyan]::before {
+  border-color: var(--terminal-cyan);
+  color: var(--terminal-cyan);
+  box-shadow: 
+    0 0 10px rgba(119, 255, 255, 0.5),
+    inset 0 0 20px rgba(119, 255, 255, 0.1);
+  text-shadow: 0 0 8px rgba(119, 255, 255, 0.8);
+}
+
+[data-tooltip-cyan]::after {
+  border-top-color: var(--terminal-cyan);
+}
+
+[data-tooltip-yellow]::before {
+  border-color: var(--terminal-yellow);
+  color: var(--terminal-yellow);
+  box-shadow: 
+    0 0 10px rgba(255, 255, 102, 0.5),
+    inset 0 0 20px rgba(255, 255, 102, 0.1);
+  text-shadow: 0 0 8px rgba(255, 255, 102, 0.8);
+}
+
+[data-tooltip-yellow]::after {
+  border-top-color: var(--terminal-yellow);
+}
+
+[data-tooltip-red]::before {
+  border-color: var(--terminal-red);
+  color: var(--terminal-red);
+  box-shadow: 
+    0 0 10px rgba(255, 119, 119, 0.5),
+    inset 0 0 20px rgba(255, 119, 119, 0.1);
+  text-shadow: 0 0 8px rgba(255, 119, 119, 0.8);
+}
+
+[data-tooltip-red]::after {
+  border-top-color: var(--terminal-red);
+}
+
 

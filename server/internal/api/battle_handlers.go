@@ -161,6 +161,13 @@ func (h *BattleHandler) GetBattleStatus(c *gin.Context) {
 
 	// 获取所有角色（所有角色都参与战斗）
 	characters, _ := h.charRepo.GetByUserID(userID)
+	
+	// 为每个角色添加buff信息
+	for _, char := range characters {
+		buffs := h.battleMgr.GetCharacterBuffs(char.ID)
+		char.Buffs = buffs
+	}
+	
 	status.Team = characters
 
 	c.JSON(http.StatusOK, models.APIResponse{

@@ -79,6 +79,19 @@ type Character struct {
 	TotalKills      int        `json:"totalKills"`
 	TotalDeaths     int        `json:"totalDeaths"`
 	CreatedAt       time.Time  `json:"createdAt"`
+	Buffs           []*BuffInfo `json:"buffs,omitempty"` // Buff/Debuff信息（不存储在数据库）
+}
+
+// BuffInfo Buff/Debuff信息（用于API返回）
+type BuffInfo struct {
+	EffectID     string  `json:"effectId"`
+	Name         string  `json:"name"`
+	Type         string  `json:"type"`
+	IsBuff       bool    `json:"isBuff"`
+	Duration     int     `json:"duration"`
+	Value        float64 `json:"value"`
+	StatAffected string  `json:"statAffected"`
+	Description  string  `json:"description,omitempty"` // 效果描述
 }
 
 // CharacterCreate 创建角色请求

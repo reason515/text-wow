@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"text-wow/internal/auth"
+	"text-wow/internal/game"
 	"text-wow/internal/models"
 	"text-wow/internal/repository"
 	"text-wow/internal/service"
@@ -435,9 +436,14 @@ func (h *Handler) GetCharacter(c *gin.Context) {
 
 	// 返回第一个角色（即使死亡也会返回，以便显示复活状态）
 	if len(characters) > 0 {
+		char := characters[0]
+		// 添加buff信息
+		battleMgr := game.GetBattleManager()
+		char.Buffs = battleMgr.GetCharacterBuffs(char.ID)
+		
 		c.JSON(http.StatusOK, models.APIResponse{
 			Success: true,
-			Data:    characters[0],
+			Data:    char,
 		})
 		return
 	}

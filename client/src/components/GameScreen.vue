@@ -19,17 +19,133 @@ const logContainer = ref<HTMLElement | null>(null)
 // 角色详情弹窗
 const showCharacterDetail = ref(false)
 const selectedCharacter = ref<any>(null)
+const characterSkills = ref<any[]>([])
+const loadingSkills = ref(false)
 
 // 显示角色详情
-function showDetail(char: any) {
+async function showDetail(char: any) {
   selectedCharacter.value = char
   showCharacterDetail.value = true
+  // 获取角色技能
+  await fetchCharacterSkills(char.id)
+}
+
+// 获取角色技能
+async function fetchCharacterSkills(characterId: number) {
+  loadingSkills.value = true
+  try {
+    const response = await fetch(`/api/characters/${characterId}/skills`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    })
+    const data = await response.json()
+    if (data.success && data.data) {
+      // API返回格式: { activeSkills: [...], passiveSkills: [...] }
+      characterSkills.value = data.data.activeSkills || []
+    } else {
+      characterSkills.value = []
+    }
+  } catch (e) {
+    console.error('Failed to fetch character skills:', e)
+    characterSkills.value = []
+  } finally {
+    loadingSkills.value = false
+  }
 }
 
 // 关闭角色详情
 function closeDetail() {
   showCharacterDetail.value = false
   selectedCharacter.value = null
+  characterSkills.value = []
+  hideSkillTooltip() // 关闭时也隐藏tooltip
+}
+
+// 获取技能tooltip文本
+function getSkillTooltip(skill: any): string {
+  if (!skill) return ''
+  
+  // 如果没有skill详情，至少返回skillId
+  if (!skill.skill) {
+    return skill.skillId || '未知技能'
+  }
+  
+  const parts: string[] = []
+  // 技能名称
+  const skillName = skill.skill.name || skill.skillId || '未知技能'
+  parts.push(skillName)
+  
+  // 技能描述
+  if (skill.skill.description) {
+    parts.push(skill.skill.description)
+  }
+  
+  // 技能详情
+  const details: string[] = []
+  if (skill.skillLevel) {
+    details.push(`等级: ${skill.skillLevel}`)
+  }
+  if (skill.skill.resourceCost !== undefined && skill.skill.resourceCost !== null) {
+    const resourceName = getResourceTypeName(selectedCharacter.value)
+    const resourceShort = resourceName === '怒气' ? '怒' : resourceName === '能量' ? '能' : 'MP'
+    details.push(`消耗: ${skill.skill.resourceCost}${resourceShort}`)
+  }
+  if (skill.skill.cooldown !== undefined && skill.skill.cooldown !== null && skill.skill.cooldown > 0) {
+    details.push(`冷却: ${skill.skill.cooldown}回合`)
+  }
+  
+  if (details.length > 0) {
+    parts.push(details.join(' | '))
+  }
+  
+  const result = parts.join('\n')
+  return result || skillName // 至少返回技能名称
+}
+
+// 处理技能tooltip显示（使用fixed定位避免被overflow裁剪）
+let skillTooltipEl: HTMLElement | null = null
+
+function handleSkillTooltip(event: MouseEvent, skill: any) {
+  const tooltipText = getSkillTooltip(skill)
+  if (!tooltipText) return
+  
+  // 移除旧的tooltip
+  if (skillTooltipEl) {
+    skillTooltipEl.remove()
+  }
+  
+  // 创建新的tooltip元素
+  skillTooltipEl = document.createElement('div')
+  skillTooltipEl.className = 'skill-tooltip-fixed'
+  skillTooltipEl.textContent = tooltipText
+  document.body.appendChild(skillTooltipEl)
+  
+  // 计算位置
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+  const tooltipRect = skillTooltipEl.getBoundingClientRect()
+  
+  let left = rect.left + (rect.width / 2) - (tooltipRect.width / 2)
+  let top = rect.top - tooltipRect.height - 8
+  
+  // 确保不超出视口
+  if (left < 10) left = 10
+  if (left + tooltipRect.width > window.innerWidth - 10) {
+    left = window.innerWidth - tooltipRect.width - 10
+  }
+  if (top < 10) {
+    top = rect.bottom + 8
+  }
+  
+  skillTooltipEl.style.left = left + 'px'
+  skillTooltipEl.style.top = top + 'px'
+}
+
+function hideSkillTooltip() {
+  if (skillTooltipEl) {
+    skillTooltipEl.remove()
+    skillTooltipEl = null
+  }
 }
 
 
@@ -447,6 +563,18 @@ function escapeRegex(str: string): string {
                     {{ char.resource || char.mp || 0 }}/{{ char.maxResource || char.max_resource || char.max_mp || 100 }}
                   </div>
                 </div>
+                <!-- Buff/Debuff显示 -->
+                <div v-if="char.buffs && char.buffs.length > 0" class="team-character-buffs">
+                  <div
+                    v-for="buff in char.buffs"
+                    :key="buff.effectId"
+                    class="buff-icon"
+                    :class="{ 'buff-positive': buff.isBuff, 'buff-negative': !buff.isBuff }"
+                    :data-tooltip="buff.name + '\n' + (buff.description || '') + '\n剩余 ' + buff.duration + ' 回合'"
+                  >
+                    {{ buff.name.charAt(0) }}
+                  </div>
+                </div>
                 <div v-if="char.isDead" class="team-character-dead">
                   死亡中...
                 </div>
@@ -621,29 +749,76 @@ function escapeRegex(str: string): string {
 
         <!-- 战斗统计 -->
         <div class="character-detail-combat-stats">
-          <div class="character-detail-combat-stat" :title="`物理攻击力 = 力量 / 2\n当前: ${selectedCharacter.strength || 0} / 2 = ${selectedCharacter.physicalAttack || 0}`">
+          <div class="character-detail-combat-stat" :data-tooltip="`物理攻击力 = 力量 / 2\n当前: ${selectedCharacter.strength || 0} / 2 = ${selectedCharacter.physicalAttack || 0}`">
             <span class="character-detail-combat-stat-label">物理攻击</span>
             <span class="character-detail-combat-stat-value">{{ selectedCharacter.physicalAttack || 0 }}</span>
           </div>
-          <div class="character-detail-combat-stat" :title="`魔法攻击力 = 智力 / 2\n当前: ${selectedCharacter.intellect || 0} / 2 = ${selectedCharacter.magicAttack || 0}`">
+          <div class="character-detail-combat-stat" :data-tooltip="`魔法攻击力 = 智力 / 2\n当前: ${selectedCharacter.intellect || 0} / 2 = ${selectedCharacter.magicAttack || 0}`">
             <span class="character-detail-combat-stat-label">魔法攻击</span>
             <span class="character-detail-combat-stat-value">{{ selectedCharacter.magicAttack || 0 }}</span>
           </div>
-          <div class="character-detail-combat-stat" :title="`物理防御力 = 耐力 / 3\n当前: ${selectedCharacter.stamina || 0} / 3 = ${selectedCharacter.physicalDefense || 0}`">
+          <div class="character-detail-combat-stat" :data-tooltip="`物理防御力 = 耐力 / 3\n当前: ${selectedCharacter.stamina || 0} / 3 = ${selectedCharacter.physicalDefense || 0}`">
             <span class="character-detail-combat-stat-label">物理防御</span>
             <span class="character-detail-combat-stat-value">{{ selectedCharacter.physicalDefense || 0 }}</span>
           </div>
-          <div class="character-detail-combat-stat" :title="`魔法防御力 = (智力 + 精神) / 4\n当前: (${selectedCharacter.intellect || 0} + ${selectedCharacter.spirit || 0}) / 4 = ${selectedCharacter.magicDefense || 0}`">
+          <div class="character-detail-combat-stat" :data-tooltip="`魔法防御力 = (智力 + 精神) / 4\n当前: (${selectedCharacter.intellect || 0} + ${selectedCharacter.spirit || 0}) / 4 = ${selectedCharacter.magicDefense || 0}`">
             <span class="character-detail-combat-stat-label">魔法防御</span>
             <span class="character-detail-combat-stat-value">{{ selectedCharacter.magicDefense || 0 }}</span>
           </div>
-          <div class="character-detail-combat-stat" :title="`暴击率 = 基础值 + 被动技能加成 + Buff加成\n基础值: 5%\n当前: ${((selectedCharacter.critRate || 0.05) * 100).toFixed(1)}%`">
+          <div class="character-detail-combat-stat" :data-tooltip="`暴击率 = 基础值 + 被动技能加成 + Buff加成\n基础值: 5%\n当前: ${((selectedCharacter.critRate || 0.05) * 100).toFixed(1)}%`">
             <span class="character-detail-combat-stat-label">暴击率</span>
             <span class="character-detail-combat-stat-value">{{ ((selectedCharacter.critRate || 0.05) * 100).toFixed(1) }}%</span>
           </div>
-          <div class="character-detail-combat-stat" :title="`暴击伤害 = 基础值 × 暴击伤害倍率\n基础值: 150%\n当前: ${((selectedCharacter.critDamage || 1.5) * 100).toFixed(0)}%`">
+          <div class="character-detail-combat-stat" :data-tooltip="`暴击伤害 = 基础值 × 暴击伤害倍率\n基础值: 150%\n当前: ${((selectedCharacter.critDamage || 1.5) * 100).toFixed(0)}%`">
             <span class="character-detail-combat-stat-label">暴击伤害</span>
             <span class="character-detail-combat-stat-value">{{ ((selectedCharacter.critDamage || 1.5) * 100).toFixed(0) }}%</span>
+          </div>
+        </div>
+
+        <!-- Buff/Debuff显示 -->
+        <div v-if="selectedCharacter.buffs && selectedCharacter.buffs.length > 0" class="character-detail-buffs">
+          <div class="character-detail-section-title">Buff/Debuff</div>
+          <div class="character-detail-buffs-list">
+            <div
+              v-for="buff in selectedCharacter.buffs"
+              :key="buff.effectId"
+              class="character-detail-buff-item"
+              :class="{ 'buff-positive': buff.isBuff, 'buff-negative': !buff.isBuff }"
+            >
+              <div class="buff-item-name">{{ buff.name }}</div>
+              <div class="buff-item-desc">{{ buff.description || '' }}</div>
+              <div class="buff-item-duration">剩余 {{ buff.duration }} 回合</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 技能列表 -->
+        <div class="character-detail-skills">
+          <div class="character-detail-section-title">已掌握的技能 ({{ characterSkills.length }})</div>
+          <div v-if="loadingSkills" class="character-detail-loading">加载中...</div>
+          <div v-else-if="characterSkills.length === 0" class="character-detail-no-skills">暂无技能</div>
+          <div v-else class="character-detail-skills-list">
+            <div
+              v-for="skill in characterSkills"
+              :key="skill.id"
+              class="character-detail-skill-item"
+              :data-tooltip="getSkillTooltip(skill)"
+              @mouseenter="handleSkillTooltip($event, skill)"
+              @mouseleave="hideSkillTooltip"
+            >
+              <div class="skill-item-main">
+                <span class="skill-item-name">{{ skill.skill?.name || skill.skillId }}</span>
+                <span class="skill-item-level">Lv.{{ skill.skillLevel }}</span>
+              </div>
+              <div class="skill-item-meta">
+                <span v-if="skill.skill?.resourceCost" class="skill-item-cost">
+                  {{ skill.skill.resourceCost }}{{ getResourceTypeName(selectedCharacter) === '怒气' ? '怒' : getResourceTypeName(selectedCharacter) === '能量' ? '能' : 'MP' }}
+                </span>
+                <span v-if="skill.skill?.cooldown" class="skill-item-cooldown">
+                  CD:{{ skill.skill.cooldown }}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -962,6 +1137,45 @@ function escapeRegex(str: string): string {
   text-align: right;
 }
 
+.team-character-buffs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+  min-height: 18px;
+}
+
+.buff-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  font-size: 10px;
+  font-weight: bold;
+  border: 1px solid;
+  border-radius: 2px;
+  cursor: help;
+  transition: all 0.2s;
+}
+
+.buff-icon:hover {
+  transform: scale(1.2);
+  z-index: 10;
+}
+
+.buff-positive {
+  background: rgba(0, 255, 0, 0.2);
+  border-color: #00ff00;
+  color: #00ff00;
+}
+
+.buff-negative {
+  background: rgba(255, 0, 0, 0.2);
+  border-color: #ff4444;
+  color: #ff4444;
+}
+
 .team-character-dead {
   color: var(--terminal-red);
   font-size: 10px;
@@ -1153,6 +1367,136 @@ function escapeRegex(str: string): string {
 .character-detail-summary-deaths {
   color: var(--terminal-gray);
   opacity: 0.7;
+}
+
+.character-detail-section-title {
+  color: var(--terminal-cyan);
+  font-size: 14px;
+  font-weight: bold;
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--text-dim);
+}
+
+.character-detail-buffs {
+  margin-bottom: 15px;
+  padding-top: 15px;
+  border-top: 1px solid var(--text-dim);
+}
+
+.character-detail-buffs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.character-detail-buff-item {
+  padding: 8px;
+  border: 1px solid;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.character-detail-buff-item.buff-positive {
+  background: rgba(0, 255, 0, 0.1);
+  border-color: #00ff00;
+}
+
+.character-detail-buff-item.buff-negative {
+  background: rgba(255, 0, 0, 0.1);
+  border-color: #ff4444;
+}
+
+.buff-item-name {
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.buff-item-desc {
+  color: var(--text-secondary);
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+
+.buff-item-duration {
+  color: var(--text-gray);
+  font-size: 10px;
+}
+
+.character-detail-skills {
+  margin-bottom: 15px;
+  padding-top: 15px;
+  border-top: 1px solid var(--text-dim);
+}
+
+.character-detail-loading,
+.character-detail-no-skills {
+  color: var(--text-gray);
+  font-size: 12px;
+  text-align: center;
+  padding: 10px;
+}
+
+.character-detail-skills-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.character-detail-skill-item {
+  padding: 6px 8px;
+  border: 1px solid var(--text-dim);
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.3);
+  font-size: 11px;
+  cursor: help;
+  transition: all 0.2s;
+}
+
+.character-detail-skill-item:hover {
+  border-color: var(--terminal-green);
+  background: rgba(0, 255, 0, 0.05);
+}
+
+.skill-item-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.skill-item-name {
+  font-weight: bold;
+  color: var(--terminal-cyan);
+  font-size: 12px;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.skill-item-level {
+  color: var(--terminal-gold);
+  font-size: 10px;
+  margin-left: 6px;
+  flex-shrink: 0;
+}
+
+.skill-item-meta {
+  display: flex;
+  gap: 8px;
+  font-size: 9px;
+  color: var(--text-gray);
+}
+
+.skill-item-cost {
+  color: var(--terminal-cyan);
+}
+
+.skill-item-cooldown {
+  color: var(--terminal-yellow);
 }
 
 /* 弹窗滚动条样式 */
