@@ -254,6 +254,11 @@ func (s *SkillService) GetCharacterAllSkills(characterID int) (map[string]interf
 
 // CalculateSkillEffect 计算技能效果（根据等级）
 func (s *SkillService) CalculateSkillEffect(skill *models.Skill, skillLevel int) map[string]interface{} {
+	// 防御性检查
+	if skill == nil {
+		return map[string]interface{}{}
+	}
+	
 	// 基础效果
 	effect := map[string]interface{}{
 		"baseDamage":     skill.BaseValue,

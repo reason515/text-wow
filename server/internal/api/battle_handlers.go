@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 
 	"text-wow/internal/game"
@@ -95,6 +96,16 @@ func (h *BattleHandler) ToggleBattle(c *gin.Context) {
 
 // BattleTick 执行战斗回合
 func (h *BattleHandler) BattleTick(c *gin.Context) {
+	// 添加 panic 恢复
+	defer func() {
+		if r := recover(); r != nil {
+			c.JSON(http.StatusInternalServerError, models.APIResponse{
+				Success: false,
+				Error:   fmt.Sprintf("战斗处理发生错误: %v", r),
+			})
+		}
+	}()
+
 	userID := c.GetInt("userID")
 
 	// 获取用户的所有角色（所有角色都参与战斗）
@@ -102,7 +113,7 @@ func (h *BattleHandler) BattleTick(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.APIResponse{
 			Success: false,
-			Error:   "failed to get characters",
+			Error:   fmt.Sprintf("获取角色失败: %v", err),
 		})
 		return
 	}
@@ -120,7 +131,7 @@ func (h *BattleHandler) BattleTick(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.APIResponse{
 			Success: false,
-			Error:   err.Error(),
+			Error:   fmt.Sprintf("执行战斗回合失败: %v", err),
 		})
 		return
 	}

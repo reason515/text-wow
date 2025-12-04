@@ -51,7 +51,7 @@ func (sm *SkillManager) LoadCharacterSkills(characterID int) error {
 	skillStates := make([]*CharacterSkillState, 0)
 	for _, cs := range characterSkills {
 		skill, err := sm.skillRepo.GetSkillByID(cs.SkillID)
-		if err != nil {
+		if err != nil || skill == nil {
 			continue // 跳过不存在的技能
 		}
 

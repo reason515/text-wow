@@ -189,15 +189,19 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 	}
 
 	// 加载角色的技能（如果还没有加载）
-	if err := m.skillManager.LoadCharacterSkills(char.ID); err != nil {
-		// 如果加载失败，记录日志但不中断战斗
-		m.addLog(session, "system", fmt.Sprintf("警告：无法加载角色技能: %v", err), "#ffaa00")
+	if m.skillManager != nil {
+		if err := m.skillManager.LoadCharacterSkills(char.ID); err != nil {
+			// 如果加载失败，记录日志但不中断战斗
+			m.addLog(session, "system", fmt.Sprintf("警告：无法加载角色技能: %v", err), "#ffaa00")
+		}
 	}
 
 	// 加载角色的被动技能（如果还没有加载）
-	if err := m.passiveSkillManager.LoadCharacterPassiveSkills(char.ID); err != nil {
-		// 如果加载失败，记录日志但不中断战斗
-		m.addLog(session, "system", fmt.Sprintf("警告：无法加载角色被动技能: %v", err), "#ffaa00")
+	if m.passiveSkillManager != nil {
+		if err := m.passiveSkillManager.LoadCharacterPassiveSkills(char.ID); err != nil {
+			// 如果加载失败，记录日志但不中断战斗
+			m.addLog(session, "system", fmt.Sprintf("警告：无法加载角色被动技能: %v", err), "#ffaa00")
+		}
 	}
 
 	// 如果战斗未运行且不在休息状态，检查是否需要返回角色数据
@@ -402,7 +406,10 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 			hasMultipleEnemies := len(aliveEnemies) > 1
 
 			// 使用技能管理器选择技能
-			skillState := m.skillManager.SelectBestSkill(char.ID, char.Resource, targetHPPercent, hasMultipleEnemies)
+			var skillState *CharacterSkillState
+			if m.skillManager != nil {
+				skillState = m.skillManager.SelectBestSkill(char.ID, char.Resource, targetHPPercent, hasMultipleEnemies)
+			}
 
 			var skillName string
 			var playerDamage int
@@ -412,7 +419,7 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 			var skillEffects map[string]interface{}
 			var isCrit bool
 
-			if skillState != nil {
+			if skillState != nil && skillState.Skill != nil {
 				// 使用技能
 				skillName = skillState.Skill.Name
 				resourceCost = m.skillManager.GetSkillResourceCost(skillState)
@@ -1060,6 +1067,9 @@ func (m *BattleManager) spawnEnemies(session *BattleSession, playerLevel int) er
 	}
 
 	session.BattleCount++
+	if len(enemyNames) == 0 {
+		return fmt.Errorf("failed to generate enemies")
+	}
 	enemyList := fmt.Sprintf("%s", enemyNames[0])
 	if len(enemyNames) > 1 {
 		enemyList = fmt.Sprintf("%s 等 %d 个敌人", enemyNames[0], len(enemyNames))

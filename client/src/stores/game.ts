@@ -227,7 +227,10 @@ export const useGameStore = defineStore('game', () => {
 
         if (isRunning) {
           console.log('Starting battle loop')
+          // 先启动循环，然后立即执行一次 battleTick 以开始战斗
           startBattleLoop()
+          // 立即执行一次战斗回合，不要等待定时器
+          battleTick().catch(console.error)
         } else {
           console.log('Stopping battle loop')
           stopBattleLoop()
@@ -360,7 +363,10 @@ export const useGameStore = defineStore('game', () => {
   }
 
   function startBattleLoop() {
-    if (battleInterval.value) return
+    // 如果循环已经存在，先停止它
+    if (battleInterval.value) {
+      stopBattleLoop()
+    }
     
     // 确保 battleStatus.value 存在
     if (!battleStatus.value) {
@@ -382,10 +388,14 @@ export const useGameStore = defineStore('game', () => {
       }
     }
     
+    console.log('Starting battle loop, isRunning:', battleStatus.value?.is_running)
+    
     battleInterval.value = (typeof window !== 'undefined' ? window.setInterval : setInterval)(() => {
       // 如果战斗正在运行，或者正在休息，都需要调用 battleTick 来处理
       const isRunning = battleStatus.value?.is_running ?? false
       const isResting = battleStatus.value?.isResting ?? battleStatus.value?.is_resting ?? false
+      
+      console.log('Battle loop tick, isRunning:', isRunning, 'isResting:', isResting)
       
       if (isRunning || isResting) {
         battleTick()
