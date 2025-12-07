@@ -72,7 +72,7 @@ func (sm *SkillManager) LoadCharacterSkills(characterID int) error {
 }
 
 // GetAvailableSkills 获取可用的技能（冷却完成且资源足够）
-func (sm *SkillManager) GetAvailableSkills(characterID int, currentResource int) []*CharacterSkillState {
+func (sm *SkillManager) GetAvailableSkills(characterID int, currentResource int, buffManager *BuffManager) []*CharacterSkillState {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
 
@@ -99,65 +99,59 @@ func (sm *SkillManager) GetAvailableSkills(characterID int, currentResource int)
 			continue
 		}
 
+		// 检查buff技能是否已有buff（避免浪费资源）
+		if state.Skill.Type == "buff" && buffManager != nil {
+			if sm.hasBuffAlready(characterID, state.SkillID, buffManager) {
+				continue
+			}
+		}
+
 		available = append(available, state)
 	}
 
 	return available
 }
 
+// hasBuffAlready 检查技能是否已有对应的buff
+func (sm *SkillManager) hasBuffAlready(characterID int, skillID string, buffManager *BuffManager) bool {
+	switch skillID {
+	case "warrior_battle_shout":
+		return buffManager.HasBuff(characterID, "battle_shout")
+	case "warrior_shield_block":
+		return buffManager.HasBuff(characterID, "shield_block")
+	case "warrior_recklessness":
+		// 鲁莽有两个buff，检查任意一个即可
+		return buffManager.HasBuff(characterID, "recklessness_crit") || buffManager.HasBuff(characterID, "recklessness_damage")
+	case "warrior_berserker_rage":
+		return buffManager.HasBuff(characterID, "berserker_rage")
+	case "warrior_avatar":
+		// 天神下凡有两个buff，检查任意一个即可
+		return buffManager.HasBuff(characterID, "avatar") || buffManager.HasBuff(characterID, "avatar_cc_immune")
+	case "warrior_shield_wall":
+		return buffManager.HasBuff(characterID, "shield_wall")
+	case "warrior_unbreakable_barrier":
+		return buffManager.HasBuff(characterID, "unbreakable_barrier")
+	case "warrior_shield_reflection":
+		return buffManager.HasBuff(characterID, "shield_reflection")
+	case "warrior_retaliation":
+		return buffManager.HasBuff(characterID, "retaliation")
+	default:
+		return false
+	}
+}
+
 // SelectBestSkill 选择最佳技能（根据当前情况）
 func (sm *SkillManager) SelectBestSkill(characterID int, currentResource int, targetHPPercent float64, hasMultipleEnemies bool, buffManager *BuffManager) *CharacterSkillState {
-	available := sm.GetAvailableSkills(characterID, currentResource)
+	// GetAvailableSkills 已经过滤掉了已有buff的buff技能
+	available := sm.GetAvailableSkills(characterID, currentResource, buffManager)
 	if len(available) == 0 {
 		return nil
-	}
-
-	// 过滤掉已有buff的buff技能（避免浪费资源）
-	filteredAvailable := make([]*CharacterSkillState, 0)
-	for _, skill := range available {
-		// 检查是否是buff技能且已有相同buff
-		if skill.Skill.Type == "buff" && buffManager != nil {
-			// 检查是否已有该buff
-			hasBuff := false
-			switch skill.SkillID {
-			case "warrior_battle_shout":
-				hasBuff = buffManager.HasBuff(characterID, "battle_shout")
-			case "warrior_shield_block":
-				hasBuff = buffManager.HasBuff(characterID, "shield_block")
-			case "warrior_recklessness":
-				// 鲁莽有两个buff，检查任意一个即可
-				hasBuff = buffManager.HasBuff(characterID, "recklessness_crit") || buffManager.HasBuff(characterID, "recklessness_damage")
-			case "warrior_berserker_rage":
-				hasBuff = buffManager.HasBuff(characterID, "berserker_rage")
-			case "warrior_avatar":
-				// 天神下凡有两个buff，检查任意一个即可
-				hasBuff = buffManager.HasBuff(characterID, "avatar") || buffManager.HasBuff(characterID, "avatar_cc_immune")
-			case "warrior_shield_wall":
-				hasBuff = buffManager.HasBuff(characterID, "shield_wall")
-			case "warrior_unbreakable_barrier":
-				hasBuff = buffManager.HasBuff(characterID, "unbreakable_barrier")
-			case "warrior_shield_reflection":
-				hasBuff = buffManager.HasBuff(characterID, "shield_reflection")
-			case "warrior_retaliation":
-				hasBuff = buffManager.HasBuff(characterID, "retaliation")
-			}
-			// 如果已有buff，跳过该技能
-			if hasBuff {
-				continue
-			}
-		}
-		filteredAvailable = append(filteredAvailable, skill)
-	}
-
-	// 如果过滤后没有可用技能，使用原始列表（至少保证有技能可用）
-	if len(filteredAvailable) == 0 {
-		filteredAvailable = available
 	}
 
 	// 简单的技能选择逻辑
 	// 1. 如果有多个敌人，优先选择AOE技能
 	if hasMultipleEnemies {
-		for _, skill := range filteredAvailable {
+		for _, skill := range available {
 			if skill.Skill.TargetType == "enemy_all" {
 				return skill
 			}
@@ -166,7 +160,7 @@ func (sm *SkillManager) SelectBestSkill(characterID int, currentResource int, ta
 
 	// 2. 如果目标HP<20%，优先使用斩杀
 	if targetHPPercent < 0.20 {
-		for _, skill := range filteredAvailable {
+		for _, skill := range available {
 			if skill.SkillID == "warrior_execute" {
 				return skill
 			}
@@ -174,9 +168,9 @@ func (sm *SkillManager) SelectBestSkill(characterID int, currentResource int, ta
 	}
 
 	// 3. 优先使用高伤害技能
-	bestSkill := filteredAvailable[0]
+	bestSkill := available[0]
 	maxDamage := 0.0
-	for _, skill := range filteredAvailable {
+	for _, skill := range available {
 		if skill.Skill.Type == "attack" {
 			multiplier := 1.0
 			if m, ok := skill.Effect["damageMultiplier"].(float64); ok {
@@ -349,16 +343,13 @@ func (sm *SkillManager) CalculateSkillDamage(skillState *CharacterSkillState, ch
 		}
 	}
 	
-	// 应用目标防御
-	finalDamage := baseDamage - actualDefense/2.0
+	// 应用目标防御：基础伤害 = 实际攻击力 - 目标防御力（不再除以2）
+	finalDamage := baseDamage - actualDefense
 	if finalDamage < 1 {
 		finalDamage = 1
 	}
 
-	// 添加随机波动 ±20%
-	variance := finalDamage * 0.2
-	finalDamage = finalDamage + (rand.Float64()*2-1)*variance
-
+	// 不再使用随机波动，未来通过装备的攻击力上下限实现
 	return int(finalDamage)
 }
 

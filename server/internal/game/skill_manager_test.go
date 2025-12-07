@@ -175,14 +175,21 @@ func TestSkillManager_CalculateSkillDamage_WithBuffModifiers(t *testing.T) {
 		},
 	}
 	
-	// 计算技能伤害（带Buff加成）
-	damageWithBuff := sm.CalculateSkillDamage(skillState, character, enemy, nil, bm)
+	// 由于有随机波动，多次测试取平均值
+	const iterations = 100
+	var totalDamageWithBuff, totalDamageWithoutBuff int
 	
-	// 计算技能伤害（不带Buff加成）
-	damageWithoutBuff := sm.CalculateSkillDamage(skillState, character, enemy, nil, nil)
+	for i := 0; i < iterations; i++ {
+		totalDamageWithBuff += sm.CalculateSkillDamage(skillState, character, enemy, nil, bm)
+		totalDamageWithoutBuff += sm.CalculateSkillDamage(skillState, character, enemy, nil, nil)
+	}
 	
-	// 带Buff的伤害应该更高
-	assert.Greater(t, damageWithBuff, damageWithoutBuff)
+	avgDamageWithBuff := float64(totalDamageWithBuff) / iterations
+	avgDamageWithoutBuff := float64(totalDamageWithoutBuff) / iterations
+	
+	// 带Buff的平均伤害应该更高
+	assert.Greater(t, avgDamageWithBuff, avgDamageWithoutBuff, 
+		"带Buff的平均伤害 %.2f 应该大于不带Buff的平均伤害 %.2f", avgDamageWithBuff, avgDamageWithoutBuff)
 }
 
 func TestSkillManager_CalculateSkillDamage_ShieldSlam(t *testing.T) {
@@ -363,5 +370,122 @@ func TestSkillManager_TickCooldowns(t *testing.T) {
 	
 	// 冷却时间应该为0
 	assert.Equal(t, 0, skillState.CooldownLeft)
+}
+
+func TestSkillManager_GetAvailableSkills_FiltersBuffSkillsWithExistingBuff(t *testing.T) {
+	sm, character, _ := setupSkillManagerTest(t)
+	
+	// 创建Buff管理器并添加战斗怒吼buff
+	bm := NewBuffManager()
+	bm.ApplyBuff(character.ID, "battle_shout", "战斗怒吼", "buff", true, 5, 20.0, "attack", "")
+	
+	// 创建战斗怒吼技能状态
+	battleShoutSkill := &CharacterSkillState{
+		SkillID:    "warrior_battle_shout",
+		SkillLevel: 1,
+		CooldownLeft: 0,
+		Skill: &models.Skill{
+			ID:            "warrior_battle_shout",
+			Name:          "战斗怒吼",
+			Type:          "buff",
+			TargetType:    "ally_all",
+			ResourceCost:  10,
+			Cooldown:      0,
+		},
+		Effect: map[string]interface{}{},
+	}
+	
+	// 创建其他技能（英勇打击）
+	heroicStrikeSkill := &CharacterSkillState{
+		SkillID:    "warrior_heroic_strike",
+		SkillLevel: 1,
+		CooldownLeft: 0,
+		Skill: &models.Skill{
+			ID:            "warrior_heroic_strike",
+			Name:          "英勇打击",
+			Type:          "attack",
+			TargetType:    "enemy",
+			ResourceCost:  10,
+			Cooldown:      0,
+		},
+		Effect: map[string]interface{}{},
+	}
+	
+	// 加载技能
+	sm.mu.Lock()
+	sm.characterSkills[character.ID] = []*CharacterSkillState{battleShoutSkill, heroicStrikeSkill}
+	sm.mu.Unlock()
+	
+	// 获取可用技能（应该过滤掉战斗怒吼，因为已有buff）
+	available := sm.GetAvailableSkills(character.ID, 50, bm)
+	
+	// 应该只返回英勇打击，不包含战斗怒吼
+	assert.Len(t, available, 1)
+	assert.Equal(t, "warrior_heroic_strike", available[0].SkillID)
+	
+	// 如果没有buff管理器，应该返回所有可用技能
+	availableWithoutBM := sm.GetAvailableSkills(character.ID, 50, nil)
+	assert.Len(t, availableWithoutBM, 2)
+}
+
+func TestSkillManager_SelectBestSkill_SkipsBuffSkillsWithExistingBuff(t *testing.T) {
+	sm, character, _ := setupSkillManagerTest(t)
+	
+	// 创建Buff管理器并添加战斗怒吼buff
+	bm := NewBuffManager()
+	bm.ApplyBuff(character.ID, "battle_shout", "战斗怒吼", "buff", true, 5, 20.0, "attack", "")
+	
+	// 创建战斗怒吼技能状态
+	battleShoutSkill := &CharacterSkillState{
+		SkillID:    "warrior_battle_shout",
+		SkillLevel: 1,
+		CooldownLeft: 0,
+		Skill: &models.Skill{
+			ID:            "warrior_battle_shout",
+			Name:          "战斗怒吼",
+			Type:          "buff",
+			TargetType:    "ally_all",
+			ResourceCost:  10,
+			Cooldown:      0,
+		},
+		Effect: map[string]interface{}{},
+	}
+	
+	// 创建其他技能（英勇打击）
+	heroicStrikeSkill := &CharacterSkillState{
+		SkillID:    "warrior_heroic_strike",
+		SkillLevel: 1,
+		CooldownLeft: 0,
+		Skill: &models.Skill{
+			ID:            "warrior_heroic_strike",
+			Name:          "英勇打击",
+			Type:          "attack",
+			TargetType:    "enemy",
+			ResourceCost:  10,
+			Cooldown:      0,
+			ScalingRatio:  1.0,
+		},
+		Effect: map[string]interface{}{
+			"damageMultiplier": 1.0,
+		},
+	}
+	
+	// 加载技能
+	sm.mu.Lock()
+	sm.characterSkills[character.ID] = []*CharacterSkillState{battleShoutSkill, heroicStrikeSkill}
+	sm.mu.Unlock()
+	
+	// 选择最佳技能（应该跳过战斗怒吼，选择英勇打击）
+	bestSkill := sm.SelectBestSkill(character.ID, 50, 0.5, false, bm)
+	
+	// 应该选择英勇打击，而不是战斗怒吼
+	assert.NotNil(t, bestSkill)
+	assert.Equal(t, "warrior_heroic_strike", bestSkill.SkillID)
+	
+	// 如果没有buff，应该可以选择战斗怒吼
+	bm2 := NewBuffManager()
+	bestSkill2 := sm.SelectBestSkill(character.ID, 50, 0.5, false, bm2)
+	// 由于英勇打击是攻击技能，可能会被优先选择，但至少战斗怒吼应该在可用列表中
+	assert.NotNil(t, bestSkill2)
 }
 
