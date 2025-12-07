@@ -11,8 +11,7 @@ import (
 	"text-wow/internal/repository"
 )
 
-// BattleManager 战斗管理器 - 管理所有用户的战斗状态
-type BattleManager struct {
+// BattleManager ææç®¡çå?- ç®¡çææç¨æ·çææç¶æ?type BattleManager struct {
 	mu                  sync.RWMutex
 	sessions            map[int]*BattleSession // key: userID
 	gameRepo            *repository.GameRepository
@@ -22,13 +21,13 @@ type BattleManager struct {
 	passiveSkillManager *PassiveSkillManager
 }
 
-// BattleSession 用户战斗会话
+// BattleSession ç¨æ·ææä¼è¯
 type BattleSession struct {
 	UserID             int
 	IsRunning          bool
 	CurrentZone        *models.Zone
-	CurrentEnemy       *models.Monster   // 保留用于向后兼容
-	CurrentEnemies     []*models.Monster // 多个敌人支持
+	CurrentEnemy       *models.Monster   // ä¿çç¨äºååå¼å®¹
+	CurrentEnemies     []*models.Monster // å¤ä¸ªæäººæ¯æ
 	BattleLogs         []models.BattleLog
 	BattleCount        int
 	SessionKills       int
@@ -36,20 +35,12 @@ type BattleSession struct {
 	SessionExp         int
 	StartedAt          time.Time
 	LastTick           time.Time
-	IsResting          bool       // 是否在休息
-	RestUntil          *time.Time // 休息结束时间
-	RestStartedAt      *time.Time // 休息开始时间
-	LastRestTick       *time.Time // 上次恢复处理的时间
-	RestSpeed          float64    // 恢复速度倍率
-	CurrentBattleExp   int        // 本场战斗获得的经验
-	CurrentBattleGold  int        // 本场战斗获得的金币
-	CurrentBattleKills int        // 本场战斗击杀数
-	CurrentTurnIndex   int        // 回合控制：-1=玩家回合，>=0=敌人索引
-	JustEncountered    bool       // 刚遭遇敌人，需要等待1个tick再开始战斗
-}
+	IsResting          bool       // æ¯å¦å¨ä¼æ?	RestUntil          *time.Time // ä¼æ¯ç»ææ¶é´
+	RestStartedAt      *time.Time // ä¼æ¯å¼å§æ¶é?	LastRestTick       *time.Time // ä¸æ¬¡æ¢å¤å¤ççæ¶é?	RestSpeed          float64    // æ¢å¤éåº¦åç
+	CurrentBattleExp   int        // æ¬åºææè·å¾çç»éª?	CurrentBattleGold  int        // æ¬åºææè·å¾çéå¸?	CurrentBattleKills int        // æ¬åºææå»ææ?	CurrentTurnIndex   int        // ååæ§å¶ï¼?1=ç©å®¶ååï¼?=0=æäººç´¢å¼
+	JustEncountered    bool       // åé­éæäººï¼éè¦ç­å¾?ä¸ªtickåå¼å§ææ?}
 
-// NewBattleManager 创建战斗管理器
-func NewBattleManager() *BattleManager {
+// NewBattleManager åå»ºææç®¡çå?func NewBattleManager() *BattleManager {
 	return &BattleManager{
 		sessions:            make(map[int]*BattleSession),
 		gameRepo:            repository.NewGameRepository(),
@@ -60,20 +51,17 @@ func NewBattleManager() *BattleManager {
 	}
 }
 
-// 全局战斗管理器实例
-var battleManager *BattleManager
+// å¨å±ææç®¡çå¨å®ä¾?var battleManager *BattleManager
 var once sync.Once
 
-// GetBattleManager 获取战斗管理器单例
-func GetBattleManager() *BattleManager {
+// GetBattleManager è·åææç®¡çå¨åä¾?func GetBattleManager() *BattleManager {
 	once.Do(func() {
 		battleManager = NewBattleManager()
 	})
 	return battleManager
 }
 
-// GetOrCreateSession 获取或创建战斗会话
-func (m *BattleManager) GetOrCreateSession(userID int) *BattleSession {
+// GetOrCreateSession è·åæåå»ºææä¼è¯?func (m *BattleManager) GetOrCreateSession(userID int) *BattleSession {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -86,22 +74,21 @@ func (m *BattleManager) GetOrCreateSession(userID int) *BattleSession {
 		BattleLogs:       make([]models.BattleLog, 0),
 		StartedAt:        time.Now(),
 		CurrentEnemies:   make([]*models.Monster, 0),
-		CurrentTurnIndex: -1, // 初始化为玩家回合
+		CurrentTurnIndex: -1, // åå§åä¸ºç©å®¶åå
 		RestSpeed:        1.0,
 	}
 	m.sessions[userID] = session
 	return session
 }
 
-// GetSession 获取战斗会话
+// GetSession è·åææä¼è¯
 func (m *BattleManager) GetSession(userID int) *BattleSession {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.sessions[userID]
 }
 
-// ToggleBattle 切换战斗状态
-func (m *BattleManager) ToggleBattle(userID int) (bool, error) {
+// ToggleBattle åæ¢ææç¶æ?func (m *BattleManager) ToggleBattle(userID int) (bool, error) {
 	session := m.GetOrCreateSession(userID)
 
 	m.mu.Lock()
@@ -111,24 +98,21 @@ func (m *BattleManager) ToggleBattle(userID int) (bool, error) {
 	session.LastTick = time.Now()
 
 	if session.IsRunning {
-		// 如果没有设置区域，设置默认区域
-		if session.CurrentZone == nil {
+		// å¦ææ²¡æè®¾ç½®åºåï¼è®¾ç½®é»è®¤åºå?		if session.CurrentZone == nil {
 			zone, err := m.gameRepo.GetZoneByID("elwynn")
 			if err == nil {
 				session.CurrentZone = zone
 			}
 		}
-		session.CurrentTurnIndex = -1 // 重置为玩家回合
-		m.addLog(session, "system", ">> 开始自动战斗...", "#33ff33")
+		session.CurrentTurnIndex = -1 // éç½®ä¸ºç©å®¶åå?		m.addLog(session, "system", ">> å¼å§èªå¨ææ?..", "#33ff33")
 	} else {
-		m.addLog(session, "system", ">> 暂停自动战斗", "#ffff00")
+		m.addLog(session, "system", ">> æåèªå¨ææ", "#ffff00")
 	}
 
 	return session.IsRunning, nil
 }
 
-// StartBattle 开始战斗
-func (m *BattleManager) StartBattle(userID int) (bool, error) {
+// StartBattle å¼å§ææ?func (m *BattleManager) StartBattle(userID int) (bool, error) {
 	session := m.GetOrCreateSession(userID)
 
 	m.mu.Lock()
@@ -140,9 +124,8 @@ func (m *BattleManager) StartBattle(userID int) (bool, error) {
 
 	session.IsRunning = true
 	session.LastTick = time.Now()
-	session.CurrentTurnIndex = -1 // 重置为玩家回合
-
-	// 设置默认区域
+	session.CurrentTurnIndex = -1 // éç½®ä¸ºç©å®¶åå?
+	// è®¾ç½®é»è®¤åºå
 	if session.CurrentZone == nil {
 		zone, err := m.gameRepo.GetZoneByID("elwynn")
 		if err == nil {
@@ -150,11 +133,11 @@ func (m *BattleManager) StartBattle(userID int) (bool, error) {
 		}
 	}
 
-	m.addLog(session, "system", ">> 开始自动战斗...", "#33ff33")
+	m.addLog(session, "system", ">> å¼å§èªå¨ææ?..", "#33ff33")
 	return true, nil
 }
 
-// StopBattle 停止战斗
+// StopBattle åæ­¢ææ
 func (m *BattleManager) StopBattle(userID int) error {
 	session := m.GetSession(userID)
 	if session == nil {
@@ -165,60 +148,54 @@ func (m *BattleManager) StopBattle(userID int) error {
 	defer m.mu.Unlock()
 
 	session.IsRunning = false
-	m.addLog(session, "system", ">> 暂停自动战斗", "#ffff00")
+	m.addLog(session, "system", ">> æåèªå¨ææ", "#ffff00")
 	return nil
 }
 
-// ExecuteBattleTick 执行战斗回合（回合制：每tick只执行一个动作）
+// ExecuteBattleTick æ§è¡ææååï¼ååå¶ï¼æ¯tickåªæ§è¡ä¸ä¸ªå¨ä½ï¼
 func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Character) (*BattleTickResult, error) {
 	session := m.GetOrCreateSession(userID)
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	// 如果没有角色，返回nil
+	// å¦ææ²¡æè§è²ï¼è¿ånil
 	if len(characters) == 0 {
 		return nil, nil
 	}
 
-	// 使用第一个角色进行战斗
-	char := characters[0]
+	// ä½¿ç¨ç¬¬ä¸ä¸ªè§è²è¿è¡ææ?	char := characters[0]
 
-	// 确保战士的怒气上限为100（每次tick都检查，防止被覆盖）
+	// ç¡®ä¿æå£«çææ°ä¸éä¸?00ï¼æ¯æ¬¡tické½æ£æ¥ï¼é²æ­¢è¢«è¦çï¼
 	if char.ResourceType == "rage" {
 		char.MaxResource = 100
 	}
 
-	// 加载角色的技能（如果还没有加载）
+	// å è½½è§è²çæè½ï¼å¦æè¿æ²¡æå è½½ï¼
 	if m.skillManager != nil {
 		if err := m.skillManager.LoadCharacterSkills(char.ID); err != nil {
-			// 如果加载失败，记录日志但不中断战斗
-			m.addLog(session, "system", fmt.Sprintf("警告：无法加载角色技能: %v", err), "#ffaa00")
+			// å¦æå è½½å¤±è´¥ï¼è®°å½æ¥å¿ä½ä¸ä¸­æ­ææ?			m.addLog(session, "system", fmt.Sprintf("è­¦åï¼æ æ³å è½½è§è²æè? %v", err), "#ffaa00")
 		}
 	}
 
-	// 加载角色的被动技能（如果还没有加载）
+	// å è½½è§è²çè¢«å¨æè½ï¼å¦æè¿æ²¡æå è½½ï¼
 	if m.passiveSkillManager != nil {
 		if err := m.passiveSkillManager.LoadCharacterPassiveSkills(char.ID); err != nil {
-			// 如果加载失败，记录日志但不中断战斗
-			m.addLog(session, "system", fmt.Sprintf("警告：无法加载角色被动技能: %v", err), "#ffaa00")
+			// å¦æå è½½å¤±è´¥ï¼è®°å½æ¥å¿ä½ä¸ä¸­æ­ææ?			m.addLog(session, "system", fmt.Sprintf("è­¦åï¼æ æ³å è½½è§è²è¢«å¨æè? %v", err), "#ffaa00")
 		}
 	}
 
-	// 如果战斗未运行且不在休息状态，检查是否需要返回角色数据
-	// 如果角色刚复活（之前死亡但现在不死亡），需要返回一次数据让前端更新
+	// å¦ææææªè¿è¡ä¸ä¸å¨ä¼æ¯ç¶æï¼æ£æ¥æ¯å¦éè¦è¿åè§è²æ°æ?	// å¦æè§è²åå¤æ´»ï¼ä¹åæ­»äº¡ä½ç°å¨ä¸æ­»äº¡ï¼ï¼éè¦è¿åä¸æ¬¡æ°æ®è®©åç«¯æ´æ°
 	if !session.IsRunning && !session.IsResting {
-		// 从数据库重新加载角色数据以确保状态正确
-		updatedChar, err := m.charRepo.GetByID(char.ID)
+		// ä»æ°æ®åºéæ°å è½½è§è²æ°æ®ä»¥ç¡®ä¿ç¶ææ­£ç¡?		updatedChar, err := m.charRepo.GetByID(char.ID)
 		if err == nil && updatedChar != nil {
 			char = updatedChar
-			// 确保战士的怒气上限为100
+			// ç¡®ä¿æå£«çææ°ä¸éä¸?00
 			if char.ResourceType == "rage" {
 				char.MaxResource = 100
 			}
-			// 如果角色已经复活（之前死亡但现在不死亡），返回角色数据
-			if !char.IsDead {
-				// 返回角色数据，让前端知道角色已经复活
+			// å¦æè§è²å·²ç»å¤æ´»ï¼ä¹åæ­»äº¡ä½ç°å¨ä¸æ­»äº¡ï¼ï¼è¿åè§è²æ°æ?			if !char.IsDead {
+				// è¿åè§è²æ°æ®ï¼è®©åç«¯ç¥éè§è²å·²ç»å¤æ´»
 				return &BattleTickResult{
 					Character:    char,
 					Enemy:        nil,
@@ -234,21 +211,18 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 				}, nil
 			}
 		}
-		// 如果无法获取角色数据或角色仍然死亡，返回nil
+		// å¦ææ æ³è·åè§è²æ°æ®æè§è²ä»ç¶æ­»äº¡ï¼è¿ånil
 		return nil, nil
 	}
 
 	session.LastTick = time.Now()
 	logs := make([]models.BattleLog, 0)
 
-	// 检查角色是否死亡且还没到复活时间
-	now := time.Now()
+	// æ£æ¥è§è²æ¯å¦æ­»äº¡ä¸è¿æ²¡å°å¤æ´»æ¶é?	now := time.Now()
 	if char.IsDead && char.ReviveAt != nil && now.Before(*char.ReviveAt) {
-		// 角色死亡但还没到复活时间，进入休息状态
-		if !session.IsResting {
-			// 计算休息时间（复活时间 + 恢复时间）
-			reviveRemaining := char.ReviveAt.Sub(now)
-			recoveryTime := 25 * time.Second // 恢复一半HP需要的时间
+		// è§è²æ­»äº¡ä½è¿æ²¡å°å¤æ´»æ¶é´ï¼è¿å¥ä¼æ¯ç¶æ?		if !session.IsResting {
+			// è®¡ç®ä¼æ¯æ¶é´ï¼å¤æ´»æ¶é?+ æ¢å¤æ¶é´ï¼?			reviveRemaining := char.ReviveAt.Sub(now)
+			recoveryTime := 25 * time.Second // æ¢å¤ä¸åHPéè¦çæ¶é´
 			restDuration := reviveRemaining + recoveryTime
 			restUntil := now.Add(restDuration)
 			session.IsResting = true
@@ -256,59 +230,52 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 			session.RestStartedAt = &now
 			session.LastRestTick = &now
 			session.RestSpeed = 1.0
-			// 保持 isRunning = true，这样按钮会显示"停止挂机"，休息状态可以自动处理
-
+			// ä¿æ isRunning = trueï¼è¿æ ·æé®ä¼æ¾ç¤º"åæ­¢ææº"ï¼ä¼æ¯ç¶æå¯ä»¥èªå¨å¤ç?
 			remainingSeconds := int(reviveRemaining.Seconds()) + 1
-			m.addLog(session, "death", fmt.Sprintf("%s 正在复活中... (剩余 %d 秒)", char.Name, remainingSeconds), "#ff0000")
+			m.addLog(session, "death", fmt.Sprintf("%s æ­£å¨å¤æ´»ä¸?.. (å©ä½ %d ç§?", char.Name, remainingSeconds), "#ff0000")
 			logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
 		}
 	}
 
-	// 如果正在休息，处理休息
-	if session.IsResting && session.RestUntil != nil {
+	// å¦ææ­£å¨ä¼æ¯ï¼å¤çä¼æ?	if session.IsResting && session.RestUntil != nil {
 		initialHP := char.HP
 		initialMP := char.Resource
 		now := time.Now()
 		m.processRest(session, char)
 
-		// 更新LastTick，用于下次计算时间差
+		// æ´æ°LastTickï¼ç¨äºä¸æ¬¡è®¡ç®æ¶é´å·®
 		session.LastTick = now
 
 		if !session.IsResting {
-			// 休息结束，保存角色数据
-			m.charRepo.UpdateAfterBattle(char.ID, char.HP, char.Resource, char.Exp, char.Level,
+			// ä¼æ¯ç»æï¼ä¿å­è§è²æ°æ?			m.charRepo.UpdateAfterBattle(char.ID, char.HP, char.Resource, char.Exp, char.Level,
 				char.ExpToNext, char.MaxHP, char.MaxResource, char.PhysicalAttack, char.MagicAttack, char.PhysicalDefense, char.MagicDefense,
 				char.Strength, char.Agility, char.Stamina, char.TotalKills)
 
-			// 休息结束后，确保返回角色数据，让前端知道休息已结束
-			// 从数据库重新加载角色数据以确保状态正确
-			updatedChar, err := m.charRepo.GetByID(char.ID)
+			// ä¼æ¯ç»æåï¼ç¡®ä¿è¿åè§è²æ°æ®ï¼è®©åç«¯ç¥éä¼æ¯å·²ç»æ?			// ä»æ°æ®åºéæ°å è½½è§è²æ°æ®ä»¥ç¡®ä¿ç¶ææ­£ç¡?			updatedChar, err := m.charRepo.GetByID(char.ID)
 			if err == nil && updatedChar != nil {
 				char = updatedChar
-				// 确保战士的怒气上限为100
+				// ç¡®ä¿æå£«çææ°ä¸éä¸?00
 				if char.ResourceType == "rage" {
 					char.MaxResource = 100
 				}
 			}
 
-			// 如果角色已经复活（不再死亡），自动恢复战斗
-			if !char.IsDead {
+			// å¦æè§è²å·²ç»å¤æ´»ï¼ä¸åæ­»äº¡ï¼ï¼èªå¨æ¢å¤ææ?			if !char.IsDead {
 				session.IsRunning = true
-				m.addLog(session, "system", ">> 休息结束，自动恢复战斗", "#33ff33")
+				m.addLog(session, "system", ">> ä¼æ¯ç»æï¼èªå¨æ¢å¤ææ?, "#33ff33")
 			} else {
-				m.addLog(session, "system", ">> 休息结束，准备下一场战斗", "#33ff33")
+				m.addLog(session, "system", ">> ä¼æ¯ç»æï¼åå¤ä¸ä¸åºææ?, "#33ff33")
 			}
 			logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
 		} else {
-			// 仍在休息中
-			remaining := session.RestUntil.Sub(time.Now())
+			// ä»å¨ä¼æ¯ä¸?			remaining := session.RestUntil.Sub(time.Now())
 			if remaining > 0 {
-				m.addLog(session, "system", fmt.Sprintf(">> 休息中... (剩余 %d 秒)", int(remaining.Seconds())+1), "#888888")
+				m.addLog(session, "system", fmt.Sprintf(">> ä¼æ¯ä¸?.. (å©ä½ %d ç§?", int(remaining.Seconds())+1), "#888888")
 				logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
 			}
 		}
 
-		// 保存角色数据更新
+		// ä¿å­è§è²æ°æ®æ´æ°
 		if char.HP != initialHP || char.Resource != initialMP {
 			m.charRepo.UpdateAfterBattle(char.ID, char.HP, char.Resource, char.Exp, char.Level,
 				char.ExpToNext, char.MaxHP, char.MaxResource, char.PhysicalAttack, char.MagicAttack, char.PhysicalDefense, char.MagicDefense,
@@ -330,23 +297,21 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 		}, nil
 	}
 
-	// 获取存活的敌人
-	aliveEnemies := make([]*models.Monster, 0)
+	// è·åå­æ´»çæäº?	aliveEnemies := make([]*models.Monster, 0)
 	for _, enemy := range session.CurrentEnemies {
 		if enemy != nil && enemy.HP > 0 {
 			aliveEnemies = append(aliveEnemies, enemy)
 		}
 	}
 
-	// 如果没有敌人，生成新的
-	if len(aliveEnemies) == 0 {
-		// 重置本场战斗统计
+	// å¦ææ²¡ææäººï¼çææ°ç?	if len(aliveEnemies) == 0 {
+		// éç½®æ¬åºææç»è®¡
 		session.CurrentBattleExp = 0
 		session.CurrentBattleGold = 0
 		session.CurrentBattleKills = 0
-		session.CurrentTurnIndex = -1 // 玩家回合
+		session.CurrentTurnIndex = -1 // ç©å®¶åå
 
-		// 战斗开始时，确保战士的怒气为0，最大怒气为100
+		// ææå¼å§æ¶ï¼ç¡®ä¿æå£«çææ°ä¸?ï¼æå¤§ææ°ä¸?00
 		if char.ResourceType == "rage" {
 			char.Resource = 0
 			char.MaxResource = 100
@@ -358,14 +323,12 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 		}
 		logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
 
-		// 标记刚遭遇敌人，需要等待1个tick再开始战斗
-		session.JustEncountered = true
+		// æ è®°åé­éæäººï¼éè¦ç­å¾?ä¸ªtickåå¼å§ææ?		session.JustEncountered = true
 
-		// 更新存活敌人列表
+		// æ´æ°å­æ´»æäººåè¡¨
 		aliveEnemies = session.CurrentEnemies
 
-		// 刚遭遇敌人，这个tick只显示信息，不执行战斗
-		return &BattleTickResult{
+		// åé­éæäººï¼è¿ä¸ªtickåªæ¾ç¤ºä¿¡æ¯ï¼ä¸æ§è¡ææ?		return &BattleTickResult{
 			Character:    char,
 			Enemy:        session.CurrentEnemy,
 			Enemies:      session.CurrentEnemies,
@@ -380,10 +343,8 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 		}, nil
 	}
 
-	// 如果刚遭遇敌人，这个tick只显示信息，不执行战斗
-	if session.JustEncountered {
-		session.JustEncountered = false // 清除标志，下一个tick开始战斗
-		return &BattleTickResult{
+	// å¦æåé­éæäººï¼è¿ä¸ªtickåªæ¾ç¤ºä¿¡æ¯ï¼ä¸æ§è¡ææ?	if session.JustEncountered {
+		session.JustEncountered = false // æ¸é¤æ å¿ï¼ä¸ä¸ä¸ªtickå¼å§ææ?		return &BattleTickResult{
 			Character:    char,
 			Enemy:        session.CurrentEnemy,
 			Enemies:      session.CurrentEnemies,
@@ -398,16 +359,15 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 		}, nil
 	}
 
-	// 回合制逻辑：CurrentTurnIndex == -1 表示玩家回合，>=0 表示敌人索引
+	// ååå¶é»è¾ï¼CurrentTurnIndex == -1 è¡¨ç¤ºç©å®¶ååï¼?=0 è¡¨ç¤ºæäººç´¢å¼
 	if session.CurrentTurnIndex == -1 {
-		// 玩家回合：攻击第一个存活的敌人
+		// ç©å®¶ååï¼æ»å»ç¬¬ä¸ä¸ªå­æ´»çæäºº
 		if len(aliveEnemies) > 0 {
 			target := aliveEnemies[0]
 			targetHPPercent := float64(target.HP) / float64(target.MaxHP)
 			hasMultipleEnemies := len(aliveEnemies) > 1
 
-			// 使用技能管理器选择技能
-			var skillState *CharacterSkillState
+			// ä½¿ç¨æè½ç®¡çå¨éæ©æè?			var skillState *CharacterSkillState
 			if m.skillManager != nil {
 				skillState = m.skillManager.SelectBestSkill(char.ID, char.Resource, targetHPPercent, hasMultipleEnemies, m.buffManager)
 			}
@@ -420,41 +380,30 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 			var skillEffects map[string]interface{}
 			var isCrit bool
 			var damageDetails *DamageCalculationDetails
-			var shouldDealDamage bool // 是否应该造成伤害（只有attack类型的技能才造成伤害）
-
+			var shouldDealDamage bool // æ¯å¦åºè¯¥é æä¼¤å®³ï¼åªæattackç±»åçæè½æé æä¼¤å®³ï¼?
 			if skillState != nil && skillState.Skill != nil {
-				// 使用技能
-				skillName = skillState.Skill.Name
+				// ä½¿ç¨æè?				skillName = skillState.Skill.Name
 				resourceCost = m.skillManager.GetSkillResourceCost(skillState)
 
-				// 判断技能是否应该造成伤害（只有attack类型的技能才造成伤害）
-				shouldDealDamage = skillState.Skill.Type == "attack"
+				// å¤æ­æè½æ¯å¦åºè¯¥é æä¼¤å®³ï¼åªæattackç±»åçæè½æé æä¼¤å®³ï¼?				shouldDealDamage = skillState.Skill.Type == "attack"
 
-				// 检查资源是否足够
-				if resourceCost <= char.Resource {
+				// æ£æ¥èµæºæ¯å¦è¶³å¤?				if resourceCost <= char.Resource {
 					
 					var baseDamage int
-					var playerDamage int
-					var isCrit bool
-					var damageDetails *DamageCalculationDetails
-					
+					// playerDamage, isCrit, and damageDetails are already declared in outer scope
+					// Do not redeclare them here to avoid shadowing outer scope variables
 					if shouldDealDamage {
-						// 计算技能伤害（基础伤害，暴击在后面处理）
-						baseDamage = m.skillManager.CalculateSkillDamage(skillState, char, target, m.passiveSkillManager, m.buffManager)
+						// è®¡ç®æè½ä¼¤å®³ï¼åºç¡ä¼¤å®³ï¼æ´å»å¨åé¢å¤çï¼?						baseDamage = m.skillManager.CalculateSkillDamage(skillState, char, target, m.passiveSkillManager, m.buffManager)
 						
-						// 创建技能伤害详情（简化版）
-						damageDetails = &DamageCalculationDetails{
+						// åå»ºæè½ä¼¤å®³è¯¦æï¼ç®åçï¼?						damageDetails = &DamageCalculationDetails{
 							BaseAttack:      char.PhysicalAttack,
 							BaseDefense:     target.PhysicalDefense,
 							BaseDamage:      float64(baseDamage),
-							AttackModifiers: []string{fmt.Sprintf("技能倍率: %.1f", skillState.Skill.ScalingRatio)},
+							AttackModifiers: []string{fmt.Sprintf("æè½åç: %.1f", skillState.Skill.ScalingRatio)},
 							DefenseModifiers: []string{},
-							ActualCritRate:  -1, // -1 表示未设置
-							RandomRoll:      -1, // -1 表示未设置
-						}
+							ActualCritRate:  -1, // -1 è¡¨ç¤ºæªè®¾ç½?							RandomRoll:      -1, // -1 è¡¨ç¤ºæªè®¾ç½?						}
 
-						// 计算暴击（技能也可以暴击，应用被动技能和Buff加成）
-						actualCritRate := char.CritRate
+						// è®¡ç®æ´å»ï¼æè½ä¹å¯ä»¥æ´å»ï¼åºç¨è¢«å¨æè½åBuffå æï¼?						actualCritRate := char.CritRate
 						damageDetails.BaseCritRate = char.CritRate
 						damageDetails.CritModifiers = []string{}
 						
@@ -463,16 +412,15 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 							if critModifier > 0 {
 								actualCritRate = char.CritRate + critModifier/100.0
 								damageDetails.CritModifiers = append(damageDetails.CritModifiers, 
-									fmt.Sprintf("被动暴击+%.0f%%", critModifier))
+									fmt.Sprintf("è¢«å¨æ´å»+%.0f%%", critModifier))
 							}
 						}
-						// 应用Buff的暴击率加成（鲁莽等）
-						if m.buffManager != nil {
+						// åºç¨Buffçæ´å»çå æï¼é²è½ç­ï¼?						if m.buffManager != nil {
 							critBuffValue := m.buffManager.GetBuffValue(char.ID, "crit_rate")
 							if critBuffValue > 0 {
 								actualCritRate = actualCritRate + critBuffValue/100.0
 								damageDetails.CritModifiers = append(damageDetails.CritModifiers, 
-									fmt.Sprintf("Buff暴击+%.0f%%", critBuffValue))
+									fmt.Sprintf("Buffæ´å»+%.0f%%", critBuffValue))
 							}
 						}
 						if actualCritRate > 1.0 {
@@ -493,29 +441,25 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 						damageDetails.FinalDamage = playerDamage
 					}
 
-					// 应用技能效果
-					skillEffects = m.skillManager.ApplySkillEffects(skillState, char, target)
+					// åºç¨æè½ææ?					skillEffects = m.skillManager.ApplySkillEffects(skillState, char, target)
 
-					// 应用Buff/Debuff效果
+					// åºç¨Buff/Debuffææ
 					m.applySkillBuffs(skillState, char, target, skillEffects)
 
-					// 应用Debuff到敌人（挫志怒吼、旋风斩等）
+					// åºç¨Debuffå°æäººï¼æ«å¿æå¼ãæé£æ©ç­ï¼
 					m.applySkillDebuffs(skillState, char, target, aliveEnemies, skillEffects)
 
-					// 消耗资源
-					char.Resource -= resourceCost
+					// æ¶èèµæº?					char.Resource -= resourceCost
 					if char.Resource < 0 {
 						char.Resource = 0
 					}
 
-					// 使用技能（设置冷却）
-					m.skillManager.UseSkill(char.ID, skillState.SkillID)
+					// ä½¿ç¨æè½ï¼è®¾ç½®å·å´ï¼?					m.skillManager.UseSkill(char.ID, skillState.SkillID)
 					usedSkill = true
 
-					// 处理技能特殊效果（怒气获得等）
+					// å¤çæè½ç¹æ®ææï¼ææ°è·å¾ç­ï¼
 					if rageGain, ok := skillEffects["rageGain"].(int); ok {
-						// 应用被动技能的怒气获得加成（愤怒掌握等）
-						actualRageGain := m.applyRageGenerationModifiers(char.ID, rageGain)
+						// åºç¨è¢«å¨æè½çææ°è·å¾å æï¼æ¤æææ¡ç­ï¼?						actualRageGain := m.applyRageGenerationModifiers(char.ID, rageGain)
 						char.Resource += actualRageGain
 						resourceGain = actualRageGain
 						if char.Resource > char.MaxResource {
@@ -523,11 +467,10 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 						}
 					}
 
-					// 只有attack类型的技能才造成伤害
+					// åªæattackç±»åçæè½æé æä¼¤å®³
 					if shouldDealDamage {
-						// 处理AOE技能（旋风斩等）
-						if skillState.Skill.TargetType == "enemy_all" {
-							// 对所有敌人造成伤害
+						// å¤çAOEæè½ï¼æé£æ©ç­ï¼?						if skillState.Skill.TargetType == "enemy_all" {
+							// å¯¹æææäººé æä¼¤å®³
 							for _, enemy := range aliveEnemies {
 								if enemy.HP > 0 {
 									damage := m.skillManager.CalculateSkillDamage(skillState, char, enemy, m.passiveSkillManager, m.buffManager)
@@ -540,20 +483,18 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 									}
 								}
 							}
-							// playerDamage用于日志显示（主目标伤害）
-						} else if skillState.SkillID == "warrior_cleave" {
-							// 顺劈斩：主目标+相邻目标
+							// playerDamageç¨äºæ¥å¿æ¾ç¤ºï¼ä¸»ç®æ ä¼¤å®³ï¼?						} else if skillState.SkillID == "warrior_cleave" {
+							// é¡ºåæ©ï¼ä¸»ç®æ ?ç¸é»ç®æ 
 							target.HP -= playerDamage
 
-							// 对相邻目标造成伤害（最多2个）
+							// å¯¹ç¸é»ç®æ é æä¼¤å®³ï¼æå¤?ä¸ªï¼
 							adjacentCount := 0
 							for _, enemy := range aliveEnemies {
 								if enemy != target && enemy.HP > 0 && adjacentCount < 2 {
-									// 计算相邻目标伤害
+									// è®¡ç®ç¸é»ç®æ ä¼¤å®³
 									if effect, ok := skillState.Effect["adjacentMultiplier"].(float64); ok {
 										adjacentDamage := int(float64(char.PhysicalAttack) * effect)
-										// 基础伤害 = 实际攻击力 - 目标防御力（不再除以2）
-										adjacentDamage = adjacentDamage - enemy.PhysicalDefense
+										// åºç¡ä¼¤å®³ = å®éæ»å»å?- ç®æ é²å¾¡åï¼ä¸åé¤ä»¥2ï¼?										adjacentDamage = adjacentDamage - enemy.PhysicalDefense
 										if adjacentDamage < 1 {
 											adjacentDamage = 1
 										}
@@ -565,75 +506,67 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 											enemy.HP = 0
 										}
 										adjacentCount++
-										m.addLog(session, "combat", fmt.Sprintf("%s 的顺劈斩波及到 %s，造成 %d 点伤害", char.Name, enemy.Name, adjacentDamage), "#ffaa00")
+										m.addLog(session, "combat", fmt.Sprintf("%s çé¡ºåæ©æ³¢åå?%sï¼é æ %d ç¹ä¼¤å®?, char.Name, enemy.Name, adjacentDamage), "#ffaa00")
 										logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
 									}
 								}
 							}
 						} else {
-							// 单体技能
-							target.HP -= playerDamage
+							// åä½æè?							target.HP -= playerDamage
 						}
 					}
 				} else {
-					// 资源不足，使用普通攻击
-					skillState = nil
+					// èµæºä¸è¶³ï¼ä½¿ç¨æ®éæ»å?					skillState = nil
 				}
 			}
 
-			// 如果没有使用技能或资源不足，使用普通攻击
-			if skillState == nil {
-				skillName = "普通攻击"
-				// 计算实际物理攻击力（应用被动技能加成）
+			// å¦ææ²¡æä½¿ç¨æè½æèµæºä¸è¶³ï¼ä½¿ç¨æ®éæ»å?			if skillState == nil {
+				skillName = "æ®éæ»å?
+				// è®¡ç®å®éç©çæ»å»åï¼åºç¨è¢«å¨æè½å æï¼
 				actualAttack := float64(char.PhysicalAttack)
 				damageDetails = &DamageCalculationDetails{
 					BaseAttack:      char.PhysicalAttack,
 					BaseDefense:     target.PhysicalDefense,
 					AttackModifiers: []string{},
 					DefenseModifiers: []string{},
-					ActualCritRate:  -1, // -1 表示未设置
-					RandomRoll:      -1, // -1 表示未设置
-				}
+					ActualCritRate:  -1, // -1 è¡¨ç¤ºæªè®¾ç½?					RandomRoll:      -1, // -1 è¡¨ç¤ºæªè®¾ç½?				}
 				
 				if m.passiveSkillManager != nil {
 					attackModifier := m.passiveSkillManager.GetPassiveModifier(char.ID, "attack")
 					if attackModifier > 0 {
 						actualAttack = actualAttack * (1.0 + attackModifier/100.0)
 						damageDetails.AttackModifiers = append(damageDetails.AttackModifiers, 
-							fmt.Sprintf("被动攻击+%.0f%%", attackModifier))
+							fmt.Sprintf("è¢«å¨æ»å»+%.0f%%", attackModifier))
 					}
-					// 应用被动技能的伤害加成
+					// åºç¨è¢«å¨æè½çä¼¤å®³å æ
 					damageModifier := m.passiveSkillManager.GetPassiveModifier(char.ID, "damage")
 					if damageModifier > 0 {
 						actualAttack = actualAttack * (1.0 + damageModifier/100.0)
 						damageDetails.AttackModifiers = append(damageDetails.AttackModifiers, 
-							fmt.Sprintf("被动伤害+%.0f%%", damageModifier))
+							fmt.Sprintf("è¢«å¨ä¼¤å®³+%.0f%%", damageModifier))
 					}
 
-					// 处理低血量时的攻击力加成（狂暴之心）
+					// å¤çä½è¡éæ¶çæ»å»åå æï¼çæ´ä¹å¿ï¼
 					hpPercent := float64(char.HP) / float64(char.MaxHP)
 					passives := m.passiveSkillManager.GetPassiveSkills(char.ID)
 					for _, passive := range passives {
 						if passive.Passive.EffectType == "stat_mod" && passive.Passive.ID == "warrior_passive_berserker_heart" {
-							// 根据等级计算触发阈值（1级50%，5级30%）
-							threshold := 0.50 - float64(passive.Level-1)*0.05
+							// æ ¹æ®ç­çº§è®¡ç®è§¦åéå¼ï¼1çº?0%ï¼?çº?0%ï¼?							threshold := 0.50 - float64(passive.Level-1)*0.05
 							if hpPercent < threshold {
-								// 根据等级计算攻击力加成（1级20%，5级60%）
-								attackBonus := 20.0 + float64(passive.Level-1)*10.0
+								// æ ¹æ®ç­çº§è®¡ç®æ»å»åå æï¼1çº?0%ï¼?çº?0%ï¼?								attackBonus := 20.0 + float64(passive.Level-1)*10.0
 								actualAttack = actualAttack * (1.0 + attackBonus/100.0)
 								damageDetails.AttackModifiers = append(damageDetails.AttackModifiers, 
-									fmt.Sprintf("狂暴之心+%.0f%%", attackBonus))
+									fmt.Sprintf("çæ´ä¹å¿+%.0f%%", attackBonus))
 							}
 						}
 					}
 				}
-				// 应用Buff的攻击力加成（战斗怒吼、狂暴之怒、天神下凡等）
-				if m.buffManager != nil {
+				// åºç¨Buffçæ»å»åå æï¼æææå¼ãçæ´ä¹æãå¤©ç¥ä¸å¡ç­ï¼?				if m.buffManager != nil {
 					attackBuffValue := m.buffManager.GetBuffValue(char.ID, "attack")
 					if attackBuffValue > 0 {
 						actualAttack = actualAttack * (1.0 + attackBuffValue/100.0)
 						damageDetails.AttackModifiers = append(damageDetails.AttackModifiers, 
-							fmt.Sprintf("Buff攻击+%.0f%%", attackBuffValue))
+							fmt.Sprintf("Buffæ»å»+%.0f%%", attackBuffValue))
 					}
 				}
 				
@@ -644,8 +577,7 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 				damageDetails.BaseDamage = calcDetails.BaseDamage
 				damageDetails.Variance = calcDetails.Variance
 				
-				// 计算暴击率（应用被动技能和Buff加成）
-				actualCritRate := char.CritRate
+				// è®¡ç®æ´å»çï¼åºç¨è¢«å¨æè½åBuffå æï¼?				actualCritRate := char.CritRate
 				damageDetails.BaseCritRate = char.CritRate
 				damageDetails.CritModifiers = []string{}
 				
@@ -654,16 +586,15 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 					if critModifier > 0 {
 						actualCritRate = char.CritRate + critModifier/100.0
 						damageDetails.CritModifiers = append(damageDetails.CritModifiers, 
-							fmt.Sprintf("被动暴击+%.0f%%", critModifier))
+							fmt.Sprintf("è¢«å¨æ´å»+%.0f%%", critModifier))
 					}
 				}
-				// 应用Buff的暴击率加成（鲁莽等）
-				if m.buffManager != nil {
+				// åºç¨Buffçæ´å»çå æï¼é²è½ç­ï¼?				if m.buffManager != nil {
 					critBuffValue := m.buffManager.GetBuffValue(char.ID, "crit_rate")
 					if critBuffValue > 0 {
 						actualCritRate = actualCritRate + critBuffValue/100.0
 						damageDetails.CritModifiers = append(damageDetails.CritModifiers, 
-							fmt.Sprintf("Buff暴击+%.0f%%", critBuffValue))
+							fmt.Sprintf("Buffæ´å»+%.0f%%", critBuffValue))
 					}
 				}
 				if actualCritRate > 1.0 {
@@ -686,101 +617,91 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 				resourceCost = 0
 				usedSkill = false
 			}
-			// 如果使用了技能，isCrit已经在上面计算了
+			// å¦æä½¿ç¨äºæè½ï¼isCritå·²ç»å¨ä¸é¢è®¡ç®äº
 
-			// 普通攻击获得怒气（只有普通攻击才获得怒气，使用技能时不获得）
+			// æ®éæ»å»è·å¾ææ°ï¼åªææ®éæ»å»æè·å¾ææ°ï¼ä½¿ç¨æè½æ¶ä¸è·å¾ï¼
 			if char.ResourceType == "rage" && !usedSkill {
 				var baseRageGain int
 				if isCrit {
-					baseRageGain = 10 // 暴击获得10点怒气
+					baseRageGain = 10 // æ´å»è·å¾10ç¹ææ°
 				} else {
-					baseRageGain = 5 // 普通攻击获得5点怒气
+					baseRageGain = 5 // æ®éæ»å»è·å¾?ç¹ææ°
 				}
 
-				// 应用被动技能的怒气获得加成（愤怒掌握等）
-				rageGain := m.applyRageGenerationModifiers(char.ID, baseRageGain)
+				// åºç¨è¢«å¨æè½çææ°è·å¾å æï¼æ¤æææ¡ç­ï¼?				rageGain := m.applyRageGenerationModifiers(char.ID, baseRageGain)
 
 				char.Resource += rageGain
 				resourceGain = rageGain
-				// 确保不超过最大值
-				if char.Resource > char.MaxResource {
+				// ç¡®ä¿ä¸è¶è¿æå¤§å?				if char.Resource > char.MaxResource {
 					char.Resource = char.MaxResource
 				}
 			}
 
-			// 处理被动技能的特殊效果（攻击时触发）
-			m.handlePassiveOnHitEffects(char, playerDamage, usedSkill, session, &logs)
+			// å¤çè¢«å¨æè½çç¹æ®ææï¼æ»å»æ¶è§¦åï¼?			m.handlePassiveOnHitEffects(char, playerDamage, usedSkill, session, &logs)
 
-			// 构建战斗日志消息，包含资源变化（带颜色）
+			// æå»ºæææ¥å¿æ¶æ¯ï¼åå«èµæºååï¼å¸¦é¢è²ï¼
 			resourceChangeText := m.formatResourceChange(char.ResourceType, resourceCost, resourceGain)
 			
-			// 格式化伤害公式
-			formulaText := ""
+			// æ ¼å¼åä¼¤å®³å¬å¼?			formulaText := ""
 			if damageDetails != nil {
 				formulaText = m.formatDamageFormula(damageDetails)
 			}
 
-			// 处理技能特殊效果日志
-			if skillEffects != nil {
+			// å¤çæè½ç¹æ®æææ¥å¿?			if skillEffects != nil {
 				if stun, ok := skillEffects["stun"].(bool); ok && stun {
-					m.addLog(session, "combat", fmt.Sprintf("%s 被眩晕了！", target.Name), "#ff00ff")
+					m.addLog(session, "combat", fmt.Sprintf("%s è¢«ç©æäºï¼?, target.Name), "#ff00ff")
 					logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
 				}
-				// 处理基于伤害的恢复（嗜血等）
+				// å¤çåºäºä¼¤å®³çæ¢å¤ï¼åè¡ç­ï¼
 				if healPercent, ok := skillEffects["healPercent"].(float64); ok && usedSkill {
 					healAmount := int(float64(playerDamage) * healPercent / 100.0)
 					char.HP += healAmount
 					if char.HP > char.MaxHP {
 						char.HP = char.MaxHP
 					}
-					m.addLog(session, "heal", fmt.Sprintf("%s 恢复了 %d 点生命值", char.Name, healAmount), "#00ff00")
+					m.addLog(session, "heal", fmt.Sprintf("%s æ¢å¤äº?%d ç¹çå½å?, char.Name, healAmount), "#00ff00")
 					logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
 				}
-				// 处理破釜沉舟的立即恢复（基于最大HP）
-				if healMaxHpPercent, ok := skillEffects["healMaxHpPercent"].(float64); ok && usedSkill {
+				// å¤çç ´éæ²èçç«å³æ¢å¤ï¼åºäºæå¤§HPï¼?				if healMaxHpPercent, ok := skillEffects["healMaxHpPercent"].(float64); ok && usedSkill {
 					healAmount := int(float64(char.MaxHP) * healMaxHpPercent / 100.0)
 					char.HP += healAmount
 					if char.HP > char.MaxHP {
 						char.HP = char.MaxHP
 					}
-					m.addLog(session, "heal", fmt.Sprintf("%s 的破釜沉舟恢复了 %d 点生命值", char.Name, healAmount), "#00ff00")
+					m.addLog(session, "heal", fmt.Sprintf("%s çç ´éæ²èæ¢å¤äº %d ç¹çå½å?, char.Name, healAmount), "#00ff00")
 					logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
 				}
 			}
 
-			// 记录技能使用日志
-			if shouldDealDamage {
-				// 攻击类技能：记录伤害
+			// è®°å½æè½ä½¿ç¨æ¥å¿?			if shouldDealDamage {
+				// æ»å»ç±»æè½ï¼è®°å½ä¼¤å®³
 				if isCrit {
-					m.addLog(session, "combat", fmt.Sprintf("%s 使用 [%s] 💥暴击！对 %s 造成 %d 点伤害%s%s", char.Name, skillName, target.Name, playerDamage, formulaText, resourceChangeText), "#ff6b6b")
+					m.addLog(session, "combat", fmt.Sprintf("%s ä½¿ç¨ [%s] ð¥æ´å»ï¼å¯¹ %s é æ %d ç¹ä¼¤å®?s%s", char.Name, skillName, target.Name, playerDamage, formulaText, resourceChangeText), "#ff6b6b")
 				} else {
-					m.addLog(session, "combat", fmt.Sprintf("%s 使用 [%s] 对 %s 造成 %d 点伤害%s%s", char.Name, skillName, target.Name, playerDamage, formulaText, resourceChangeText), "#ffaa00")
+					m.addLog(session, "combat", fmt.Sprintf("%s ä½¿ç¨ [%s] å¯?%s é æ %d ç¹ä¼¤å®?s%s", char.Name, skillName, target.Name, playerDamage, formulaText, resourceChangeText), "#ffaa00")
 				}
 			} else {
-				// 非攻击类技能（buff/debuff/control等）：只记录使用，不记录伤害
-				m.addLog(session, "combat", fmt.Sprintf("%s 使用 [%s]%s", char.Name, skillName, resourceChangeText), "#8888ff")
+				// éæ»å»ç±»æè½ï¼buff/debuff/controlç­ï¼ï¼åªè®°å½ä½¿ç¨ï¼ä¸è®°å½ä¼¤å®³
+				m.addLog(session, "combat", fmt.Sprintf("%s ä½¿ç¨ [%s]%s", char.Name, skillName, resourceChangeText), "#8888ff")
 			}
 			logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
 
-			// 减少技能冷却时间
-			m.skillManager.TickCooldowns(char.ID)
+			// åå°æè½å·å´æ¶é?			m.skillManager.TickCooldowns(char.ID)
 
-			// 减少Buff/Debuff持续时间
+			// åå°Buff/Debuffæç»­æ¶é´
 			expiredBuffs := m.buffManager.TickBuffs(char.ID)
 			for _, effectID := range expiredBuffs {
-				m.addLog(session, "buff", fmt.Sprintf("%s 的 %s 效果消失了", char.Name, effectID), "#888888")
+				m.addLog(session, "buff", fmt.Sprintf("%s ç?%s æææ¶å¤±äº?, char.Name, effectID), "#888888")
 				logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
 			}
 
-			// 检查目标是否死亡
-			if target.HP <= 0 {
-				// 确保HP归零
+			// æ£æ¥ç®æ æ¯å¦æ­»äº?			if target.HP <= 0 {
+				// ç¡®ä¿HPå½é¶
 				target.HP = 0
 
-				// 处理战争机器的击杀回怒效果
-				m.handleWarMachineRageGain(char, session, &logs)
+				// å¤çæäºæºå¨çå»æåæææ?				m.handleWarMachineRageGain(char, session, &logs)
 
-				// 敌人死亡
+				// æäººæ­»äº¡
 				expGain := target.ExpReward
 				goldGain := target.GoldMin + rand.Intn(target.GoldMax-target.GoldMin+1)
 
@@ -794,21 +715,17 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 				char.Exp += expGain
 				char.TotalKills++
 
-				// 检查升级
-				for char.Exp >= char.ExpToNext {
+				// æ£æ¥åçº?				for char.Exp >= char.ExpToNext {
 					char.Exp -= char.ExpToNext
 					char.Level++
 					char.ExpToNext = int(float64(char.ExpToNext) * 1.5)
 
-					// 升级属性提升
-					char.MaxHP += 15
+					// åçº§å±æ§æå?					char.MaxHP += 15
 					char.HP = char.MaxHP
 
-					// 战士的怒气最大值固定为100，不随升级改变
-					if char.ResourceType == "rage" {
+					// æå£«çææ°æå¤§å¼åºå®ä¸º100ï¼ä¸éåçº§æ¹å?					if char.ResourceType == "rage" {
 						char.MaxResource = 100
-						// 升级时怒气保持不变，不重置为最大值
-					} else {
+						// åçº§æ¶ææ°ä¿æä¸åï¼ä¸éç½®ä¸ºæå¤§å?					} else {
 						char.MaxResource += 8
 						char.Resource = char.MaxResource
 					}
@@ -823,108 +740,93 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 					char.PhysicalDefense = char.Stamina / 3
 					char.MagicDefense = (char.Intellect + char.Spirit) / 4
 
-					m.addLog(session, "levelup", fmt.Sprintf("🎉【升级】恭喜！%s 升到了 %d 级！", char.Name, char.Level), "#ffd700")
+					m.addLog(session, "levelup", fmt.Sprintf("ðãåçº§ãæ­åï¼%s åå°äº?%d çº§ï¼", char.Name, char.Level), "#ffd700")
 					logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
 				}
 			}
 
-			// 移动到下一个敌人回合
-			session.CurrentTurnIndex = 0
+			// ç§»å¨å°ä¸ä¸ä¸ªæäººåå?			session.CurrentTurnIndex = 0
 		}
 	} else {
-		// 敌人回合：当前索引的敌人攻击玩家
+		// æäººååï¼å½åç´¢å¼çæäººæ»å»ç©å®¶
 		if session.CurrentTurnIndex < len(aliveEnemies) {
 			enemy := aliveEnemies[session.CurrentTurnIndex]
-			// 敌人默认使用物理攻击
+			// æäººé»è®¤ä½¿ç¨ç©çæ»å»
 			baseEnemyDamage, enemyDamageDetails := m.calculatePhysicalDamageWithDetails(enemy.PhysicalAttack, char.PhysicalDefense)
 			enemyDamageDetails.BaseAttack = enemy.PhysicalAttack
 			enemyDamageDetails.BaseDefense = char.PhysicalDefense
 			enemyDamageDetails.AttackModifiers = []string{}
 			enemyDamageDetails.DefenseModifiers = []string{}
 
-			// 应用buff/debuff效果（如盾牌格挡的减伤等）
-			originalDamage := baseEnemyDamage
+			// åºç¨buff/debuffææï¼å¦ç¾çæ ¼æ¡çåä¼¤ç­ï¼?			originalDamage := baseEnemyDamage
 			enemyDamage := m.buffManager.CalculateDamageTakenWithBuffs(baseEnemyDamage, char.ID, true)
 			if enemyDamage != originalDamage {
 				reduction := float64(originalDamage-enemyDamage) / float64(originalDamage) * 100.0
 				enemyDamageDetails.DefenseModifiers = append(enemyDamageDetails.DefenseModifiers, 
-					fmt.Sprintf("减伤Buff -%.0f%%", reduction))
+					fmt.Sprintf("åä¼¤Buff -%.0f%%", reduction))
 			}
 
-			// 处理被动技能的减伤效果（不灭意志等）
-			originalDamage2 := enemyDamage
+			// å¤çè¢«å¨æè½çåä¼¤ææï¼ä¸ç­æå¿ç­ï¼?			originalDamage2 := enemyDamage
 			enemyDamage = m.handlePassiveDamageReduction(char, enemyDamage)
 			if enemyDamage != originalDamage2 {
 				reduction := float64(originalDamage2-enemyDamage) / float64(originalDamage2) * 100.0
 				enemyDamageDetails.DefenseModifiers = append(enemyDamageDetails.DefenseModifiers, 
-					fmt.Sprintf("被动减伤 -%.0f%%", reduction))
+					fmt.Sprintf("è¢«å¨åä¼¤ -%.0f%%", reduction))
 			}
 			enemyDamageDetails.FinalDamage = enemyDamage
 
-			// 处理护盾效果（不灭壁垒等）
-			shieldAmount := m.buffManager.GetBuffValue(char.ID, "shield")
+			// å¤çæ¤ç¾ææï¼ä¸ç­å£åç­ï¼?			shieldAmount := m.buffManager.GetBuffValue(char.ID, "shield")
 			if shieldAmount > 0 {
-				// 有护盾，先消耗护盾
-				shieldInt := int(shieldAmount)
+				// ææ¤ç¾ï¼åæ¶èæ¤ç?				shieldInt := int(shieldAmount)
 				if enemyDamage <= shieldInt {
-					// 伤害完全被护盾吸收
-					shieldInt -= enemyDamage
+					// ä¼¤å®³å®å¨è¢«æ¤ç¾å¸æ?					shieldInt -= enemyDamage
 					absorbedDamage := enemyDamage
 					enemyDamage = 0
-					m.addLog(session, "shield", fmt.Sprintf("%s 的护盾吸收了 %d 点伤害", char.Name, absorbedDamage), "#00ffff")
+					m.addLog(session, "shield", fmt.Sprintf("%s çæ¤ç¾å¸æ¶äº %d ç¹ä¼¤å®?, char.Name, absorbedDamage), "#00ffff")
 					logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
-					// 更新护盾值（通过更新Buff的value）
-					m.updateShieldValue(char.ID, float64(shieldInt))
+					// æ´æ°æ¤ç¾å¼ï¼éè¿æ´æ°Buffçvalueï¼?					m.updateShieldValue(char.ID, float64(shieldInt))
 				} else {
-					// 护盾被击破，剩余伤害继续
+					// æ¤ç¾è¢«å»ç ´ï¼å©ä½ä¼¤å®³ç»§ç»­
 					absorbedDamage := shieldInt
 					enemyDamage -= shieldInt
-					m.addLog(session, "shield", fmt.Sprintf("%s 的护盾吸收了 %d 点伤害后被击破", char.Name, absorbedDamage), "#00ffff")
+					m.addLog(session, "shield", fmt.Sprintf("%s çæ¤ç¾å¸æ¶äº %d ç¹ä¼¤å®³åè¢«å»ç ?, char.Name, absorbedDamage), "#00ffff")
 					logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
 					m.updateShieldValue(char.ID, 0)
 				}
 			}
 
-			// 处理被动技能的生存效果（坚韧不拔等）- 在受到伤害前检查
-			originalHP := char.HP
+			// å¤çè¢«å¨æè½ççå­ææï¼åé§ä¸æç­ï¼? å¨åå°ä¼¤å®³åæ£æ?			originalHP := char.HP
 			char.HP -= enemyDamage
 
-			// 如果受到致命伤害，检查坚韧不拔效果
-			if originalHP > 0 && char.HP <= 0 {
+			// å¦æåå°è´å½ä¼¤å®³ï¼æ£æ¥åé§ä¸æææ?			if originalHP > 0 && char.HP <= 0 {
 				if m.passiveSkillManager != nil {
 					passives := m.passiveSkillManager.GetPassiveSkills(char.ID)
 					for _, passive := range passives {
 						if passive.Passive.EffectType == "survival" && passive.Passive.ID == "warrior_passive_unbreakable" {
-							// 坚韧不拔：受到致命伤害时保留1点HP
+							// åé§ä¸æï¼åå°è´å½ä¼¤å®³æ¶ä¿ç1ç¹HP
 							char.HP = 1
-							m.addLog(session, "survival", fmt.Sprintf("%s 的坚韧不拔效果触发，保留了1点生命值！", char.Name), "#ff00ff")
+							m.addLog(session, "survival", fmt.Sprintf("%s çåé§ä¸æææè§¦åï¼ä¿çäº?ç¹çå½å¼ï¼", char.Name), "#ff00ff")
 							logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
-							break // 只触发一次
-						}
+							break // åªè§¦åä¸æ¬?						}
 					}
 				}
 			}
 
-			// 处理反击效果（反击风暴、复仇被动等）
-			m.handleCounterAttacks(char, enemy, enemyDamage, session, &logs)
+			// å¤çåå»ææï¼åå»é£æ´ãå¤ä»è¢«å¨ç­ï¼?			m.handleCounterAttacks(char, enemy, enemyDamage, session, &logs)
 
-			// 处理被动技能的反射效果（盾牌反射被动等）
-			m.handlePassiveReflectEffects(char, enemy, enemyDamage, session, &logs)
+			// å¤çè¢«å¨æè½çåå°ææï¼ç¾çåå°è¢«å¨ç­ï¼?			m.handlePassiveReflectEffects(char, enemy, enemyDamage, session, &logs)
 
-			// 处理主动技能的反射效果（盾牌反射技能等）
-			m.handleActiveReflectEffects(char, enemy, enemyDamage, session, &logs)
+			// å¤çä¸»å¨æè½çåå°ææï¼ç¾çåå°æè½ç­ï¼?			m.handleActiveReflectEffects(char, enemy, enemyDamage, session, &logs)
 
-			// 战士受到伤害时获得怒气
+			// æå£«åå°ä¼¤å®³æ¶è·å¾ææ°
 			resourceGain := 0
 			if char.ResourceType == "rage" && enemyDamage > 0 {
-				// 受到伤害获得怒气: 伤害/最大HP × 50，至少1点
-				baseRageGain := int(float64(enemyDamage) / float64(char.MaxHP) * 50)
+				// åå°ä¼¤å®³è·å¾ææ°: ä¼¤å®³/æå¤§HP Ã 50ï¼è³å°?ç?				baseRageGain := int(float64(enemyDamage) / float64(char.MaxHP) * 50)
 				if baseRageGain < 1 {
 					baseRageGain = 1
 				}
 
-				// 应用被动技能的怒气获得加成（愤怒掌握等）
-				rageGain := m.applyRageGenerationModifiers(char.ID, baseRageGain)
+				// åºç¨è¢«å¨æè½çææ°è·å¾å æï¼æ¤æææ¡ç­ï¼?				rageGain := m.applyRageGenerationModifiers(char.ID, baseRageGain)
 
 				char.Resource += rageGain
 				resourceGain = rageGain
@@ -933,59 +835,52 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 				}
 			}
 
-			// 构建战斗日志消息，包含资源变化（带颜色）
+			// æå»ºæææ¥å¿æ¶æ¯ï¼åå«èµæºååï¼å¸¦é¢è²ï¼
 			resourceChangeText := m.formatResourceChange(char.ResourceType, 0, resourceGain)
 			
-			// 格式化伤害公式
-			enemyFormulaText := ""
+			// æ ¼å¼åä¼¤å®³å¬å¼?			enemyFormulaText := ""
 			if enemyDamageDetails != nil {
 				enemyFormulaText = m.formatDamageFormula(enemyDamageDetails)
 			}
 
-			m.addLog(session, "combat", fmt.Sprintf("%s 攻击了 %s，造成 %d 点伤害%s%s", enemy.Name, char.Name, enemyDamage, enemyFormulaText, resourceChangeText), "#ff4444")
+			m.addLog(session, "combat", fmt.Sprintf("%s æ»å»äº?%sï¼é æ %d ç¹ä¼¤å®?s%s", enemy.Name, char.Name, enemyDamage, enemyFormulaText, resourceChangeText), "#ff4444")
 			logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
 
-			// 检查玩家是否死亡
-			if char.HP <= 0 {
+			// æ£æ¥ç©å®¶æ¯å¦æ­»äº?			if char.HP <= 0 {
 				char.TotalDeaths++
-				// 角色死亡时不停止战斗，保持 isRunning = true，这样休息状态可以自动处理
-				// 用户已经开启了自动战斗，死亡只是暂时进入休息状态，休息结束后应该自动恢复战斗
-				session.CurrentEnemies = nil
+				// è§è²æ­»äº¡æ¶ä¸åæ­¢ææï¼ä¿æ?isRunning = trueï¼è¿æ ·ä¼æ¯ç¶æå¯ä»¥èªå¨å¤ç?				// ç¨æ·å·²ç»å¼å¯äºèªå¨ææï¼æ­»äº¡åªæ¯ææ¶è¿å¥ä¼æ¯ç¶æï¼ä¼æ¯ç»æååºè¯¥èªå¨æ¢å¤ææ?				session.CurrentEnemies = nil
 				session.CurrentEnemy = nil
 				session.CurrentTurnIndex = -1
 
-				// 角色死亡时，战士的怒气归0
+				// è§è²æ­»äº¡æ¶ï¼æå£«çææ°å½?
 				if char.ResourceType == "rage" {
 					char.Resource = 0
 				}
 
-				// 计算复活时间
+				// è®¡ç®å¤æ´»æ¶é´
 				reviveDuration := m.calculateReviveTime(userID)
 				now := time.Now()
 				reviveAt := now.Add(reviveDuration)
 
-				// 设置角色HP为0（死亡状态）
+				// è®¾ç½®è§è²HPä¸?ï¼æ­»äº¡ç¶æï¼
 				char.HP = 0
 				char.IsDead = true
 				char.ReviveAt = &reviveAt
 
-				// 角色死亡时，立即清除所有buff和debuff
+				// è§è²æ­»äº¡æ¶ï¼ç«å³æ¸é¤ææbuffådebuff
 				if m.buffManager != nil {
 					m.buffManager.ClearBuffs(char.ID)
 				}
 
-				m.addLog(session, "death", fmt.Sprintf("%s 被击败了... 需要 %d 秒复活", char.Name, int(reviveDuration.Seconds())), "#ff0000")
+				m.addLog(session, "death", fmt.Sprintf("%s è¢«å»è´¥äº... éè¦?%d ç§å¤æ´?, char.Name, int(reviveDuration.Seconds())), "#ff0000")
 				logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
 
-				// 战斗失败总结
+				// ææå¤±è´¥æ»ç»
 				m.addBattleSummary(session, false, &logs)
 
-				// 保存死亡数据（包括死亡标记、复活时间和怒气归0）
-				m.charRepo.UpdateAfterDeath(char.ID, char.HP, char.Resource, char.TotalDeaths, &reviveAt)
+				// ä¿å­æ­»äº¡æ°æ®ï¼åæ¬æ­»äº¡æ è®°ãå¤æ´»æ¶é´åææ°å½?ï¼?				m.charRepo.UpdateAfterDeath(char.ID, char.HP, char.Resource, char.TotalDeaths, &reviveAt)
 
-				// 进入休息状态，休息时间 = 复活时间 + 恢复时间（恢复一半HP需要的时间）
-				// 恢复时间：从0恢复到50% HP，每秒恢复2%，需要25秒
-				recoveryTime := 25 * time.Second
+				// è¿å¥ä¼æ¯ç¶æï¼ä¼æ¯æ¶é´ = å¤æ´»æ¶é´ + æ¢å¤æ¶é´ï¼æ¢å¤ä¸åHPéè¦çæ¶é´ï¼?				// æ¢å¤æ¶é´ï¼ä»0æ¢å¤å?0% HPï¼æ¯ç§æ¢å¤?%ï¼éè¦?5ç§?				recoveryTime := 25 * time.Second
 				restDuration := reviveDuration + recoveryTime
 				restUntil := now.Add(restDuration)
 				session.IsResting = true
@@ -994,24 +889,21 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 				session.LastRestTick = &now
 				session.RestSpeed = 1.0
 
-				m.addLog(session, "system", fmt.Sprintf(">> 进入休息恢复状态 (预计 %d 秒)", int(restDuration.Seconds())+1), "#33ff33")
+				m.addLog(session, "system", fmt.Sprintf(">> è¿å¥ä¼æ¯æ¢å¤ç¶æ?(é¢è®¡ %d ç§?", int(restDuration.Seconds())+1), "#33ff33")
 				logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
 
-				// 重置本场战斗统计
+				// éç½®æ¬åºææç»è®¡
 				session.CurrentBattleExp = 0
 				session.CurrentBattleGold = 0
 				session.CurrentBattleKills = 0
 				session.CurrentTurnIndex = -1
 
-				// 角色死亡时，立即返回，确保前端清除敌人显示
-				// 保持 isRunning = true，这样按钮会显示"停止挂机"，休息状态可以自动处理
-				return &BattleTickResult{
+				// è§è²æ­»äº¡æ¶ï¼ç«å³è¿åï¼ç¡®ä¿åç«¯æ¸é¤æäººæ¾ç¤?				// ä¿æ isRunning = trueï¼è¿æ ·æé®ä¼æ¾ç¤º"åæ­¢ææº"ï¼ä¼æ¯ç¶æå¯ä»¥èªå¨å¤ç?				return &BattleTickResult{
 					Character:    char,
 					Enemy:        nil,
-					Enemies:      nil, // 明确返回 nil，让前端清除敌人显示
+					Enemies:      nil, // æç¡®è¿å nilï¼è®©åç«¯æ¸é¤æäººæ¾ç¤º
 					Logs:         logs,
-					IsRunning:    session.IsRunning, // 保持运行状态，不停止
-					IsResting:    session.IsResting,
+					IsRunning:    session.IsRunning, // ä¿æè¿è¡ç¶æï¼ä¸åæ­?					IsResting:    session.IsResting,
 					RestUntil:    session.RestUntil,
 					SessionKills: session.SessionKills,
 					SessionGold:  session.SessionGold,
@@ -1019,19 +911,18 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 					BattleCount:  session.BattleCount,
 				}, nil
 			} else {
-				// 移动到下一个敌人或回到玩家回合
+				// ç§»å¨å°ä¸ä¸ä¸ªæäººæåå°ç©å®¶åå
 				session.CurrentTurnIndex++
 				if session.CurrentTurnIndex >= len(aliveEnemies) {
-					session.CurrentTurnIndex = -1 // 回到玩家回合
+					session.CurrentTurnIndex = -1 // åå°ç©å®¶åå
 				}
 			}
 		} else {
-			// 索引超出范围，回到玩家回合
-			session.CurrentTurnIndex = -1
+			// ç´¢å¼è¶åºèå´ï¼åå°ç©å®¶åå?			session.CurrentTurnIndex = -1
 		}
 	}
 
-	// 更新存活敌人列表
+	// æ´æ°å­æ´»æäººåè¡¨
 	aliveEnemies = make([]*models.Monster, 0)
 	for _, enemy := range session.CurrentEnemies {
 		if enemy != nil && enemy.HP > 0 {
@@ -1039,50 +930,46 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 		}
 	}
 
-	// 如果所有敌人都被击败，处理战斗结束
+	// å¦ææææäººé½è¢«å»è´¥ï¼å¤çææç»æ
 	if len(aliveEnemies) == 0 && len(session.CurrentEnemies) > 0 {
-		// 确保所有敌人的HP都归零
-		for _, enemy := range session.CurrentEnemies {
+		// ç¡®ä¿æææäººçHPé½å½é?		for _, enemy := range session.CurrentEnemies {
 			if enemy != nil && enemy.HP <= 0 {
 				enemy.HP = 0
 			}
 		}
 
-		// 战斗胜利总结
+		// ææèå©æ»ç»
 		m.addBattleSummary(session, true, &logs)
 
-		// 战斗结束后，所有战士角色的怒气都归0
+		// ææç»æåï¼æææå£«è§è²çææ°é½å½0
 		for _, c := range characters {
 			if c.ResourceType == "rage" {
 				c.Resource = 0
 			}
-			// 保存所有角色的数据（包括战士的怒气归0）
-			m.charRepo.UpdateAfterBattle(c.ID, c.HP, c.Resource, c.Exp, c.Level,
+			// ä¿å­ææè§è²çæ°æ®ï¼åæ¬æå£«çææ°å½?ï¼?			m.charRepo.UpdateAfterBattle(c.ID, c.HP, c.Resource, c.Exp, c.Level,
 				c.ExpToNext, c.MaxHP, c.MaxResource, c.PhysicalAttack, c.MagicAttack, c.PhysicalDefense, c.MagicDefense,
 				c.Strength, c.Agility, c.Stamina, c.TotalKills)
 		}
 
-		// 计算并开始休息
-		restDuration := m.calculateRestTime(char)
+		// è®¡ç®å¹¶å¼å§ä¼æ?		restDuration := m.calculateRestTime(char)
 		now := time.Now()
 		restUntil := now.Add(restDuration)
 		session.IsResting = true
 		session.RestUntil = &restUntil
 		session.RestStartedAt = &now
 		session.LastRestTick = &now
-		session.RestSpeed = 1.0 // 默认恢复速度
+		session.RestSpeed = 1.0 // é»è®¤æ¢å¤éåº¦
 
-		m.addLog(session, "system", fmt.Sprintf(">> 开始休息恢复 (预计 %d 秒)", int(restDuration.Seconds())+1), "#33ff33")
+		m.addLog(session, "system", fmt.Sprintf(">> å¼å§ä¼æ¯æ¢å¤?(é¢è®¡ %d ç§?", int(restDuration.Seconds())+1), "#33ff33")
 		logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
 
-		// 重置本场战斗统计
+		// éç½®æ¬åºææç»è®¡
 		session.CurrentBattleExp = 0
 		session.CurrentBattleGold = 0
 		session.CurrentBattleKills = 0
 		session.CurrentTurnIndex = -1
 
-		// 先返回一次带有HP=0的敌人状态，让前端更新显示
-		// 创建敌人副本，确保HP为0
+		// åè¿åä¸æ¬¡å¸¦æHP=0çæäººç¶æï¼è®©åç«¯æ´æ°æ¾ç¤?		// åå»ºæäººå¯æ¬ï¼ç¡®ä¿HPä¸?
 		defeatedEnemies := make([]*models.Monster, len(session.CurrentEnemies))
 		for i, enemy := range session.CurrentEnemies {
 			if enemy != nil {
@@ -1092,16 +979,13 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 			}
 		}
 
-		// 清除敌人（在返回结果之后）
-		session.CurrentEnemies = nil
+		// æ¸é¤æäººï¼å¨è¿åç»æä¹åï¼?		session.CurrentEnemies = nil
 		session.CurrentEnemy = nil
 
-		// 返回带有HP=0的敌人状态
-		return &BattleTickResult{
+		// è¿åå¸¦æHP=0çæäººç¶æ?		return &BattleTickResult{
 			Character:    char,
 			Enemy:        nil,
-			Enemies:      defeatedEnemies, // 返回HP=0的敌人副本
-			Logs:         logs,
+			Enemies:      defeatedEnemies, // è¿åHP=0çæäººå¯æ?			Logs:         logs,
 			IsRunning:    session.IsRunning,
 			IsResting:    session.IsResting,
 			RestUntil:    session.RestUntil,
@@ -1112,7 +996,7 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 		}, nil
 	}
 
-	// 保存角色数据更新
+	// ä¿å­è§è²æ°æ®æ´æ°
 	m.charRepo.UpdateAfterBattle(char.ID, char.HP, char.Resource, char.Exp, char.Level,
 		char.ExpToNext, char.MaxHP, char.MaxResource, char.PhysicalAttack, char.MagicAttack, char.PhysicalDefense, char.MagicDefense,
 		char.Strength, char.Agility, char.Stamina, char.TotalKills)
@@ -1132,15 +1016,15 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 	}, nil
 }
 
-// spawnEnemy 生成敌人（向后兼容）
+// spawnEnemy çææäººï¼ååå¼å®¹ï¼
 func (m *BattleManager) spawnEnemy(session *BattleSession, playerLevel int) error {
 	return m.spawnEnemies(session, playerLevel)
 }
 
-// spawnEnemies 生成多个敌人（1-3个随机）
+// spawnEnemies çæå¤ä¸ªæäººï¼?-3ä¸ªéæºï¼
 func (m *BattleManager) spawnEnemies(session *BattleSession, playerLevel int) error {
 	if session.CurrentZone == nil {
-		// 加载默认区域
+		// å è½½é»è®¤åºå
 		zone, err := m.gameRepo.GetZoneByID("elwynn")
 		if err != nil {
 			fmt.Printf("[ERROR] Failed to get zone: %v\n", err)
@@ -1150,7 +1034,7 @@ func (m *BattleManager) spawnEnemies(session *BattleSession, playerLevel int) er
 		fmt.Printf("[DEBUG] Loaded zone: %s\n", zone.Name)
 	}
 
-	// 获取区域怪物
+	// è·ååºåæªç©
 	monsters, err := m.gameRepo.GetMonstersByZone(session.CurrentZone.ID)
 	if err != nil {
 		fmt.Printf("[ERROR] Failed to get monsters: %v\n", err)
@@ -1162,13 +1046,11 @@ func (m *BattleManager) spawnEnemies(session *BattleSession, playerLevel int) er
 	}
 	fmt.Printf("[DEBUG] Found %d monsters in zone\n", len(monsters))
 
-	// 随机生成1-3个敌人
-	enemyCount := 1 + rand.Intn(3) // 1-3个
-	session.CurrentEnemies = make([]*models.Monster, 0, enemyCount)
+	// éæºçæ1-3ä¸ªæäº?	enemyCount := 1 + rand.Intn(3) // 1-3ä¸?	session.CurrentEnemies = make([]*models.Monster, 0, enemyCount)
 
 	var enemyNames []string
 	for i := 0; i < enemyCount; i++ {
-		// 随机选择一个怪物模板
+		// éæºéæ©ä¸ä¸ªæªç©æ¨¡æ¿
 		template := monsters[rand.Intn(len(monsters))]
 
 		enemy := &models.Monster{
@@ -1191,7 +1073,7 @@ func (m *BattleManager) spawnEnemies(session *BattleSession, playerLevel int) er
 		enemyNames = append(enemyNames, fmt.Sprintf("%s (Lv.%d)", enemy.Name, enemy.Level))
 	}
 
-	// 保留 CurrentEnemy 用于向后兼容（指向第一个敌人）
+	// ä¿ç CurrentEnemy ç¨äºååå¼å®¹ï¼æåç¬¬ä¸ä¸ªæäººï¼
 	if len(session.CurrentEnemies) > 0 {
 		session.CurrentEnemy = session.CurrentEnemies[0]
 	}
@@ -1202,14 +1084,14 @@ func (m *BattleManager) spawnEnemies(session *BattleSession, playerLevel int) er
 	}
 	enemyList := fmt.Sprintf("%s", enemyNames[0])
 	if len(enemyNames) > 1 {
-		enemyList = fmt.Sprintf("%s 等 %d 个敌人", enemyNames[0], len(enemyNames))
+		enemyList = fmt.Sprintf("%s ç­?%d ä¸ªæäº?, enemyNames[0], len(enemyNames))
 	}
-	m.addLog(session, "encounter", fmt.Sprintf("━━━ 战斗 #%d ━━━ 遭遇: %s", session.BattleCount, enemyList), "#ffff00")
+	m.addLog(session, "encounter", fmt.Sprintf("âââ?ææ #%d âââ?é­é: %s", session.BattleCount, enemyList), "#ffff00")
 
 	return nil
 }
 
-// ChangeZone 切换区域
+// ChangeZone åæ¢åºå
 func (m *BattleManager) ChangeZone(userID int, zoneID string, playerLevel int) error {
 	session := m.GetOrCreateSession(userID)
 
@@ -1228,14 +1110,13 @@ func (m *BattleManager) ChangeZone(userID int, zoneID string, playerLevel int) e
 	session.CurrentZone = zone
 	session.CurrentEnemy = nil
 
-	m.addLog(session, "zone", fmt.Sprintf(">> 你来到了 [%s]", zone.Name), "#00ffff")
+	m.addLog(session, "zone", fmt.Sprintf(">> ä½ æ¥å°äº [%s]", zone.Name), "#00ffff")
 	m.addLog(session, "zone", zone.Description, "#888888")
 
 	return nil
 }
 
-// GetBattleStatus 获取战斗状态
-func (m *BattleManager) GetBattleStatus(userID int) *models.BattleStatus {
+// GetBattleStatus è·åææç¶æ?func (m *BattleManager) GetBattleStatus(userID int) *models.BattleStatus {
 	session := m.GetSession(userID)
 	if session == nil {
 		return &models.BattleStatus{
@@ -1265,8 +1146,7 @@ func (m *BattleManager) GetBattleStatus(userID int) *models.BattleStatus {
 	return status
 }
 
-// GetCharacterBuffs 获取角色的所有Buff/Debuff信息（用于API返回）
-func (m *BattleManager) GetCharacterBuffs(characterID int) []*models.BuffInfo {
+// GetCharacterBuffs è·åè§è²çææBuff/Debuffä¿¡æ¯ï¼ç¨äºAPIè¿åï¼?func (m *BattleManager) GetCharacterBuffs(characterID int) []*models.BuffInfo {
 	if m.buffManager == nil {
 		return []*models.BuffInfo{}
 	}
@@ -1292,45 +1172,44 @@ func (m *BattleManager) GetCharacterBuffs(characterID int) []*models.BuffInfo {
 	return buffs
 }
 
-// getBuffDescription 获取Buff的描述文本
-func (m *BattleManager) getBuffDescription(buff *BuffInstance) string {
+// getBuffDescription è·åBuffçæè¿°ææ?func (m *BattleManager) getBuffDescription(buff *BuffInstance) string {
 	switch buff.StatAffected {
 	case "attack":
 		if buff.IsBuff {
-			return fmt.Sprintf("提升%.0f%%物理攻击力", buff.Value)
+			return fmt.Sprintf("æå%.0f%%ç©çæ»å»å?, buff.Value)
 		}
-		return fmt.Sprintf("降低%.0f%%物理攻击力", -buff.Value)
+		return fmt.Sprintf("éä½%.0f%%ç©çæ»å»å?, -buff.Value)
 	case "defense":
 		if buff.IsBuff {
-			return fmt.Sprintf("提升%.0f%%物理防御", buff.Value)
+			return fmt.Sprintf("æå%.0f%%ç©çé²å¾¡", buff.Value)
 		}
-		return fmt.Sprintf("降低%.0f%%物理防御", -buff.Value)
+		return fmt.Sprintf("éä½%.0f%%ç©çé²å¾¡", -buff.Value)
 	case "physical_damage_taken":
-		return fmt.Sprintf("减少%.0f%%受到的物理伤害", -buff.Value)
+		return fmt.Sprintf("åå°%.0f%%åå°çç©çä¼¤å®?, -buff.Value)
 	case "damage_taken":
-		return fmt.Sprintf("减少%.0f%%受到的伤害", -buff.Value)
+		return fmt.Sprintf("åå°%.0f%%åå°çä¼¤å®?, -buff.Value)
 	case "crit_rate":
 		if buff.IsBuff {
-			return fmt.Sprintf("提升%.0f%%暴击率", buff.Value)
+			return fmt.Sprintf("æå%.0f%%æ´å»ç?, buff.Value)
 		}
-		return fmt.Sprintf("降低%.0f%%暴击率", -buff.Value)
+		return fmt.Sprintf("éä½%.0f%%æ´å»ç?, -buff.Value)
 	case "healing_received":
-		return fmt.Sprintf("降低%.0f%%治疗效果", buff.Value)
+		return fmt.Sprintf("éä½%.0f%%æ²»çææ", buff.Value)
 	case "shield":
-		return fmt.Sprintf("获得相当于最大HP %.0f%%的护盾", buff.Value/float64(100))
+		return fmt.Sprintf("è·å¾ç¸å½äºæå¤§HP %.0f%%çæ¤ç?, buff.Value/float64(100))
 	case "reflect":
-		return fmt.Sprintf("反射%.0f%%受到的伤害", buff.Value)
+		return fmt.Sprintf("åå°%.0f%%åå°çä¼¤å®?, buff.Value)
 	case "counter_attack":
-		return fmt.Sprintf("受到攻击时反击，造成%.0f%%物理攻击力伤害", buff.Value)
+		return fmt.Sprintf("åå°æ»å»æ¶åå»ï¼é æ%.0f%%ç©çæ»å»åä¼¤å®?, buff.Value)
 	case "cc_immune":
-		return "免疫控制效果"
+		return "åç«æ§å¶ææ"
 	default:
-		// 如果没有匹配的类型，返回buff名称
+		// å¦ææ²¡æå¹éçç±»åï¼è¿åbuffåç§°
 		return buff.Name
 	}
 }
 
-// GetBattleLogs 获取战斗日志
+// GetBattleLogs è·åæææ¥å¿
 func (m *BattleManager) GetBattleLogs(userID int, limit int) []models.BattleLog {
 	session := m.GetSession(userID)
 	if session == nil {
@@ -1347,26 +1226,17 @@ func (m *BattleManager) GetBattleLogs(userID int, limit int) []models.BattleLog 
 	return logs
 }
 
-// DamageCalculationDetails 伤害计算详情
+// DamageCalculationDetails ä¼¤å®³è®¡ç®è¯¦æ
 type DamageCalculationDetails struct {
-	BaseAttack      int     // 基础攻击力
-	ActualAttack    float64 // 实际攻击力（应用加成后）
-	BaseDefense     int     // 基础防御力
-	ActualDefense   float64 // 实际防御力（应用Debuff后）
-	BaseDamage      float64 // 基础伤害（攻击-防御/2）
-	FinalDamage     int     // 最终伤害（应用随机波动后）
-	Variance        float64 // 随机波动值
-	IsCrit          bool    // 是否暴击
-	CritMultiplier  float64 // 暴击倍率
-	BaseCritRate    float64 // 基础暴击率
-	ActualCritRate  float64 // 实际暴击率（应用加成后）
-	RandomRoll      float64 // 随机数（用于暴击判定）
-	AttackModifiers []string // 攻击力加成说明
-	DefenseModifiers []string // 防御力修改说明
-	CritModifiers   []string // 暴击率加成说明
-}
+	BaseAttack      int     // åºç¡æ»å»å?	ActualAttack    float64 // å®éæ»å»åï¼åºç¨å æåï¼
+	BaseDefense     int     // åºç¡é²å¾¡å?	ActualDefense   float64 // å®éé²å¾¡åï¼åºç¨Debuffåï¼
+	BaseDamage      float64 // åºç¡ä¼¤å®³ï¼æ»å?é²å¾¡/2ï¼?	FinalDamage     int     // æç»ä¼¤å®³ï¼åºç¨éæºæ³¢å¨åï¼
+	Variance        float64 // éæºæ³¢å¨å?	IsCrit          bool    // æ¯å¦æ´å»
+	CritMultiplier  float64 // æ´å»åç
+	BaseCritRate    float64 // åºç¡æ´å»ç?	ActualCritRate  float64 // å®éæ´å»çï¼åºç¨å æåï¼
+	RandomRoll      float64 // éæºæ°ï¼ç¨äºæ´å»å¤å®ï¼?	AttackModifiers []string // æ»å»åå æè¯´æ?	DefenseModifiers []string // é²å¾¡åä¿®æ¹è¯´æ?	CritModifiers   []string // æ´å»çå æè¯´æ?}
 
-// calculatePhysicalDamage 计算物理伤害（返回详情）
+// calculatePhysicalDamage è®¡ç®ç©çä¼¤å®³ï¼è¿åè¯¦æï¼
 func (m *BattleManager) calculatePhysicalDamageWithDetails(attack, defense int) (int, *DamageCalculationDetails) {
 	details := &DamageCalculationDetails{
 		BaseAttack:      attack,
@@ -1377,25 +1247,23 @@ func (m *BattleManager) calculatePhysicalDamageWithDetails(attack, defense int) 
 		DefenseModifiers: []string{},
 	}
 	
-	// 基础伤害 = 实际攻击力 - 目标防御力（不再除以2）
-	baseDamage := float64(attack) - float64(defense)
+	// åºç¡ä¼¤å®³ = å®éæ»å»å?- ç®æ é²å¾¡åï¼ä¸åé¤ä»¥2ï¼?	baseDamage := float64(attack) - float64(defense)
 	if baseDamage < 1 {
 		baseDamage = 1
 	}
 	details.BaseDamage = baseDamage
-	details.Variance = 0 // 不再使用随机波动，未来通过装备的攻击力上下限实现
-	details.FinalDamage = int(baseDamage)
+	details.Variance = 0 // ä¸åä½¿ç¨éæºæ³¢å¨ï¼æªæ¥éè¿è£å¤çæ»å»åä¸ä¸éå®ç?	details.FinalDamage = int(baseDamage)
 	
 	return int(baseDamage), details
 }
 
-// calculatePhysicalDamage 计算物理伤害（保持向后兼容）
+// calculatePhysicalDamage è®¡ç®ç©çä¼¤å®³ï¼ä¿æååå¼å®¹ï¼
 func (m *BattleManager) calculatePhysicalDamage(attack, defense int) int {
 	damage, _ := m.calculatePhysicalDamageWithDetails(attack, defense)
 	return damage
 }
 
-// calculateMagicDamage 计算魔法伤害（返回详情）
+// calculateMagicDamage è®¡ç®é­æ³ä¼¤å®³ï¼è¿åè¯¦æï¼
 func (m *BattleManager) calculateMagicDamageWithDetails(attack, defense int) (int, *DamageCalculationDetails) {
 	details := &DamageCalculationDetails{
 		BaseAttack:      attack,
@@ -1406,30 +1274,28 @@ func (m *BattleManager) calculateMagicDamageWithDetails(attack, defense int) (in
 		DefenseModifiers: []string{},
 	}
 	
-	// 基础伤害 = 实际攻击力 - 目标防御力（不再除以2）
-	baseDamage := float64(attack) - float64(defense)
+	// åºç¡ä¼¤å®³ = å®éæ»å»å?- ç®æ é²å¾¡åï¼ä¸åé¤ä»¥2ï¼?	baseDamage := float64(attack) - float64(defense)
 	if baseDamage < 1 {
 		baseDamage = 1
 	}
 	details.BaseDamage = baseDamage
-	details.Variance = 0 // 不再使用随机波动，未来通过装备的攻击力上下限实现
-	details.FinalDamage = int(baseDamage)
+	details.Variance = 0 // ä¸åä½¿ç¨éæºæ³¢å¨ï¼æªæ¥éè¿è£å¤çæ»å»åä¸ä¸éå®ç?	details.FinalDamage = int(baseDamage)
 	
 	return int(baseDamage), details
 }
 
-// calculateMagicDamage 计算魔法伤害（保持向后兼容）
+// calculateMagicDamage è®¡ç®é­æ³ä¼¤å®³ï¼ä¿æååå¼å®¹ï¼
 func (m *BattleManager) calculateMagicDamage(attack, defense int) int {
 	damage, _ := m.calculateMagicDamageWithDetails(attack, defense)
 	return damage
 }
 
-// calculateDamage 计算伤害（兼容旧代码，默认使用物理）
+// calculateDamage è®¡ç®ä¼¤å®³ï¼å¼å®¹æ§ä»£ç ï¼é»è®¤ä½¿ç¨ç©çï¼
 func (m *BattleManager) calculateDamage(attack, defense int) int {
 	return m.calculatePhysicalDamage(attack, defense)
 }
 
-// addLog 添加日志
+// addLog æ·»å æ¥å¿
 func (m *BattleManager) addLog(session *BattleSession, logType, message, color string) {
 	log := models.BattleLog{
 		Message:   message,
@@ -1438,120 +1304,112 @@ func (m *BattleManager) addLog(session *BattleSession, logType, message, color s
 	}
 	session.BattleLogs = append(session.BattleLogs, log)
 
-	// 保持日志数量在合理范围
-	if len(session.BattleLogs) > 200 {
+	// ä¿ææ¥å¿æ°éå¨åçèå?	if len(session.BattleLogs) > 200 {
 		session.BattleLogs = session.BattleLogs[len(session.BattleLogs)-200:]
 	}
 }
 
-// addBattleSummary 添加战斗总结和分割线
+// addBattleSummary æ·»å æææ»ç»ååå²çº¿
 func (m *BattleManager) addBattleSummary(session *BattleSession, isVictory bool, logs *[]models.BattleLog) {
-	// 生成战斗总结，使用不同颜色标记不同指标
-	var summaryMsg string
+	// çææææ»ç»ï¼ä½¿ç¨ä¸åé¢è²æ è®°ä¸åææ ?	var summaryMsg string
 	if isVictory {
 		if session.CurrentBattleKills > 0 {
-			// 使用HTML标签为不同部分添加颜色
-			// 结果：金色 #ffd700，击杀：红色 #ff4444，经验：蓝色 #3d85c6，金币：金色 #ffd700
-			summaryMsg = fmt.Sprintf("━━━ 战斗总结 ━━━ 结果: <span style=\"color: #ffd700\">✓ 胜利</span> | 击杀: <span style=\"color: #ff4444\">%d</span> | 经验: <span style=\"color: #3d85c6\">%d</span> | 金币: <span style=\"color: #ffd700\">%d</span>",
+			// ä½¿ç¨HTMLæ ç­¾ä¸ºä¸åé¨åæ·»å é¢è?			// ç»æï¼éè?#ffd700ï¼å»æï¼çº¢è?#ff4444ï¼ç»éªï¼èè² #3d85c6ï¼éå¸ï¼éè² #ffd700
+			summaryMsg = fmt.Sprintf("âââ?æææ»ç» âââ?ç»æ: <span style=\"color: #ffd700\">â?èå©</span> | å»æ: <span style=\"color: #ff4444\">%d</span> | ç»éª: <span style=\"color: #3d85c6\">%d</span> | éå¸: <span style=\"color: #ffd700\">%d</span>",
 				session.CurrentBattleKills, session.CurrentBattleExp, session.CurrentBattleGold)
 		} else {
-			summaryMsg = "━━━ 战斗总结 ━━━ 结果: <span style=\"color: #ffd700\">✓ 胜利</span>"
+			summaryMsg = "âââ?æææ»ç» âââ?ç»æ: <span style=\"color: #ffd700\">â?èå©</span>"
 		}
 		m.addLog(session, "battle_summary", summaryMsg, "#ffd700")
 		*logs = append(*logs, session.BattleLogs[len(session.BattleLogs)-1])
 	} else {
-		// 失败时的总结
+		// å¤±è´¥æ¶çæ»ç»
 		if session.CurrentBattleKills > 0 {
-			// 结果：红色 #ff6666，击杀：橙色 #ffaa00，经验：蓝色 #3d85c6，金币：金色 #ffd700
-			summaryMsg = fmt.Sprintf("━━━ 战斗总结 ━━━ 结果: <span style=\"color: #ff6666\">✗ 失败</span> | 击杀: <span style=\"color: #ffaa00\">%d</span> | 经验: <span style=\"color: #3d85c6\">%d</span> | 金币: <span style=\"color: #ffd700\">%d</span>",
+			// ç»æï¼çº¢è?#ff6666ï¼å»æï¼æ©è?#ffaa00ï¼ç»éªï¼èè² #3d85c6ï¼éå¸ï¼éè² #ffd700
+			summaryMsg = fmt.Sprintf("âââ?æææ»ç» âââ?ç»æ: <span style=\"color: #ff6666\">â?å¤±è´¥</span> | å»æ: <span style=\"color: #ffaa00\">%d</span> | ç»éª: <span style=\"color: #3d85c6\">%d</span> | éå¸: <span style=\"color: #ffd700\">%d</span>",
 				session.CurrentBattleKills, session.CurrentBattleExp, session.CurrentBattleGold)
 		} else {
-			summaryMsg = "━━━ 战斗总结 ━━━ 结果: <span style=\"color: #ff6666\">✗ 失败</span>"
+			summaryMsg = "âââ?æææ»ç» âââ?ç»æ: <span style=\"color: #ff6666\">â?å¤±è´¥</span>"
 		}
 		m.addLog(session, "battle_summary", summaryMsg, "#ff6666")
 		*logs = append(*logs, session.BattleLogs[len(session.BattleLogs)-1])
 	}
 
-	// 添加分割线
-	m.addLog(session, "battle_separator", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", "#666666")
+	// æ·»å åå²çº?	m.addLog(session, "battle_separator", "ââââââââââââââââââââââââââââââââââââââââ", "#666666")
 	*logs = append(*logs, session.BattleLogs[len(session.BattleLogs)-1])
 }
 
-// getResourceName 获取资源的中文名称
-func (m *BattleManager) getResourceName(resourceType string) string {
+// getResourceName è·åèµæºçä¸­æåç§?func (m *BattleManager) getResourceName(resourceType string) string {
 	switch resourceType {
 	case "rage":
-		return "怒气"
+		return "ææ°"
 	case "mana":
 		return "MP"
 	case "energy":
-		return "能量"
+		return "è½é"
 	default:
-		return "资源"
+		return "èµæº"
 	}
 }
 
-// getResourceColor 获取资源的颜色（参考魔兽世界）
+// getResourceColor è·åèµæºçé¢è²ï¼åèé­å½ä¸çï¼
 func (m *BattleManager) getResourceColor(resourceType string) string {
 	switch resourceType {
 	case "rage":
-		return "#ff4444" // 红色 - 怒气
+		return "#ff4444" // çº¢è² - ææ°
 	case "mana":
-		return "#3d85c6" // 蓝色 - 法力
+		return "#3d85c6" // èè² - æ³å
 	case "energy":
-		return "#ffd700" // 金色/黄色 - 能量
+		return "#ffd700" // éè²/é»è² - è½é
 	default:
-		return "#ffffff" // 白色 - 默认
+		return "#ffffff" // ç½è² - é»è®¤
 	}
 }
 
-// formatDamageFormula 格式化伤害计算公式文本
-func (m *BattleManager) formatDamageFormula(details *DamageCalculationDetails) string {
+// formatDamageFormula æ ¼å¼åä¼¤å®³è®¡ç®å¬å¼ææ?func (m *BattleManager) formatDamageFormula(details *DamageCalculationDetails) string {
 	if details == nil {
 		return ""
 	}
 	
 	var formulaParts []string
 	
-	// 基础公式：攻击力 - 防御力
-	baseFormula := fmt.Sprintf("%d - %d", details.BaseAttack, details.BaseDefense)
+	// åºç¡å¬å¼ï¼æ»å»å - é²å¾¡å?	baseFormula := fmt.Sprintf("%d - %d", details.BaseAttack, details.BaseDefense)
 	if details.BaseDamage > 0 {
 		baseFormula = fmt.Sprintf("%s = %.0f", baseFormula, details.BaseDamage)
 	}
 	formulaParts = append(formulaParts, baseFormula)
 	
-	// 如果有攻击力加成
+	// å¦æææ»å»åå æ
 	if len(details.AttackModifiers) > 0 {
 		modifierText := strings.Join(details.AttackModifiers, ", ")
 		if details.ActualAttack > float64(details.BaseAttack) {
-			formulaParts = append(formulaParts, fmt.Sprintf("攻击加成: %s → %.0f", modifierText, details.ActualAttack))
+			formulaParts = append(formulaParts, fmt.Sprintf("æ»å»å æ: %s â?%.0f", modifierText, details.ActualAttack))
 		} else {
-			formulaParts = append(formulaParts, fmt.Sprintf("攻击加成: %s", modifierText))
+			formulaParts = append(formulaParts, fmt.Sprintf("æ»å»å æ: %s", modifierText))
 		}
 	}
 	
-	// 如果有防御力修改
+	// å¦ææé²å¾¡åä¿®æ¹
 	if len(details.DefenseModifiers) > 0 {
 		modifierText := strings.Join(details.DefenseModifiers, ", ")
-		formulaParts = append(formulaParts, fmt.Sprintf("防御修改: %s", modifierText))
+		formulaParts = append(formulaParts, fmt.Sprintf("é²å¾¡ä¿®æ¹: %s", modifierText))
 	}
 	
-	// 显示暴击判定过程（如果进行了暴击判定）
-	// 检查是否进行了暴击判定：如果 ActualCritRate >= 0 且 RandomRoll >= 0，说明进行了判定
+	// æ¾ç¤ºæ´å»å¤å®è¿ç¨ï¼å¦æè¿è¡äºæ´å»å¤å®ï¼?	// æ£æ¥æ¯å¦è¿è¡äºæ´å»å¤å®ï¼å¦æ?ActualCritRate >= 0 ä¸?RandomRoll >= 0ï¼è¯´æè¿è¡äºå¤å®
 	if details.ActualCritRate >= 0 && details.RandomRoll >= 0 {
-		critInfo := fmt.Sprintf("暴击率: %.1f%%", details.BaseCritRate*100)
+		critInfo := fmt.Sprintf("æ´å»ç? %.1f%%", details.BaseCritRate*100)
 		if len(details.CritModifiers) > 0 {
 			critInfo += fmt.Sprintf(" + %s = %.1f%%", strings.Join(details.CritModifiers, " + "), details.ActualCritRate*100)
 		} else if details.ActualCritRate != details.BaseCritRate {
 			critInfo += fmt.Sprintf(" = %.1f%%", details.ActualCritRate*100)
 		}
-		critInfo += fmt.Sprintf(" | 随机: %.3f", details.RandomRoll)
+		critInfo += fmt.Sprintf(" | éæº: %.3f", details.RandomRoll)
 		if details.IsCrit {
-			critInfo += fmt.Sprintf(" < %.3f ✓暴击", details.ActualCritRate)
-			formulaParts = append(formulaParts, fmt.Sprintf("💥%s | 伤害: %.0f × %.1f = %d", 
+			critInfo += fmt.Sprintf(" < %.3f âæ´å?, details.ActualCritRate)
+			formulaParts = append(formulaParts, fmt.Sprintf("ð¥%s | ä¼¤å®³: %.0f Ã %.1f = %d", 
 				critInfo, details.BaseDamage, details.CritMultiplier, details.FinalDamage))
 		} else {
-			critInfo += fmt.Sprintf(" ≥ %.3f ✗未暴击", details.ActualCritRate)
+			critInfo += fmt.Sprintf(" â?%.3f âæªæ´å»", details.ActualCritRate)
 			formulaParts = append(formulaParts, critInfo)
 		}
 	}
@@ -1560,13 +1418,12 @@ func (m *BattleManager) formatDamageFormula(details *DamageCalculationDetails) s
 		return ""
 	}
 	
-	// 使用较亮的灰色显示公式，提高可读性
-	// 使用圆括号而不是方括号，避免被前端的技能名匹配规则影响
+	// ä½¿ç¨è¾äº®çç°è²æ¾ç¤ºå¬å¼ï¼æé«å¯è¯»æ?	// ä½¿ç¨åæ¬å·èä¸æ¯æ¹æ¬å·ï¼é¿åè¢«åç«¯çæè½åå¹éè§åå½±å
 	formulaText := strings.Join(formulaParts, " | ")
 	return fmt.Sprintf(" <span style=\"color: #bbbbbb !important; opacity: 0.95;\">(%s)</span>", formulaText)
 }
 
-// formatResourceChange 格式化资源变化文本（带颜色）
+// formatResourceChange æ ¼å¼åèµæºååææ¬ï¼å¸¦é¢è²ï¼
 func (m *BattleManager) formatResourceChange(resourceType string, cost int, gain int) string {
 	if cost == 0 && gain == 0 {
 		return ""
@@ -1587,7 +1444,7 @@ func (m *BattleManager) formatResourceChange(resourceType string, cost int, gain
 		return ""
 	}
 
-	// 将多个部分用空格连接
+	// å°å¤ä¸ªé¨åç¨ç©ºæ ¼è¿æ¥
 	changeText := ""
 	for i, part := range parts {
 		if i > 0 {
@@ -1599,73 +1456,63 @@ func (m *BattleManager) formatResourceChange(resourceType string, cost int, gain
 	return fmt.Sprintf(" (<span style=\"color: %s\">%s</span> %s)", color, resourceName, changeText)
 }
 
-// getRandomSkillName 获取随机技能名称
-func (m *BattleManager) getRandomSkillName(classID string) string {
+// getRandomSkillName è·åéæºæè½åç§?func (m *BattleManager) getRandomSkillName(classID string) string {
 	skills := map[string][]string{
-		"warrior": {"英勇打击", "雷霆一击", "顺劈斩", "致死打击"},
-		"paladin": {"圣光术", "十字军打击", "正义之锤", "审判"},
-		"hunter":  {"奥术射击", "多重射击", "瞄准射击", "稳固射击"},
-		"rogue":   {"邪恶攻击", "剔骨", "背刺", "毒刃"},
-		"priest":  {"惩击", "暗言术:痛", "神圣之火", "心灵震爆"},
-		"mage":    {"火球术", "寒冰箭", "奥术飞弹", "炎爆术"},
-		"warlock": {"暗影箭", "腐蚀术", "献祭", "混乱箭"},
-		"druid":   {"月火术", "愤怒", "挥击", "横扫"},
-		"shaman":  {"闪电箭", "闪电链", "熔岩爆裂", "烈焰震击"},
+		"warrior": {"è±åæå»", "é·éä¸å?, "é¡ºåæ?, "è´æ­»æå»"},
+		"paladin": {"å£åæ?, "åå­åæå?, "æ­£ä¹ä¹é¤", "å®¡å¤"},
+		"hunter":  {"å¥¥æ¯å°å»", "å¤éå°å»", "çåå°å»", "ç¨³åºå°å»"},
+		"rogue":   {"éªæ¶æ»å»", "åéª¨", "èåº", "æ¯å"},
+		"priest":  {"æ©å»", "æè¨æ?ç?, "ç¥å£ä¹ç«", "å¿çµéç"},
+		"mage":    {"ç«çæ?, "å¯å°ç®?, "å¥¥æ¯é£å¼¹", "ççæ?},
+		"warlock": {"æå½±ç®?, "èèæ?, "ç®ç¥­", "æ··ä¹±ç®?},
+		"druid":   {"æç«æ?, "æ¤æ?, "æ¥å»", "æ¨ªæ«"},
+		"shaman":  {"éªçµç®?, "éªçµé?, "çå²©çè£", "çç°éå»"},
 	}
 
 	if classSkills, ok := skills[classID]; ok {
 		return classSkills[rand.Intn(len(classSkills))]
 	}
-	return "普通攻击"
+	return "æ®éæ»å?
 }
 
-// getSkillForAttack 获取攻击技能名称和消耗
-func (m *BattleManager) getSkillForAttack(char *models.Character) (string, int) {
-	// 战士技能及其怒气消耗
-	warriorSkills := []struct {
+// getSkillForAttack è·åæ»å»æè½åç§°åæ¶è?func (m *BattleManager) getSkillForAttack(char *models.Character) (string, int) {
+	// æå£«æè½åå¶ææ°æ¶è?	warriorSkills := []struct {
 		name string
 		cost int
 	}{
-		{"英勇打击", 10},
-		{"雷霆一击", 15},
-		{"顺劈斩", 12},
-		{"致死打击", 20},
+		{"è±åæå»", 10},
+		{"é·éä¸å?, 15},
+		{"é¡ºåæ?, 12},
+		{"è´æ­»æå»", 20},
 	}
 
-	// 如果是战士，返回随机技能和消耗
-	if char.ResourceType == "rage" {
+	// å¦ææ¯æå£«ï¼è¿åéæºæè½åæ¶è?	if char.ResourceType == "rage" {
 		skill := warriorSkills[rand.Intn(len(warriorSkills))]
 		return skill.name, skill.cost
 	}
 
-	// 其他职业使用普通技能，不消耗资源（或消耗法力，但这里简化处理）
+	// å¶ä»èä¸ä½¿ç¨æ®éæè½ï¼ä¸æ¶èèµæºï¼ææ¶èæ³åï¼ä½è¿éç®åå¤çï¼
 	skillName := m.getRandomSkillName(char.ClassID)
 	return skillName, 0
 }
 
-// calculateReviveTime 计算复活时间（根据死亡人数）
+// calculateReviveTime è®¡ç®å¤æ´»æ¶é´ï¼æ ¹æ®æ­»äº¡äººæ°ï¼
 func (m *BattleManager) calculateReviveTime(userID int) time.Duration {
-	// 获取所有角色（所有角色都参与战斗）
-	characters, err := m.charRepo.GetByUserID(userID)
+	// è·åææè§è²ï¼ææè§è²é½åä¸ææï¼?	characters, err := m.charRepo.GetByUserID(userID)
 	if err != nil {
-		return 30 * time.Second // 默认30秒
-	}
+		return 30 * time.Second // é»è®¤30ç§?	}
 
-	// 统计死亡角色的数量
-	deadCount := 0
+	// ç»è®¡æ­»äº¡è§è²çæ°é?	deadCount := 0
 	for _, char := range characters {
 		if char.IsDead {
 			deadCount++
 		}
 	}
 
-	// 如果没有死亡角色，返回默认值
-	if deadCount == 0 {
-		deadCount = 1 // 至少有一个角色死亡才会调用这个函数
-	}
+	// å¦ææ²¡ææ­»äº¡è§è²ï¼è¿åé»è®¤å?	if deadCount == 0 {
+		deadCount = 1 // è³å°æä¸ä¸ªè§è²æ­»äº¡æä¼è°ç¨è¿ä¸ªå½æ?	}
 
-	// 根据死亡人数计算复活时间（秒）
-	var reviveSeconds int
+	// æ ¹æ®æ­»äº¡äººæ°è®¡ç®å¤æ´»æ¶é´ï¼ç§ï¼?	var reviveSeconds int
 	switch deadCount {
 	case 1:
 		reviveSeconds = 30
@@ -1675,35 +1522,30 @@ func (m *BattleManager) calculateReviveTime(userID int) time.Duration {
 		reviveSeconds = 90
 	case 4:
 		reviveSeconds = 120
-	default: // 5人或更多
+	default: // 5äººææ´å¤
 		reviveSeconds = 180
 	}
 
 	return time.Duration(reviveSeconds) * time.Second
 }
 
-// calculateRestTime 计算休息时间（基于HP/MP损失）
-// 注意：战士的怒气不需要恢复，战斗结束后直接归0，每场战斗从0开始
-func (m *BattleManager) calculateRestTime(char *models.Character) time.Duration {
+// calculateRestTime è®¡ç®ä¼æ¯æ¶é´ï¼åºäºHP/MPæå¤±ï¼?// æ³¨æï¼æå£«çææ°ä¸éè¦æ¢å¤ï¼ææç»æåç´æ¥å½0ï¼æ¯åºææä»0å¼å§?func (m *BattleManager) calculateRestTime(char *models.Character) time.Duration {
 	hpLoss := float64(char.MaxHP - char.HP)
 
-	// 战士的怒气不需要恢复，只计算HP损失
-	// 其他职业需要计算MP损失
+	// æå£«çææ°ä¸éè¦æ¢å¤ï¼åªè®¡ç®HPæå¤±
+	// å¶ä»èä¸éè¦è®¡ç®MPæå¤±
 	var mpLoss float64
 	if char.ResourceType != "rage" {
 		mpLoss = float64(char.MaxResource - char.Resource)
 	} else {
-		// 战士的怒气不参与休息时间计算
-		mpLoss = 0
+		// æå£«çææ°ä¸åä¸ä¼æ¯æ¶é´è®¡ç®?		mpLoss = 0
 	}
 
-	// 如果已经满血满蓝（或满血），不需要休息
-	if hpLoss <= 0 && mpLoss <= 0 {
+	// å¦æå·²ç»æ»¡è¡æ»¡èï¼ææ»¡è¡ï¼ï¼ä¸éè¦ä¼æ?	if hpLoss <= 0 && mpLoss <= 0 {
 		return 0
 	}
 
-	// 分别计算HP和MP的恢复时间
-	// 每秒恢复2%，所以需要的时间 = 损失百分比 / 0.02 = 损失百分比 * 50
+	// åå«è®¡ç®HPåMPçæ¢å¤æ¶é?	// æ¯ç§æ¢å¤2%ï¼æä»¥éè¦çæ¶é´ = æå¤±ç¾åæ¯?/ 0.02 = æå¤±ç¾åæ¯?* 50
 	hpLossPercent := hpLoss / float64(char.MaxHP)
 
 	hpRestSeconds := hpLossPercent * 50.0
@@ -1715,19 +1557,17 @@ func (m *BattleManager) calculateRestTime(char *models.Character) time.Duration 
 		mpRestSeconds = 0
 	}
 
-	// 取两者中的最大值，因为HP和MP是同时恢复的
+	// åä¸¤èä¸­çæå¤§å¼ï¼å ä¸ºHPåMPæ¯åæ¶æ¢å¤ç
 	restSeconds := hpRestSeconds
 	if mpRestSeconds > restSeconds {
 		restSeconds = mpRestSeconds
 	}
 
-	// 最少1秒
-	if restSeconds < 1.0 {
+	// æå°?ç§?	if restSeconds < 1.0 {
 		restSeconds = 1.0
 	}
 
-	// 应用恢复速度倍率（未来可以从装备获取）
-	restSpeed := 1.0 // 默认恢复速度
+	// åºç¨æ¢å¤éåº¦åçï¼æªæ¥å¯ä»¥ä»è£å¤è·åï¼?	restSpeed := 1.0 // é»è®¤æ¢å¤éåº¦
 	if restSpeed > 0 {
 		restSeconds = restSeconds / restSpeed
 	}
@@ -1735,37 +1575,34 @@ func (m *BattleManager) calculateRestTime(char *models.Character) time.Duration 
 	return time.Duration(restSeconds) * time.Second
 }
 
-// processRest 处理休息期间的恢复
-func (m *BattleManager) processRest(session *BattleSession, char *models.Character) {
+// processRest å¤çä¼æ¯æé´çæ¢å¤?func (m *BattleManager) processRest(session *BattleSession, char *models.Character) {
 	if !session.IsResting || session.RestUntil == nil || session.RestStartedAt == nil {
 		return
 	}
 
 	now := time.Now()
 
-	// 检查角色是否已经复活（如果角色死亡且有复活时间）
-	if char.IsDead && char.ReviveAt != nil {
+	// æ£æ¥è§è²æ¯å¦å·²ç»å¤æ´»ï¼å¦æè§è²æ­»äº¡ä¸æå¤æ´»æ¶é´ï¼?	if char.IsDead && char.ReviveAt != nil {
 		if now.After(*char.ReviveAt) || now.Equal(*char.ReviveAt) {
-			// 复活时间到了，恢复角色到一半HP
+			// å¤æ´»æ¶é´å°äºï¼æ¢å¤è§è²å°ä¸åHP
 			char.HP = char.MaxHP / 2
 			char.IsDead = false
 			char.ReviveAt = nil
 
-			// 更新数据库，清除死亡标记
+			// æ´æ°æ°æ®åºï¼æ¸é¤æ­»äº¡æ è®°
 			m.charRepo.SetDead(char.ID, false, nil)
 
-			// 更新角色HP
+			// æ´æ°è§è²HP
 			m.charRepo.UpdateAfterBattle(char.ID, char.HP, char.Resource, char.Exp, char.Level,
 				char.ExpToNext, char.MaxHP, char.MaxResource, char.PhysicalAttack, char.MagicAttack, char.PhysicalDefense, char.MagicDefense,
 				char.Strength, char.Agility, char.Stamina, char.TotalKills)
 
-			// 记录复活日志
-			m.addLog(session, "revive", fmt.Sprintf("%s 已复活，HP恢复至 %d/%d", char.Name, char.HP, char.MaxHP), "#00ff00")
+			// è®°å½å¤æ´»æ¥å¿
+			m.addLog(session, "revive", fmt.Sprintf("%s å·²å¤æ´»ï¼HPæ¢å¤è?%d/%d", char.Name, char.HP, char.MaxHP), "#00ff00")
 		}
 	}
 
-	// 检查是否已经恢复满血满蓝，如果是则提前结束休息
-	if char.HP >= char.MaxHP && char.Resource >= char.MaxResource {
+	// æ£æ¥æ¯å¦å·²ç»æ¢å¤æ»¡è¡æ»¡èï¼å¦ææ¯åæåç»æä¼æ?	if char.HP >= char.MaxHP && char.Resource >= char.MaxResource {
 		session.IsResting = false
 		session.RestUntil = nil
 		session.RestStartedAt = nil
@@ -1774,45 +1611,39 @@ func (m *BattleManager) processRest(session *BattleSession, char *models.Charact
 	}
 
 	if now.Before(*session.RestUntil) {
-		// 计算从上次恢复到现在经过的时间
-		var elapsed time.Duration
+		// è®¡ç®ä»ä¸æ¬¡æ¢å¤å°ç°å¨ç»è¿çæ¶é?		var elapsed time.Duration
 		if session.LastRestTick == nil {
-			// 第一次恢复，从休息开始时间计算
-			elapsed = now.Sub(*session.RestStartedAt)
+			// ç¬¬ä¸æ¬¡æ¢å¤ï¼ä»ä¼æ¯å¼å§æ¶é´è®¡ç®?			elapsed = now.Sub(*session.RestStartedAt)
 		} else {
-			// 从上次恢复时间计算
-			elapsed = now.Sub(*session.LastRestTick)
+			// ä»ä¸æ¬¡æ¢å¤æ¶é´è®¡ç®?			elapsed = now.Sub(*session.LastRestTick)
 		}
 
-		// 如果时间间隔太长（超过1秒），限制为1秒，避免一次性恢复过多
-		if elapsed > time.Second {
+		// å¦ææ¶é´é´éå¤ªé¿ï¼è¶è¿?ç§ï¼ï¼éå¶ä¸º1ç§ï¼é¿åä¸æ¬¡æ§æ¢å¤è¿å¤?		if elapsed > time.Second {
 			elapsed = time.Second
 		}
 
-		// 如果时间间隔太短（小于0.1秒），跳过恢复，避免频繁计算
+		// å¦ææ¶é´é´éå¤ªç­ï¼å°äº?.1ç§ï¼ï¼è·³è¿æ¢å¤ï¼é¿åé¢ç¹è®¡ç®
 		if elapsed < 100*time.Millisecond {
 			return
 		}
 
-		// 计算恢复速度（每秒恢复最大值的2%）
-		restSpeed := session.RestSpeed
+		// è®¡ç®æ¢å¤éåº¦ï¼æ¯ç§æ¢å¤æå¤§å¼ç2%ï¼?		restSpeed := session.RestSpeed
 		if restSpeed <= 0 {
 			restSpeed = 1.0
 		}
 
-		// 计算经过的秒数
-		elapsedSeconds := elapsed.Seconds()
+		// è®¡ç®ç»è¿çç§æ?		elapsedSeconds := elapsed.Seconds()
 
-		// 如果角色已经死亡但还没到复活时间，不恢复HP
+		// å¦æè§è²å·²ç»æ­»äº¡ä½è¿æ²¡å°å¤æ´»æ¶é´ï¼ä¸æ¢å¤HP
 		if char.IsDead && char.ReviveAt != nil && now.Before(*char.ReviveAt) {
-			// 只恢复资源（如果适用），不恢复HP
+			// åªæ¢å¤èµæºï¼å¦æéç¨ï¼ï¼ä¸æ¢å¤HP
 		} else {
-			// 根据实际经过的时间计算恢复量
-			hpRegenPercent := 0.02 * restSpeed * elapsedSeconds // 每秒2%
+			// æ ¹æ®å®éç»è¿çæ¶é´è®¡ç®æ¢å¤é
+			hpRegenPercent := 0.02 * restSpeed * elapsedSeconds // æ¯ç§2%
 
 			hpRegen := int(float64(char.MaxHP) * hpRegenPercent)
 
-			// 确保至少恢复1点（如果还没满）
+			// ç¡®ä¿è³å°æ¢å¤1ç¹ï¼å¦æè¿æ²¡æ»¡ï¼
 			if hpRegen < 1 && char.HP < char.MaxHP {
 				hpRegen = 1
 			}
@@ -1823,7 +1654,7 @@ func (m *BattleManager) processRest(session *BattleSession, char *models.Charact
 			}
 		}
 
-		// 战士的怒气不在休息时恢复，只在战斗中通过攻击/受击获得
+		// æå£«çææ°ä¸å¨ä¼æ¯æ¶æ¢å¤ï¼åªå¨ææä¸­éè¿æ»å»/åå»è·å¾
 		if char.ResourceType != "rage" {
 			mpRegenPercent := 0.02 * restSpeed * elapsedSeconds
 			mpRegen := int(float64(char.MaxResource) * mpRegenPercent)
@@ -1838,23 +1669,21 @@ func (m *BattleManager) processRest(session *BattleSession, char *models.Charact
 			}
 		}
 
-		// 更新上次恢复时间
+		// æ´æ°ä¸æ¬¡æ¢å¤æ¶é´
 		session.LastRestTick = &now
 
-		// 恢复后再次检查是否已满，如果满了则提前结束休息
-		if char.HP >= char.MaxHP && char.Resource >= char.MaxResource {
+		// æ¢å¤ååæ¬¡æ£æ¥æ¯å¦å·²æ»¡ï¼å¦ææ»¡äºåæåç»æä¼æ?		if char.HP >= char.MaxHP && char.Resource >= char.MaxResource {
 			session.IsResting = false
 			session.RestUntil = nil
 			session.RestStartedAt = nil
 			session.LastRestTick = nil
 		}
 	} else {
-		// 休息时间到了，结束休息
-		// 确保HP已满
+		// ä¼æ¯æ¶é´å°äºï¼ç»æä¼æ?		// ç¡®ä¿HPå·²æ»¡
 		if char.HP < char.MaxHP {
 			char.HP = char.MaxHP
 		}
-		// 战士的怒气不在休息时恢复，只在战斗中通过攻击/受击获得
+		// æå£«çææ°ä¸å¨ä¼æ¯æ¶æ¢å¤ï¼åªå¨ææä¸­éè¿æ»å»/åå»è·å¾
 		if char.ResourceType != "rage" {
 			if char.Resource < char.MaxResource {
 				char.Resource = char.MaxResource
@@ -1867,186 +1696,177 @@ func (m *BattleManager) processRest(session *BattleSession, char *models.Charact
 	}
 }
 
-// BattleTickResult 战斗回合结果
+// BattleTickResult ææååç»æ
 type BattleTickResult struct {
 	Character    *models.Character  `json:"character"`
 	Enemy        *models.Monster    `json:"enemy,omitempty"`
-	Enemies      []*models.Monster  `json:"enemies,omitempty"` // 多个敌人支持
+	Enemies      []*models.Monster  `json:"enemies,omitempty"` // å¤ä¸ªæäººæ¯æ
 	Logs         []models.BattleLog `json:"logs"`
 	IsRunning    bool               `json:"isRunning"`
-	IsResting    bool               `json:"isResting"`           // 是否在休息
-	RestUntil    *time.Time         `json:"restUntil,omitempty"` // 休息结束时间
+	IsResting    bool               `json:"isResting"`           // æ¯å¦å¨ä¼æ?	RestUntil    *time.Time         `json:"restUntil,omitempty"` // ä¼æ¯ç»ææ¶é´
 	SessionKills int                `json:"sessionKills"`
 	SessionGold  int                `json:"sessionGold"`
 	SessionExp   int                `json:"sessionExp"`
 	BattleCount  int                `json:"battleCount"`
 }
 
-// applySkillBuffs 应用技能的Buff/Debuff效果
+// applySkillBuffs åºç¨æè½çBuff/Debuffææ
 func (m *BattleManager) applySkillBuffs(skillState *CharacterSkillState, character *models.Character, target *models.Monster, skillEffects map[string]interface{}) {
 	skill := skillState.Skill
 	effect := skillState.Effect
 
 	switch skill.ID {
 	case "warrior_shield_block":
-		// 盾牌格挡：减少受到的物理伤害
+		// ç¾çæ ¼æ¡ï¼åå°åå°çç©çä¼¤å®³
 		if damageReduction, ok := effect["damageReduction"].(float64); ok {
 			duration := 2
 			if d, ok := effect["duration"].(int); ok {
 				duration = d
 			}
-			m.buffManager.ApplyBuff(character.ID, "shield_block", "盾牌格挡", "buff", true, duration, -damageReduction, "physical_damage_taken", "")
+			m.buffManager.ApplyBuff(character.ID, "shield_block", "ç¾çæ ¼æ¡", "buff", true, duration, -damageReduction, "physical_damage_taken", "")
 		}
 	case "warrior_battle_shout":
-		// 战斗怒吼：提升攻击力
+		// æææå¼ï¼æåæ»å»å
 		if attackBonus, ok := effect["attackBonus"].(float64); ok {
 			duration := 5
 			if d, ok := effect["duration"].(int); ok {
 				duration = d
 			}
-			m.buffManager.ApplyBuff(character.ID, "battle_shout", "战斗怒吼", "buff", true, duration, attackBonus, "attack", "")
+			m.buffManager.ApplyBuff(character.ID, "battle_shout", "æææå¼", "buff", true, duration, attackBonus, "attack", "")
 		}
 	case "warrior_demoralizing_shout":
-		// 挫志怒吼：降低所有敌人攻击力（在applySkillDebuffs中处理）
+		// æ«å¿æå¼ï¼éä½æææäººæ»å»åï¼å¨applySkillDebuffsä¸­å¤çï¼
 	case "warrior_whirlwind":
-		// 旋风斩：降低所有敌人防御（在applySkillDebuffs中处理）
+		// æé£æ©ï¼éä½æææäººé²å¾¡ï¼å¨applySkillDebuffsä¸­å¤çï¼
 	case "warrior_mortal_strike":
-		// 致死打击：降低目标治疗效果
-		if healingReduction, ok := effect["healingReduction"].(float64); ok {
+		// è´æ­»æå»ï¼éä½ç®æ æ²»çææ?		if healingReduction, ok := effect["healingReduction"].(float64); ok {
 			duration := 3
 			if d, ok := effect["debuffDuration"].(float64); ok {
 				duration = int(d)
 			}
-			// 应用到目标敌人
-			if target != nil {
-				m.buffManager.ApplyEnemyDebuff(target.ID, "mortal_strike", "致死打击", "debuff", duration, healingReduction, "healing_received", "")
+			// åºç¨å°ç®æ æäº?			if target != nil {
+				m.buffManager.ApplyEnemyDebuff(target.ID, "mortal_strike", "è´æ­»æå»", "debuff", duration, healingReduction, "healing_received", "")
 			}
 		}
 	case "warrior_last_stand":
-		// 破釜沉舟：立即恢复最大HP的百分比
+		// ç ´éæ²èï¼ç«å³æ¢å¤æå¤§HPçç¾åæ¯
 		if healPercent, ok := effect["healPercent"].(float64); ok {
-			// 立即恢复
+			// ç«å³æ¢å¤
 			healAmount := int(float64(character.MaxHP) * healPercent / 100.0)
 			character.HP += healAmount
 			if character.HP > character.MaxHP {
 				character.HP = character.MaxHP
 			}
-			// 通过skillEffects传递，在战斗日志中显示
+			// éè¿skillEffectsä¼ éï¼å¨æææ¥å¿ä¸­æ¾ç¤º
 			skillEffects["healMaxHpPercent"] = healPercent
 		}
 	case "warrior_unbreakable_barrier":
-		// 不灭壁垒：获得护盾
-		if shieldPercent, ok := effect["shieldPercent"].(float64); ok {
+		// ä¸ç­å£åï¼è·å¾æ¤ç?		if shieldPercent, ok := effect["shieldPercent"].(float64); ok {
 			duration := 4
 			if d, ok := effect["duration"].(float64); ok {
 				duration = int(d)
 			}
 			shieldAmount := int(float64(character.MaxHP) * shieldPercent / 100.0)
-			// 使用Buff存储护盾值，statAffected为"shield"，value为护盾值
-			m.buffManager.ApplyBuff(character.ID, "unbreakable_barrier", "不灭壁垒", "buff", true, duration, float64(shieldAmount), "shield", "")
+			// ä½¿ç¨Buffå­å¨æ¤ç¾å¼ï¼statAffectedä¸?shield"ï¼valueä¸ºæ¤ç¾å?			m.buffManager.ApplyBuff(character.ID, "unbreakable_barrier", "ä¸ç­å£å", "buff", true, duration, float64(shieldAmount), "shield", "")
 		}
 	case "warrior_shield_reflection":
-		// 盾牌反射：反射受到的伤害
+		// ç¾çåå°ï¼åå°åå°çä¼¤å®³
 		if reflectPercent, ok := effect["reflectPercent"].(float64); ok {
 			duration := 2
 			if d, ok := effect["duration"].(float64); ok {
 				duration = int(d)
 			}
-			// 使用Buff存储反射比例，statAffected为"reflect"，value为反射百分比
-			m.buffManager.ApplyBuff(character.ID, "shield_reflection", "盾牌反射", "buff", true, duration, reflectPercent, "reflect", "")
+			// ä½¿ç¨Buffå­å¨åå°æ¯ä¾ï¼statAffectedä¸?reflect"ï¼valueä¸ºåå°ç¾åæ¯
+			m.buffManager.ApplyBuff(character.ID, "shield_reflection", "ç¾çåå°", "buff", true, duration, reflectPercent, "reflect", "")
 		}
 	case "warrior_shield_wall":
-		// 盾墙：大幅减少受到的伤害
+		// ç¾å¢ï¼å¤§å¹åå°åå°çä¼¤å®³
 		if damageReduction, ok := effect["damageReduction"].(float64); ok {
 			duration := 2
 			if d, ok := effect["duration"].(float64); ok {
 				duration = int(d)
 			}
-			m.buffManager.ApplyBuff(character.ID, "shield_wall", "盾墙", "buff", true, duration, -damageReduction, "damage_taken", "")
+			m.buffManager.ApplyBuff(character.ID, "shield_wall", "ç¾å¢", "buff", true, duration, -damageReduction, "damage_taken", "")
 		}
 	case "warrior_recklessness":
-		// 鲁莽：提升暴击率，但受到伤害增加
+		// é²è½ï¼æåæ´å»çï¼ä½åå°ä¼¤å®³å¢å 
 		if critBonus, ok := effect["critBonus"].(float64); ok {
 			duration := 3
 			if d, ok := effect["duration"].(float64); ok {
 				duration = int(d)
 			}
-			m.buffManager.ApplyBuff(character.ID, "recklessness_crit", "鲁莽", "buff", true, duration, critBonus, "crit_rate", "")
+			m.buffManager.ApplyBuff(character.ID, "recklessness_crit", "é²è½", "buff", true, duration, critBonus, "crit_rate", "")
 		}
 		if damageIncrease, ok := effect["damageTakenIncrease"].(float64); ok {
 			duration := 3
 			if d, ok := effect["duration"].(float64); ok {
 				duration = int(d)
 			}
-			m.buffManager.ApplyBuff(character.ID, "recklessness_damage", "鲁莽", "debuff", false, duration, damageIncrease, "damage_taken", "")
+			m.buffManager.ApplyBuff(character.ID, "recklessness_damage", "é²è½", "debuff", false, duration, damageIncrease, "damage_taken", "")
 		}
 	case "warrior_retaliation":
-		// 反击风暴：受到攻击时反击
+		// åå»é£æ´ï¼åå°æ»å»æ¶åå»
 		if counterDamage, ok := effect["counterDamagePercent"].(float64); ok {
 			duration := 3
 			if d, ok := effect["duration"].(float64); ok {
 				duration = int(d)
 			}
-			m.buffManager.ApplyBuff(character.ID, "retaliation", "反击风暴", "buff", true, duration, counterDamage, "counter_attack", "")
+			m.buffManager.ApplyBuff(character.ID, "retaliation", "åå»é£æ´", "buff", true, duration, counterDamage, "counter_attack", "")
 		}
 	case "warrior_berserker_rage":
-		// 狂暴之怒：提升攻击力和怒气获取
+		// çæ´ä¹æï¼æåæ»å»ååææ°è·å
 		if attackBonus, ok := effect["attackBonus"].(float64); ok {
 			duration := 4
 			if d, ok := effect["duration"].(float64); ok {
 				duration = int(d)
 			}
-			m.buffManager.ApplyBuff(character.ID, "berserker_rage", "狂暴之怒", "buff", true, duration, attackBonus, "attack", "")
+			m.buffManager.ApplyBuff(character.ID, "berserker_rage", "çæ´ä¹æ?, "buff", true, duration, attackBonus, "attack", "")
 		}
 	case "warrior_avatar":
-		// 天神下凡：大幅提升攻击力，免疫控制
-		if attackBonus, ok := effect["attackBonus"].(float64); ok {
+		// å¤©ç¥ä¸å¡ï¼å¤§å¹æåæ»å»åï¼åç«æ§å?		if attackBonus, ok := effect["attackBonus"].(float64); ok {
 			duration := 3
 			if d, ok := effect["duration"].(float64); ok {
 				duration = int(d)
 			}
-			m.buffManager.ApplyBuff(character.ID, "avatar", "天神下凡", "buff", true, duration, attackBonus, "attack", "")
+			m.buffManager.ApplyBuff(character.ID, "avatar", "å¤©ç¥ä¸å¡", "buff", true, duration, attackBonus, "attack", "")
 		}
 		if immuneCC, ok := effect["immuneCC"].(bool); ok && immuneCC {
 			duration := 3
 			if d, ok := effect["duration"].(float64); ok {
 				duration = int(d)
 			}
-			m.buffManager.ApplyBuff(character.ID, "avatar_cc_immune", "天神下凡", "buff", true, duration, 1.0, "cc_immune", "")
+			m.buffManager.ApplyBuff(character.ID, "avatar_cc_immune", "å¤©ç¥ä¸å¡", "buff", true, duration, 1.0, "cc_immune", "")
 		}
 	}
 }
 
-// handleCounterAttacks 处理反击效果
+// handleCounterAttacks å¤çåå»ææ
 func (m *BattleManager) handleCounterAttacks(character *models.Character, attacker *models.Monster, damageTaken int, session *BattleSession, logs *[]models.BattleLog) {
-	// 处理Buff的反击效果（反击风暴）
-	buffs := m.buffManager.GetBuffs(character.ID)
+	// å¤çBuffçåå»ææï¼åå»é£æ´ï¼?	buffs := m.buffManager.GetBuffs(character.ID)
 	for _, buff := range buffs {
 		if buff.StatAffected == "counter_attack" && buff.IsBuff {
-			// 反击风暴：对攻击者造成反击伤害
+			// åå»é£æ´ï¼å¯¹æ»å»èé æåå»ä¼¤å®³
 			counterDamage := int(float64(character.PhysicalAttack) * buff.Value / 100.0)
 			attacker.HP -= counterDamage
 			if attacker.HP < 0 {
 				attacker.HP = 0
 			}
-			m.addLog(session, "combat", fmt.Sprintf("%s 的反击风暴对 %s 造成 %d 点反击伤害！", character.Name, attacker.Name, counterDamage), "#ff8800")
+			m.addLog(session, "combat", fmt.Sprintf("%s çåå»é£æ´å¯¹ %s é æ %d ç¹åå»ä¼¤å®³ï¼", character.Name, attacker.Name, counterDamage), "#ff8800")
 			*logs = append(*logs, session.BattleLogs[len(session.BattleLogs)-1])
 		}
 	}
 
-	// 处理被动技能的反击效果（复仇）
+	// å¤çè¢«å¨æè½çåå»ææï¼å¤ä»ï¼
 	if m.passiveSkillManager != nil {
 		passives := m.passiveSkillManager.GetPassiveSkills(character.ID)
 		for _, passive := range passives {
 			if passive.Passive.EffectType == "counter_attack" {
-				// 复仇：受到攻击时概率反击
-				// effectValue是触发概率（百分比），需要根据等级计算实际概率和伤害
+				// å¤ä»ï¼åå°æ»å»æ¶æ¦çåå»
+				// effectValueæ¯è§¦åæ¦çï¼ç¾åæ¯ï¼ï¼éè¦æ ¹æ®ç­çº§è®¡ç®å®éæ¦çåä¼¤å®³
 				triggerChance := passive.EffectValue / 100.0
 				if rand.Float64() < triggerChance {
-					// 计算反击伤害（根据等级：1级100%，5级180%）
-					counterDamagePercent := 100.0 + float64(passive.Level-1)*20.0
-					// 计算实际攻击力（应用被动技能和Buff加成）
-					actualAttack := float64(character.PhysicalAttack)
+					// è®¡ç®åå»ä¼¤å®³ï¼æ ¹æ®ç­çº§ï¼1çº?00%ï¼?çº?80%ï¼?					counterDamagePercent := 100.0 + float64(passive.Level-1)*20.0
+					// è®¡ç®å®éæ»å»åï¼åºç¨è¢«å¨æè½åBuffå æï¼?					actualAttack := float64(character.PhysicalAttack)
 					if m.passiveSkillManager != nil {
 						attackModifier := m.passiveSkillManager.GetPassiveModifier(character.ID, "attack")
 						actualAttack = actualAttack * (1.0 + attackModifier/100.0)
@@ -2066,7 +1886,7 @@ func (m *BattleManager) handleCounterAttacks(character *models.Character, attack
 					if attacker.HP < 0 {
 						attacker.HP = 0
 					}
-					m.addLog(session, "combat", fmt.Sprintf("%s 的复仇对 %s 造成 %d 点反击伤害！", character.Name, attacker.Name, counterDamage), "#ff8800")
+					m.addLog(session, "combat", fmt.Sprintf("%s çå¤ä»å¯¹ %s é æ %d ç¹åå»ä¼¤å®³ï¼", character.Name, attacker.Name, counterDamage), "#ff8800")
 					*logs = append(*logs, session.BattleLogs[len(session.BattleLogs)-1])
 				}
 			}
@@ -2074,8 +1894,7 @@ func (m *BattleManager) handleCounterAttacks(character *models.Character, attack
 	}
 }
 
-// handlePassiveOnHitEffects 处理被动技能的攻击时效果
-func (m *BattleManager) handlePassiveOnHitEffects(character *models.Character, damageDealt int, usedSkill bool, session *BattleSession, logs *[]models.BattleLog) {
+// handlePassiveOnHitEffects å¤çè¢«å¨æè½çæ»å»æ¶ææ?func (m *BattleManager) handlePassiveOnHitEffects(character *models.Character, damageDealt int, usedSkill bool, session *BattleSession, logs *[]models.BattleLog) {
 	if m.passiveSkillManager == nil {
 		return
 	}
@@ -2084,22 +1903,20 @@ func (m *BattleManager) handlePassiveOnHitEffects(character *models.Character, d
 	for _, passive := range passives {
 		switch passive.Passive.EffectType {
 		case "on_hit_heal":
-			// 血之狂热：每次攻击恢复生命值
-			healPercent := passive.EffectValue // 百分比值（如1.0表示1%）
-			healAmount := int(float64(character.MaxHP) * healPercent / 100.0)
+			// è¡ä¹çç­ï¼æ¯æ¬¡æ»å»æ¢å¤çå½å?			healPercent := passive.EffectValue // ç¾åæ¯å¼ï¼å¦?.0è¡¨ç¤º1%ï¼?			healAmount := int(float64(character.MaxHP) * healPercent / 100.0)
 			if healAmount > 0 {
 				character.HP += healAmount
 				if character.HP > character.MaxHP {
 					character.HP = character.MaxHP
 				}
-				m.addLog(session, "heal", fmt.Sprintf("%s 的血之狂热恢复了 %d 点生命值", character.Name, healAmount), "#00ff00")
+				m.addLog(session, "heal", fmt.Sprintf("%s çè¡ä¹çç­æ¢å¤äº %d ç¹çå½å?, character.Name, healAmount), "#00ff00")
 				*logs = append(*logs, session.BattleLogs[len(session.BattleLogs)-1])
 			}
 		}
 	}
 }
 
-// handlePassiveDamageReduction 处理被动技能的减伤效果
+// handlePassiveDamageReduction å¤çè¢«å¨æè½çåä¼¤ææ
 func (m *BattleManager) handlePassiveDamageReduction(character *models.Character, damage int) int {
 	if m.passiveSkillManager == nil {
 		return damage
@@ -2108,13 +1925,11 @@ func (m *BattleManager) handlePassiveDamageReduction(character *models.Character
 	passives := m.passiveSkillManager.GetPassiveSkills(character.ID)
 	for _, passive := range passives {
 		if passive.Passive.EffectType == "survival" && passive.Passive.ID == "warrior_passive_unbreakable_will" {
-			// 不灭意志：HP低于阈值时减伤
+			// ä¸ç­æå¿ï¼HPä½äºéå¼æ¶åä¼¤
 			hpPercent := float64(character.HP) / float64(character.MaxHP)
-			// 根据等级计算触发阈值（1级30%，5级10%）
-			threshold := 0.30 - float64(passive.Level-1)*0.05
+			// æ ¹æ®ç­çº§è®¡ç®è§¦åéå¼ï¼1çº?0%ï¼?çº?0%ï¼?			threshold := 0.30 - float64(passive.Level-1)*0.05
 			if hpPercent < threshold {
-				// 根据等级计算减伤比例（1级25%，5级65%）
-				reductionPercent := 25.0 + float64(passive.Level-1)*10.0
+				// æ ¹æ®ç­çº§è®¡ç®åä¼¤æ¯ä¾ï¼?çº?5%ï¼?çº?5%ï¼?				reductionPercent := 25.0 + float64(passive.Level-1)*10.0
 				damage = int(float64(damage) * (1.0 - reductionPercent/100.0))
 				if damage < 1 {
 					damage = 1
@@ -2126,7 +1941,7 @@ func (m *BattleManager) handlePassiveDamageReduction(character *models.Character
 	return damage
 }
 
-// handleActiveReflectEffects 处理主动技能的反射效果
+// handleActiveReflectEffects å¤çä¸»å¨æè½çåå°ææ
 func (m *BattleManager) handleActiveReflectEffects(character *models.Character, attacker *models.Monster, damageTaken int, session *BattleSession, logs *[]models.BattleLog) {
 	if m.buffManager == nil {
 		return
@@ -2135,23 +1950,21 @@ func (m *BattleManager) handleActiveReflectEffects(character *models.Character, 
 	buffs := m.buffManager.GetBuffs(character.ID)
 	for _, buff := range buffs {
 		if buff.StatAffected == "reflect" && buff.IsBuff && buff.EffectID == "shield_reflection" {
-			// 盾牌反射（主动技能）：反射受到的伤害
-			reflectPercent := buff.Value // 百分比值（如50.0表示50%）
-			reflectDamage := int(float64(damageTaken) * reflectPercent / 100.0)
+			// ç¾çåå°ï¼ä¸»å¨æè½ï¼ï¼åå°åå°çä¼¤å®³
+			reflectPercent := buff.Value // ç¾åæ¯å¼ï¼å¦?0.0è¡¨ç¤º50%ï¼?			reflectDamage := int(float64(damageTaken) * reflectPercent / 100.0)
 			if reflectDamage > 0 {
 				attacker.HP -= reflectDamage
 				if attacker.HP < 0 {
 					attacker.HP = 0
 				}
-				m.addLog(session, "combat", fmt.Sprintf("%s 的盾牌反射对 %s 造成 %d 点反射伤害！", character.Name, attacker.Name, reflectDamage), "#ff8800")
+				m.addLog(session, "combat", fmt.Sprintf("%s çç¾çåå°å¯¹ %s é æ %d ç¹åå°ä¼¤å®³ï¼", character.Name, attacker.Name, reflectDamage), "#ff8800")
 				*logs = append(*logs, session.BattleLogs[len(session.BattleLogs)-1])
 			}
 		}
 	}
 }
 
-// updateShieldValue 更新护盾值
-func (m *BattleManager) updateShieldValue(characterID int, newShieldValue float64) {
+// updateShieldValue æ´æ°æ¤ç¾å?func (m *BattleManager) updateShieldValue(characterID int, newShieldValue float64) {
 	if m.buffManager == nil {
 		return
 	}
@@ -2162,56 +1975,52 @@ func (m *BattleManager) updateShieldValue(characterID int, newShieldValue float6
 	}
 }
 
-// applySkillDebuffs 应用技能的Debuff效果到敌人
-func (m *BattleManager) applySkillDebuffs(skillState *CharacterSkillState, character *models.Character, target *models.Monster, allEnemies []*models.Monster, skillEffects map[string]interface{}) {
+// applySkillDebuffs åºç¨æè½çDebuffææå°æäº?func (m *BattleManager) applySkillDebuffs(skillState *CharacterSkillState, character *models.Character, target *models.Monster, allEnemies []*models.Monster, skillEffects map[string]interface{}) {
 	skill := skillState.Skill
 	effect := skillState.Effect
 
 	switch skill.ID {
 	case "warrior_demoralizing_shout":
-		// 挫志怒吼：降低所有敌人攻击力
+		// æ«å¿æå¼ï¼éä½æææäººæ»å»å
 		if attackReduction, ok := effect["attackReduction"].(float64); ok {
 			duration := 3
 			if d, ok := effect["duration"].(float64); ok {
 				duration = int(d)
 			}
-			// 应用到所有存活的敌人
+			// åºç¨å°ææå­æ´»çæäºº
 			for _, enemy := range allEnemies {
 				if enemy.HP > 0 {
-					m.buffManager.ApplyEnemyDebuff(enemy.ID, "demoralizing_shout", "挫志怒吼", "debuff", duration, attackReduction, "attack", "")
+					m.buffManager.ApplyEnemyDebuff(enemy.ID, "demoralizing_shout", "æ«å¿æå¼", "debuff", duration, attackReduction, "attack", "")
 				}
 			}
 		}
 	case "warrior_whirlwind":
-		// 旋风斩：降低所有敌人防御
-		if defenseReduction, ok := effect["defenseReduction"].(float64); ok {
+		// æé£æ©ï¼éä½æææäººé²å¾?		if defenseReduction, ok := effect["defenseReduction"].(float64); ok {
 			duration := 2
 			if d, ok := effect["debuffDuration"].(float64); ok {
 				duration = int(d)
 			}
-			// 应用到所有存活的敌人
+			// åºç¨å°ææå­æ´»çæäºº
 			for _, enemy := range allEnemies {
 				if enemy.HP > 0 {
-					m.buffManager.ApplyEnemyDebuff(enemy.ID, "whirlwind", "旋风斩", "debuff", duration, defenseReduction, "defense", "")
+					m.buffManager.ApplyEnemyDebuff(enemy.ID, "whirlwind", "æé£æ?, "debuff", duration, defenseReduction, "defense", "")
 				}
 			}
 		}
 	case "warrior_mortal_strike":
-		// 致死打击：降低目标治疗效果
-		if healingReduction, ok := effect["healingReduction"].(float64); ok {
+		// è´æ­»æå»ï¼éä½ç®æ æ²»çææ?		if healingReduction, ok := effect["healingReduction"].(float64); ok {
 			duration := 3
 			if d, ok := effect["debuffDuration"].(float64); ok {
 				duration = int(d)
 			}
-			// 应用到目标敌人
-			if target != nil && target.HP > 0 {
-				m.buffManager.ApplyEnemyDebuff(target.ID, "mortal_strike", "致死打击", "debuff", duration, healingReduction, "healing_received", "")
+			// åºç¨å°ç®æ æäº?			if target != nil && target.HP > 0 {
+				m.buffManager.ApplyEnemyDebuff(target.ID, "mortal_strike", "è´æ­»æå»", "debuff", duration, healingReduction, "healing_received", "")
 			}
 		}
 	}
 }
 
-// handlePassiveReflectEffects 处理被动技能的反射效果
+// handlePassiveReflectEffects å¤çè¢«å¨æè½çåå°ææ
 func (m *BattleManager) handlePassiveReflectEffects(character *models.Character, attacker *models.Monster, damageTaken int, session *BattleSession, logs *[]models.BattleLog) {
 	if m.passiveSkillManager == nil {
 		return
@@ -2220,15 +2029,14 @@ func (m *BattleManager) handlePassiveReflectEffects(character *models.Character,
 	passives := m.passiveSkillManager.GetPassiveSkills(character.ID)
 	for _, passive := range passives {
 		if passive.Passive.EffectType == "reflect" && passive.Passive.ID == "warrior_passive_shield_reflection" {
-			// 盾牌反射（被动）：受到物理攻击时反射伤害
-			reflectPercent := passive.EffectValue // 百分比值（如10.0表示10%）
-			reflectDamage := int(float64(damageTaken) * reflectPercent / 100.0)
+			// ç¾çåå°ï¼è¢«å¨ï¼ï¼åå°ç©çæ»å»æ¶åå°ä¼¤å®³
+			reflectPercent := passive.EffectValue // ç¾åæ¯å¼ï¼å¦?0.0è¡¨ç¤º10%ï¼?			reflectDamage := int(float64(damageTaken) * reflectPercent / 100.0)
 			if reflectDamage > 0 {
 				attacker.HP -= reflectDamage
 				if attacker.HP < 0 {
 					attacker.HP = 0
 				}
-				m.addLog(session, "combat", fmt.Sprintf("%s 的盾牌反射对 %s 造成 %d 点反射伤害！", character.Name, attacker.Name, reflectDamage), "#ff8800")
+				m.addLog(session, "combat", fmt.Sprintf("%s çç¾çåå°å¯¹ %s é æ %d ç¹åå°ä¼¤å®³ï¼", character.Name, attacker.Name, reflectDamage), "#ff8800")
 				*logs = append(*logs, session.BattleLogs[len(session.BattleLogs)-1])
 			}
 		}
