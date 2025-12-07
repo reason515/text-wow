@@ -434,9 +434,9 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 				if resourceCost <= char.Resource {
 					
 					var baseDamage int
-					var playerDamage int
-					var isCrit bool
-					var damageDetails *DamageCalculationDetails
+					// playerDamage, isCrit, and damageDetails are already declared in outer scope
+					// Do not redeclare them here to avoid shadowing outer scope variables
+
 					
 					if shouldDealDamage {
 						// 计算技能伤害（基础伤害，暴击在后面处理）
