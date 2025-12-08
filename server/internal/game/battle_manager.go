@@ -2,6 +2,7 @@ package game
 
 import (
 	"fmt"
+	"math"
 	"math/rand"
 	"strings"
 	"sync"
@@ -432,37 +433,64 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 
 				// 检查资源是否足够
 				if resourceCost <= char.Resource {
-					
+
 					var baseDamage int
 					// playerDamage, isCrit, and damageDetails are already declared in outer scope
 					// Do not redeclare them here to avoid shadowing outer scope variables
 
-					
 					if shouldDealDamage {
 						// 计算技能伤害（基础伤害，暴击在后面处理）
 						baseDamage = m.skillManager.CalculateSkillDamage(skillState, char, target, m.passiveSkillManager, m.buffManager)
-						
-						// 创建技能伤害详情（简化版）
+
+						// 计算实际攻击力（用于公式显示，需要包含Buff加成）
+						skillRatio := skillState.Skill.ScalingRatio
+						actualAttackForFormula := float64(char.PhysicalAttack)
+						attackModifiers := []string{}
+
+						// 检查被动技能的攻击力加成
+						if m.passiveSkillManager != nil {
+							attackModifier := m.passiveSkillManager.GetPassiveModifier(char.ID, "attack")
+							if attackModifier > 0 {
+								actualAttackForFormula = actualAttackForFormula * (1.0 + attackModifier/100.0)
+								attackModifiers = append(attackModifiers, fmt.Sprintf("被动攻击+%.0f%%", attackModifier))
+							}
+						}
+
+						// 检查Buff的攻击力加成（战斗怒吼等）
+						if m.buffManager != nil {
+							attackBuffValue := m.buffManager.GetBuffValue(char.ID, "attack")
+							if attackBuffValue > 0 {
+								actualAttackForFormula = actualAttackForFormula * (1.0 + attackBuffValue/100.0)
+								attackModifiers = append(attackModifiers, fmt.Sprintf("Buff攻击+%.0f%%", attackBuffValue))
+							}
+						}
+
+						scaledDamage := actualAttackForFormula * skillRatio
+
+						// 创建技能伤害详情
 						damageDetails = &DamageCalculationDetails{
-							BaseAttack:      char.PhysicalAttack,
-							BaseDefense:     target.PhysicalDefense,
-							BaseDamage:      float64(baseDamage),
-							AttackModifiers: []string{fmt.Sprintf("技能倍率: %.1f", skillState.Skill.ScalingRatio)},
+							BaseAttack:       char.PhysicalAttack,
+							ActualAttack:     actualAttackForFormula,
+							BaseDefense:      target.PhysicalDefense,
+							BaseDamage:       float64(baseDamage),
+							AttackModifiers:  attackModifiers,
 							DefenseModifiers: []string{},
-							ActualCritRate:  -1, // -1 表示未设置
-							RandomRoll:      -1, // -1 表示未设置
+							ActualCritRate:   -1, // -1 表示未设置
+							RandomRoll:       -1, // -1 表示未设置
+							SkillRatio:       skillRatio,
+							ScaledDamage:     scaledDamage,
 						}
 
 						// 计算暴击（技能也可以暴击，应用被动技能和Buff加成）
 						actualCritRate := char.CritRate
 						damageDetails.BaseCritRate = char.CritRate
 						damageDetails.CritModifiers = []string{}
-						
+
 						if m.passiveSkillManager != nil {
 							critModifier := m.passiveSkillManager.GetPassiveModifier(char.ID, "crit_rate")
 							if critModifier > 0 {
 								actualCritRate = char.CritRate + critModifier/100.0
-								damageDetails.CritModifiers = append(damageDetails.CritModifiers, 
+								damageDetails.CritModifiers = append(damageDetails.CritModifiers,
 									fmt.Sprintf("被动暴击+%.0f%%", critModifier))
 							}
 						}
@@ -471,7 +499,7 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 							critBuffValue := m.buffManager.GetBuffValue(char.ID, "crit_rate")
 							if critBuffValue > 0 {
 								actualCritRate = actualCritRate + critBuffValue/100.0
-								damageDetails.CritModifiers = append(damageDetails.CritModifiers, 
+								damageDetails.CritModifiers = append(damageDetails.CritModifiers,
 									fmt.Sprintf("Buff暴击+%.0f%%", critBuffValue))
 							}
 						}
@@ -484,7 +512,7 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 						isCrit = randomRoll < actualCritRate
 						damageDetails.IsCrit = isCrit
 						damageDetails.CritMultiplier = char.CritDamage
-						
+
 						if isCrit {
 							playerDamage = int(float64(baseDamage) * char.CritDamage)
 						} else {
@@ -560,12 +588,14 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 										if isCrit {
 											adjacentDamage = int(float64(adjacentDamage) * char.CritDamage)
 										}
+										adjacentOldHP := enemy.HP
 										enemy.HP -= adjacentDamage
 										if enemy.HP < 0 {
 											enemy.HP = 0
 										}
 										adjacentCount++
-										m.addLog(session, "combat", fmt.Sprintf("%s 的顺劈斩波及到 %s，造成 %d 点伤害", char.Name, enemy.Name, adjacentDamage), "#ffaa00")
+										adjacentHPChange := m.formatHPChange(enemy.Name, adjacentOldHP, enemy.HP, enemy.MaxHP)
+										m.addLog(session, "combat", fmt.Sprintf("%s 的顺劈斩波及到 %s，造成 %d 点伤害%s", char.Name, enemy.Name, adjacentDamage, adjacentHPChange), "#ffaa00")
 										logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
 									}
 								}
@@ -574,6 +604,17 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 							// 单体技能
 							target.HP -= playerDamage
 						}
+					} else {
+						// buff技能使用后，还需要进行普通攻击
+						// 先记录buff技能使用日志
+						buffResourceChangeText := m.formatResourceChange(char.ResourceType, resourceCost, resourceGain)
+						m.addLog(session, "combat", fmt.Sprintf("%s 使用 [%s]%s", char.Name, skillName, buffResourceChangeText), "#8888ff")
+						logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
+						// 重置资源消耗，避免普通攻击日志重复显示
+						resourceCost = 0
+						resourceGain = 0
+						// 设置skillState为nil，让后续代码进行普通攻击
+						skillState = nil
 					}
 				} else {
 					// 资源不足，使用普通攻击
@@ -581,32 +622,33 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 				}
 			}
 
-			// 如果没有使用技能或资源不足，使用普通攻击
+			// 如果没有使用技能或资源不足，或使用了buff技能，使用普通攻击
 			if skillState == nil {
 				skillName = "普通攻击"
+				shouldDealDamage = true // 普通攻击造成伤害
 				// 计算实际物理攻击力（应用被动技能加成）
 				actualAttack := float64(char.PhysicalAttack)
 				damageDetails = &DamageCalculationDetails{
-					BaseAttack:      char.PhysicalAttack,
-					BaseDefense:     target.PhysicalDefense,
-					AttackModifiers: []string{},
+					BaseAttack:       char.PhysicalAttack,
+					BaseDefense:      target.PhysicalDefense,
+					AttackModifiers:  []string{},
 					DefenseModifiers: []string{},
-					ActualCritRate:  -1, // -1 表示未设置
-					RandomRoll:      -1, // -1 表示未设置
+					ActualCritRate:   -1, // -1 表示未设置
+					RandomRoll:       -1, // -1 表示未设置
 				}
-				
+
 				if m.passiveSkillManager != nil {
 					attackModifier := m.passiveSkillManager.GetPassiveModifier(char.ID, "attack")
 					if attackModifier > 0 {
 						actualAttack = actualAttack * (1.0 + attackModifier/100.0)
-						damageDetails.AttackModifiers = append(damageDetails.AttackModifiers, 
+						damageDetails.AttackModifiers = append(damageDetails.AttackModifiers,
 							fmt.Sprintf("被动攻击+%.0f%%", attackModifier))
 					}
 					// 应用被动技能的伤害加成
 					damageModifier := m.passiveSkillManager.GetPassiveModifier(char.ID, "damage")
 					if damageModifier > 0 {
 						actualAttack = actualAttack * (1.0 + damageModifier/100.0)
-						damageDetails.AttackModifiers = append(damageDetails.AttackModifiers, 
+						damageDetails.AttackModifiers = append(damageDetails.AttackModifiers,
 							fmt.Sprintf("被动伤害+%.0f%%", damageModifier))
 					}
 
@@ -621,7 +663,7 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 								// 根据等级计算攻击力加成（1级20%，5级60%）
 								attackBonus := 20.0 + float64(passive.Level-1)*10.0
 								actualAttack = actualAttack * (1.0 + attackBonus/100.0)
-								damageDetails.AttackModifiers = append(damageDetails.AttackModifiers, 
+								damageDetails.AttackModifiers = append(damageDetails.AttackModifiers,
 									fmt.Sprintf("狂暴之心+%.0f%%", attackBonus))
 							}
 						}
@@ -632,28 +674,31 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 					attackBuffValue := m.buffManager.GetBuffValue(char.ID, "attack")
 					if attackBuffValue > 0 {
 						actualAttack = actualAttack * (1.0 + attackBuffValue/100.0)
-						damageDetails.AttackModifiers = append(damageDetails.AttackModifiers, 
+						damageDetails.AttackModifiers = append(damageDetails.AttackModifiers,
 							fmt.Sprintf("Buff攻击+%.0f%%", attackBuffValue))
 					}
 				}
-				
+
 				damageDetails.ActualAttack = actualAttack
 				damageDetails.ActualDefense = float64(target.PhysicalDefense)
-				
-				baseDamage, calcDetails := m.calculatePhysicalDamageWithDetails(int(actualAttack), target.PhysicalDefense)
+
+				// 计算实际用于伤害计算的攻击力（四舍五入）
+				attackUsedInCalc := int(math.Round(actualAttack))
+				baseDamage, calcDetails := m.calculatePhysicalDamageWithDetails(attackUsedInCalc, target.PhysicalDefense)
 				damageDetails.BaseDamage = calcDetails.BaseDamage
+				damageDetails.BaseAttack = attackUsedInCalc // 确保公式显示的是实际用于计算的值
 				damageDetails.Variance = calcDetails.Variance
-				
+
 				// 计算暴击率（应用被动技能和Buff加成）
 				actualCritRate := char.CritRate
 				damageDetails.BaseCritRate = char.CritRate
 				damageDetails.CritModifiers = []string{}
-				
+
 				if m.passiveSkillManager != nil {
 					critModifier := m.passiveSkillManager.GetPassiveModifier(char.ID, "crit_rate")
 					if critModifier > 0 {
 						actualCritRate = char.CritRate + critModifier/100.0
-						damageDetails.CritModifiers = append(damageDetails.CritModifiers, 
+						damageDetails.CritModifiers = append(damageDetails.CritModifiers,
 							fmt.Sprintf("被动暴击+%.0f%%", critModifier))
 					}
 				}
@@ -662,7 +707,7 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 					critBuffValue := m.buffManager.GetBuffValue(char.ID, "crit_rate")
 					if critBuffValue > 0 {
 						actualCritRate = actualCritRate + critBuffValue/100.0
-						damageDetails.CritModifiers = append(damageDetails.CritModifiers, 
+						damageDetails.CritModifiers = append(damageDetails.CritModifiers,
 							fmt.Sprintf("Buff暴击+%.0f%%", critBuffValue))
 					}
 				}
@@ -675,7 +720,7 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 				isCrit = randomRoll < actualCritRate
 				damageDetails.IsCrit = isCrit
 				damageDetails.CritMultiplier = char.CritDamage
-				
+
 				if isCrit {
 					playerDamage = int(float64(baseDamage) * char.CritDamage)
 				} else {
@@ -713,7 +758,7 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 
 			// 构建战斗日志消息，包含资源变化（带颜色）
 			resourceChangeText := m.formatResourceChange(char.ResourceType, resourceCost, resourceGain)
-			
+
 			// 格式化伤害公式
 			formulaText := ""
 			if damageDetails != nil {
@@ -750,11 +795,20 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 
 			// 记录技能使用日志
 			if shouldDealDamage {
+				// 计算目标HP变化（需要在造成伤害前记录原始HP）
+				// 注意：此时伤害已经造成，target.HP已经是伤害后的值
+				// 所以我们需要在造成伤害前记录原始HP，这里使用伤害值反推
+				targetOldHP := target.HP + playerDamage
+				if targetOldHP > target.MaxHP {
+					targetOldHP = target.MaxHP
+				}
+				hpChangeText := m.formatHPChange(target.Name, targetOldHP, target.HP, target.MaxHP)
+
 				// 攻击类技能：记录伤害
 				if isCrit {
-					m.addLog(session, "combat", fmt.Sprintf("%s 使用 [%s] 💥暴击！对 %s 造成 %d 点伤害%s%s", char.Name, skillName, target.Name, playerDamage, formulaText, resourceChangeText), "#ff6b6b")
+					m.addLog(session, "combat", fmt.Sprintf("%s 使用 [%s] 💥暴击！对 %s 造成 %d 点伤害%s%s%s", char.Name, skillName, target.Name, playerDamage, formulaText, hpChangeText, resourceChangeText), "#ff6b6b")
 				} else {
-					m.addLog(session, "combat", fmt.Sprintf("%s 使用 [%s] 对 %s 造成 %d 点伤害%s%s", char.Name, skillName, target.Name, playerDamage, formulaText, resourceChangeText), "#ffaa00")
+					m.addLog(session, "combat", fmt.Sprintf("%s 使用 [%s] 对 %s 造成 %d 点伤害%s%s%s", char.Name, skillName, target.Name, playerDamage, formulaText, hpChangeText, resourceChangeText), "#ffaa00")
 				}
 			} else {
 				// 非攻击类技能（buff/debuff/control等）：只记录使用，不记录伤害
@@ -847,7 +901,7 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 			enemyDamage := m.buffManager.CalculateDamageTakenWithBuffs(baseEnemyDamage, char.ID, true)
 			if enemyDamage != originalDamage {
 				reduction := float64(originalDamage-enemyDamage) / float64(originalDamage) * 100.0
-				enemyDamageDetails.DefenseModifiers = append(enemyDamageDetails.DefenseModifiers, 
+				enemyDamageDetails.DefenseModifiers = append(enemyDamageDetails.DefenseModifiers,
 					fmt.Sprintf("减伤Buff -%.0f%%", reduction))
 			}
 
@@ -856,7 +910,7 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 			enemyDamage = m.handlePassiveDamageReduction(char, enemyDamage)
 			if enemyDamage != originalDamage2 {
 				reduction := float64(originalDamage2-enemyDamage) / float64(originalDamage2) * 100.0
-				enemyDamageDetails.DefenseModifiers = append(enemyDamageDetails.DefenseModifiers, 
+				enemyDamageDetails.DefenseModifiers = append(enemyDamageDetails.DefenseModifiers,
 					fmt.Sprintf("被动减伤 -%.0f%%", reduction))
 			}
 			enemyDamageDetails.FinalDamage = enemyDamage
@@ -935,14 +989,17 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 
 			// 构建战斗日志消息，包含资源变化（带颜色）
 			resourceChangeText := m.formatResourceChange(char.ResourceType, 0, resourceGain)
-			
+
 			// 格式化伤害公式
 			enemyFormulaText := ""
 			if enemyDamageDetails != nil {
 				enemyFormulaText = m.formatDamageFormula(enemyDamageDetails)
 			}
 
-			m.addLog(session, "combat", fmt.Sprintf("%s 攻击了 %s，造成 %d 点伤害%s%s", enemy.Name, char.Name, enemyDamage, enemyFormulaText, resourceChangeText), "#ff4444")
+			// 格式化HP变化（使用已保存的originalHP）
+			playerHPChangeText := m.formatHPChange(char.Name, originalHP, char.HP, char.MaxHP)
+
+			m.addLog(session, "combat", fmt.Sprintf("%s 攻击了 %s，造成 %d 点伤害%s%s%s", enemy.Name, char.Name, enemyDamage, enemyFormulaText, playerHPChangeText, resourceChangeText), "#ff4444")
 			logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
 
 			// 检查玩家是否死亡
@@ -1270,10 +1327,10 @@ func (m *BattleManager) GetCharacterBuffs(characterID int) []*models.BuffInfo {
 	if m.buffManager == nil {
 		return []*models.BuffInfo{}
 	}
-	
+
 	buffInstances := m.buffManager.GetBuffs(characterID)
 	buffs := make([]*models.BuffInfo, 0, len(buffInstances))
-	
+
 	for _, buff := range buffInstances {
 		description := m.getBuffDescription(buff)
 		buffInfo := &models.BuffInfo{
@@ -1288,7 +1345,7 @@ func (m *BattleManager) GetCharacterBuffs(characterID int) []*models.BuffInfo {
 		}
 		buffs = append(buffs, buffInfo)
 	}
-	
+
 	return buffs
 }
 
@@ -1349,34 +1406,36 @@ func (m *BattleManager) GetBattleLogs(userID int, limit int) []models.BattleLog 
 
 // DamageCalculationDetails 伤害计算详情
 type DamageCalculationDetails struct {
-	BaseAttack      int     // 基础攻击力
-	ActualAttack    float64 // 实际攻击力（应用加成后）
-	BaseDefense     int     // 基础防御力
-	ActualDefense   float64 // 实际防御力（应用Debuff后）
-	BaseDamage      float64 // 基础伤害（攻击-防御/2）
-	FinalDamage     int     // 最终伤害（应用随机波动后）
-	Variance        float64 // 随机波动值
-	IsCrit          bool    // 是否暴击
-	CritMultiplier  float64 // 暴击倍率
-	BaseCritRate    float64 // 基础暴击率
-	ActualCritRate  float64 // 实际暴击率（应用加成后）
-	RandomRoll      float64 // 随机数（用于暴击判定）
-	AttackModifiers []string // 攻击力加成说明
+	BaseAttack       int      // 基础攻击力
+	ActualAttack     float64  // 实际攻击力（应用加成后）
+	BaseDefense      int      // 基础防御力
+	ActualDefense    float64  // 实际防御力（应用Debuff后）
+	BaseDamage       float64  // 基础伤害（攻击-防御/2）
+	FinalDamage      int      // 最终伤害（应用随机波动后）
+	Variance         float64  // 随机波动值
+	IsCrit           bool     // 是否暴击
+	CritMultiplier   float64  // 暴击倍率
+	BaseCritRate     float64  // 基础暴击率
+	ActualCritRate   float64  // 实际暴击率（应用加成后）
+	RandomRoll       float64  // 随机数（用于暴击判定）
+	AttackModifiers  []string // 攻击力加成说明
 	DefenseModifiers []string // 防御力修改说明
-	CritModifiers   []string // 暴击率加成说明
+	CritModifiers    []string // 暴击率加成说明
+	SkillRatio       float64  // 技能倍率（0表示普通攻击）
+	ScaledDamage     float64  // 技能倍率后的伤害（攻击×倍率）
 }
 
 // calculatePhysicalDamage 计算物理伤害（返回详情）
 func (m *BattleManager) calculatePhysicalDamageWithDetails(attack, defense int) (int, *DamageCalculationDetails) {
 	details := &DamageCalculationDetails{
-		BaseAttack:      attack,
-		ActualAttack:    float64(attack),
-		BaseDefense:     defense,
-		ActualDefense:   float64(defense),
-		AttackModifiers: []string{},
+		BaseAttack:       attack,
+		ActualAttack:     float64(attack),
+		BaseDefense:      defense,
+		ActualDefense:    float64(defense),
+		AttackModifiers:  []string{},
 		DefenseModifiers: []string{},
 	}
-	
+
 	// 基础伤害 = 实际攻击力 - 目标防御力（不再除以2）
 	baseDamage := float64(attack) - float64(defense)
 	if baseDamage < 1 {
@@ -1385,7 +1444,7 @@ func (m *BattleManager) calculatePhysicalDamageWithDetails(attack, defense int) 
 	details.BaseDamage = baseDamage
 	details.Variance = 0 // 不再使用随机波动，未来通过装备的攻击力上下限实现
 	details.FinalDamage = int(baseDamage)
-	
+
 	return int(baseDamage), details
 }
 
@@ -1398,14 +1457,14 @@ func (m *BattleManager) calculatePhysicalDamage(attack, defense int) int {
 // calculateMagicDamage 计算魔法伤害（返回详情）
 func (m *BattleManager) calculateMagicDamageWithDetails(attack, defense int) (int, *DamageCalculationDetails) {
 	details := &DamageCalculationDetails{
-		BaseAttack:      attack,
-		ActualAttack:    float64(attack),
-		BaseDefense:     defense,
-		ActualDefense:   float64(defense),
-		AttackModifiers: []string{},
+		BaseAttack:       attack,
+		ActualAttack:     float64(attack),
+		BaseDefense:      defense,
+		ActualDefense:    float64(defense),
+		AttackModifiers:  []string{},
 		DefenseModifiers: []string{},
 	}
-	
+
 	// 基础伤害 = 实际攻击力 - 目标防御力（不再除以2）
 	baseDamage := float64(attack) - float64(defense)
 	if baseDamage < 1 {
@@ -1414,7 +1473,7 @@ func (m *BattleManager) calculateMagicDamageWithDetails(attack, defense int) (in
 	details.BaseDamage = baseDamage
 	details.Variance = 0 // 不再使用随机波动，未来通过装备的攻击力上下限实现
 	details.FinalDamage = int(baseDamage)
-	
+
 	return int(baseDamage), details
 }
 
@@ -1491,11 +1550,11 @@ func (m *BattleManager) getResourceName(resourceType string) string {
 	}
 }
 
-// getResourceColor 获取资源的颜色（参考魔兽世界）
+// getResourceColor 获取资源的颜色（参考魔兽世界，但区别于伤害红色）
 func (m *BattleManager) getResourceColor(resourceType string) string {
 	switch resourceType {
 	case "rage":
-		return "#ff4444" // 红色 - 怒气
+		return "#e25822" // 橙红色 - 怒气（区别于伤害的红色）
 	case "mana":
 		return "#3d85c6" // 蓝色 - 法力
 	case "energy":
@@ -1505,65 +1564,99 @@ func (m *BattleManager) getResourceColor(resourceType string) string {
 	}
 }
 
-// formatDamageFormula 格式化伤害计算公式文本
+// formatDamageFormula 格式化伤害计算公式文本（简洁版）
 func (m *BattleManager) formatDamageFormula(details *DamageCalculationDetails) string {
 	if details == nil {
 		return ""
 	}
-	
-	var formulaParts []string
-	
-	// 基础公式：攻击力 - 防御力
-	baseFormula := fmt.Sprintf("%d - %d", details.BaseAttack, details.BaseDefense)
-	if details.BaseDamage > 0 {
-		baseFormula = fmt.Sprintf("%s = %.0f", baseFormula, details.BaseDamage)
-	}
-	formulaParts = append(formulaParts, baseFormula)
-	
-	// 如果有攻击力加成
-	if len(details.AttackModifiers) > 0 {
-		modifierText := strings.Join(details.AttackModifiers, ", ")
-		if details.ActualAttack > float64(details.BaseAttack) {
-			formulaParts = append(formulaParts, fmt.Sprintf("攻击加成: %s → %.0f", modifierText, details.ActualAttack))
+
+	var parts []string
+
+	// 检查是否为技能伤害（有技能倍率）
+	isSkillDamage := details.SkillRatio > 0
+
+	if isSkillDamage {
+		// 技能伤害公式：攻击 × 倍率 - 防御 = 伤害
+		// 使用四舍五入后的实际攻击力
+		attackDisplay := int(math.Round(details.ActualAttack))
+		if attackDisplay == 0 {
+			attackDisplay = details.BaseAttack
+		}
+
+		// 计算实际数学结果（攻击×倍率-防御）
+		scaledAttack := float64(attackDisplay) * details.SkillRatio
+		rawDamage := scaledAttack - float64(details.BaseDefense)
+
+		if rawDamage < 1 {
+			// 如果计算结果小于1，显示实际计算和最低伤害说明
+			baseFormula := fmt.Sprintf("%d攻 × %.1f - %d防 = %.0f → 最低1",
+				attackDisplay, details.SkillRatio, details.BaseDefense, rawDamage)
+			parts = append(parts, baseFormula)
 		} else {
-			formulaParts = append(formulaParts, fmt.Sprintf("攻击加成: %s", modifierText))
+			baseFormula := fmt.Sprintf("%d攻 × %.1f - %d防 = %.0f",
+				attackDisplay, details.SkillRatio, details.BaseDefense, details.BaseDamage)
+			parts = append(parts, baseFormula)
+		}
+
+		// 如果有攻击力加成，显示加成说明
+		if len(details.AttackModifiers) > 0 {
+			modText := strings.Join(details.AttackModifiers, ", ")
+			parts = append(parts, modText)
+		}
+	} else {
+		// 普通攻击公式：攻击 - 防御 = 伤害
+		// BaseAttack 已经是四舍五入后的实际计算值，直接使用
+		attackUsed := details.BaseAttack
+
+		// 计算实际数学结果
+		rawDamage := attackUsed - details.BaseDefense
+		if rawDamage < 1 {
+			// 如果计算结果小于1，显示实际计算和最低伤害说明
+			baseFormula := fmt.Sprintf("%d攻 - %d防 = %d → 最低1", attackUsed, details.BaseDefense, rawDamage)
+			parts = append(parts, baseFormula)
+		} else {
+			baseFormula := fmt.Sprintf("%d攻 - %d防 = %d", attackUsed, details.BaseDefense, rawDamage)
+			parts = append(parts, baseFormula)
 		}
 	}
-	
-	// 如果有防御力修改
+
+	// 如果暴击，显示暴击计算
+	if details.IsCrit && details.CritMultiplier > 0 {
+		critFormula := fmt.Sprintf("%.0f × %.1f暴击 = %d", details.BaseDamage, details.CritMultiplier, details.FinalDamage)
+		parts = append(parts, critFormula)
+	}
+
+	// 如果有防御修改（减伤等），简洁显示
 	if len(details.DefenseModifiers) > 0 {
-		modifierText := strings.Join(details.DefenseModifiers, ", ")
-		formulaParts = append(formulaParts, fmt.Sprintf("防御修改: %s", modifierText))
+		modText := strings.Join(details.DefenseModifiers, ", ")
+		parts = append(parts, modText)
 	}
-	
-	// 显示暴击判定过程（如果进行了暴击判定）
-	// 检查是否进行了暴击判定：如果 ActualCritRate >= 0 且 RandomRoll >= 0，说明进行了判定
-	if details.ActualCritRate >= 0 && details.RandomRoll >= 0 {
-		critInfo := fmt.Sprintf("暴击率: %.1f%%", details.BaseCritRate*100)
-		if len(details.CritModifiers) > 0 {
-			critInfo += fmt.Sprintf(" + %s = %.1f%%", strings.Join(details.CritModifiers, " + "), details.ActualCritRate*100)
-		} else if details.ActualCritRate != details.BaseCritRate {
-			critInfo += fmt.Sprintf(" = %.1f%%", details.ActualCritRate*100)
-		}
-		critInfo += fmt.Sprintf(" | 随机: %.3f", details.RandomRoll)
-		if details.IsCrit {
-			critInfo += fmt.Sprintf(" < %.3f ✓暴击", details.ActualCritRate)
-			formulaParts = append(formulaParts, fmt.Sprintf("💥%s | 伤害: %.0f × %.1f = %d", 
-				critInfo, details.BaseDamage, details.CritMultiplier, details.FinalDamage))
-		} else {
-			critInfo += fmt.Sprintf(" ≥ %.3f ✗未暴击", details.ActualCritRate)
-			formulaParts = append(formulaParts, critInfo)
-		}
-	}
-	
-	if len(formulaParts) == 0 {
+
+	if len(parts) == 0 {
 		return ""
 	}
-	
-	// 使用较亮的灰色显示公式，提高可读性
-	// 使用圆括号而不是方括号，避免被前端的技能名匹配规则影响
-	formulaText := strings.Join(formulaParts, " | ")
-	return fmt.Sprintf(" <span style=\"color: #bbbbbb !important; opacity: 0.95;\">(%s)</span>", formulaText)
+
+	// 使用暗灰色显示公式（不抢眼，作为补充信息）
+	// 注意：使用圆括号而非方括号，避免前端将其误识别为技能名
+	formulaText := strings.Join(parts, " → ")
+	return fmt.Sprintf(" <span style=\"color: #888888\">(%s)</span>", formulaText)
+}
+
+// formatHPChange 格式化HP变化显示
+func (m *BattleManager) formatHPChange(name string, oldHP, newHP, maxHP int) string {
+	// 计算HP百分比
+	newPercent := float64(newHP) / float64(maxHP) * 100
+	// 根据HP百分比选择颜色（使用青色系，区别于伤害红色）
+	var color string
+	if newPercent > 50 {
+		color = "#4ecdc4" // 青绿色 - 健康
+	} else if newPercent > 25 {
+		color = "#ffe66d" // 淡黄色 - 警告
+	} else {
+		color = "#ff6b6b" // 珊瑚红 - 危险
+	}
+	// 使用尖括号避免与前端技能名识别冲突
+	return fmt.Sprintf(" <span style=\"color: %s\">〈%s: %d→%d〉</span>", color, name, oldHP, newHP)
 }
 
 // formatResourceChange 格式化资源变化文本（带颜色）
@@ -1596,7 +1689,8 @@ func (m *BattleManager) formatResourceChange(resourceType string, cost int, gain
 		changeText += part
 	}
 
-	return fmt.Sprintf(" (<span style=\"color: %s\">%s</span> %s)", color, resourceName, changeText)
+	// 使用圆括号，资源名和变化值都带颜色
+	return fmt.Sprintf(" <span style=\"color: %s\">(%s %s)</span>", color, resourceName, changeText)
 }
 
 // getRandomSkillName 获取随机技能名称
@@ -2025,11 +2119,13 @@ func (m *BattleManager) handleCounterAttacks(character *models.Character, attack
 		if buff.StatAffected == "counter_attack" && buff.IsBuff {
 			// 反击风暴：对攻击者造成反击伤害
 			counterDamage := int(float64(character.PhysicalAttack) * buff.Value / 100.0)
+			attackerOldHP := attacker.HP
 			attacker.HP -= counterDamage
 			if attacker.HP < 0 {
 				attacker.HP = 0
 			}
-			m.addLog(session, "combat", fmt.Sprintf("%s 的反击风暴对 %s 造成 %d 点反击伤害！", character.Name, attacker.Name, counterDamage), "#ff8800")
+			counterHPChange := m.formatHPChange(attacker.Name, attackerOldHP, attacker.HP, attacker.MaxHP)
+			m.addLog(session, "combat", fmt.Sprintf("%s 的反击风暴对 %s 造成 %d 点反击伤害%s", character.Name, attacker.Name, counterDamage, counterHPChange), "#ff8800")
 			*logs = append(*logs, session.BattleLogs[len(session.BattleLogs)-1])
 		}
 	}
@@ -2062,11 +2158,13 @@ func (m *BattleManager) handleCounterAttacks(character *models.Character, attack
 					if counterDamage < 1 {
 						counterDamage = 1
 					}
+					revengeOldHP := attacker.HP
 					attacker.HP -= counterDamage
 					if attacker.HP < 0 {
 						attacker.HP = 0
 					}
-					m.addLog(session, "combat", fmt.Sprintf("%s 的复仇对 %s 造成 %d 点反击伤害！", character.Name, attacker.Name, counterDamage), "#ff8800")
+					revengeHPChange := m.formatHPChange(attacker.Name, revengeOldHP, attacker.HP, attacker.MaxHP)
+					m.addLog(session, "combat", fmt.Sprintf("%s 的复仇对 %s 造成 %d 点反击伤害%s", character.Name, attacker.Name, counterDamage, revengeHPChange), "#ff8800")
 					*logs = append(*logs, session.BattleLogs[len(session.BattleLogs)-1])
 				}
 			}
@@ -2139,11 +2237,13 @@ func (m *BattleManager) handleActiveReflectEffects(character *models.Character, 
 			reflectPercent := buff.Value // 百分比值（如50.0表示50%）
 			reflectDamage := int(float64(damageTaken) * reflectPercent / 100.0)
 			if reflectDamage > 0 {
+				reflectOldHP := attacker.HP
 				attacker.HP -= reflectDamage
 				if attacker.HP < 0 {
 					attacker.HP = 0
 				}
-				m.addLog(session, "combat", fmt.Sprintf("%s 的盾牌反射对 %s 造成 %d 点反射伤害！", character.Name, attacker.Name, reflectDamage), "#ff8800")
+				reflectHPChange := m.formatHPChange(attacker.Name, reflectOldHP, attacker.HP, attacker.MaxHP)
+				m.addLog(session, "combat", fmt.Sprintf("%s 的盾牌反射对 %s 造成 %d 点反射伤害%s", character.Name, attacker.Name, reflectDamage, reflectHPChange), "#ff8800")
 				*logs = append(*logs, session.BattleLogs[len(session.BattleLogs)-1])
 			}
 		}
@@ -2224,11 +2324,13 @@ func (m *BattleManager) handlePassiveReflectEffects(character *models.Character,
 			reflectPercent := passive.EffectValue // 百分比值（如10.0表示10%）
 			reflectDamage := int(float64(damageTaken) * reflectPercent / 100.0)
 			if reflectDamage > 0 {
+				passiveReflectOldHP := attacker.HP
 				attacker.HP -= reflectDamage
 				if attacker.HP < 0 {
 					attacker.HP = 0
 				}
-				m.addLog(session, "combat", fmt.Sprintf("%s 的盾牌反射对 %s 造成 %d 点反射伤害！", character.Name, attacker.Name, reflectDamage), "#ff8800")
+				passiveReflectHPChange := m.formatHPChange(attacker.Name, passiveReflectOldHP, attacker.HP, attacker.MaxHP)
+				m.addLog(session, "combat", fmt.Sprintf("%s 的盾牌反射对 %s 造成 %d 点反射伤害%s", character.Name, attacker.Name, reflectDamage, passiveReflectHPChange), "#ff8800")
 				*logs = append(*logs, session.BattleLogs[len(session.BattleLogs)-1])
 			}
 		}

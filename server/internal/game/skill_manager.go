@@ -2,6 +2,7 @@ package game
 
 import (
 	"fmt"
+	"math"
 	"math/rand"
 	"sync"
 
@@ -168,7 +169,7 @@ func (sm *SkillManager) SelectBestSkill(characterID int, currentResource int, ta
 	}
 
 	// 3. 优先使用高伤害技能
-	bestSkill := available[0]
+	var bestSkill *CharacterSkillState
 	maxDamage := 0.0
 	for _, skill := range available {
 		if skill.Skill.Type == "attack" {
@@ -181,6 +182,19 @@ func (sm *SkillManager) SelectBestSkill(characterID int, currentResource int, ta
 				bestSkill = skill
 			}
 		}
+	}
+
+	// 如果没有 attack 类型的技能可用，检查是否有 buff 技能需要使用
+	// 只有在没有高伤害技能时才考虑使用 buff 技能
+	if bestSkill == nil {
+		for _, skill := range available {
+			if skill.Skill.Type == "buff" {
+				// 使用 buff 技能，但战斗管理器会在造成伤害后额外使用普通攻击
+				return skill
+			}
+		}
+		// 没有任何可用技能，返回 nil 使用普通攻击
+		return nil
 	}
 
 	return bestSkill
@@ -350,7 +364,8 @@ func (sm *SkillManager) CalculateSkillDamage(skillState *CharacterSkillState, ch
 	}
 
 	// 不再使用随机波动，未来通过装备的攻击力上下限实现
-	return int(finalDamage)
+	// 使用四舍五入确保小数部分不会被截断
+	return int(math.Round(finalDamage))
 }
 
 // ApplySkillEffects 应用技能效果（buff/debuff等）
