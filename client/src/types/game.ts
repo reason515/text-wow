@@ -69,6 +69,7 @@ export interface Character {
   physCritDamage: number    // 物理暴击伤害
   spellCritRate: number     // 法术暴击率
   spellCritDamage: number   // 法术暴击伤害
+  dodgeRate: number         // 闪避率
   totalKills: number
   totalDeaths: number
   createdAt: string
@@ -160,6 +161,7 @@ export interface Monster {
   magicAttack: number
   physicalDefense: number
   magicDefense: number
+  dodgeRate: number         // 闪避率
   expReward: number
   goldMin: number
   goldMax: number

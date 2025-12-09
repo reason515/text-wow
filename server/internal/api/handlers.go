@@ -234,9 +234,26 @@ func (h *Handler) GetCurrentUser(c *gin.Context) {
 
 	user, err := h.userRepo.GetByID(userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.APIResponse{
+		// 区分用户不存在和其他错误
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, models.APIResponse{
+				Success: false,
+				Error:   "user not found",
+			})
+		} else {
+			c.JSON(http.StatusInternalServerError, models.APIResponse{
+				Success: false,
+				Error:   "failed to get user info",
+			})
+		}
+		return
+	}
+
+	// 确保返回的用户数据有效
+	if user == nil || user.ID == 0 {
+		c.JSON(http.StatusNotFound, models.APIResponse{
 			Success: false,
-			Error:   "failed to get user info",
+			Error:   "user not found",
 		})
 		return
 	}
@@ -399,6 +416,9 @@ func (h *Handler) CreateCharacter(c *gin.Context) {
 	char.SpellCritRate = 0.05 + float64(char.Spirit)/20.0/100.0
 	// 法术暴击伤害 = 150% + 智力×0.3%
 	char.SpellCritDamage = 1.5 + float64(char.Intellect)*0.3/100.0
+
+	// 计算闪避率 = 基础5% + 敏捷/20
+	char.DodgeRate = 0.05 + float64(char.Agility)/20.0/100.0
 
 	// 创建角色
 	char, err = h.charRepo.Create(char)

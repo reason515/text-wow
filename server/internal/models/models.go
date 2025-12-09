@@ -78,6 +78,7 @@ type Character struct {
 	PhysCritDamage  float64    `json:"physCritDamage"`  // 物理暴击伤害
 	SpellCritRate   float64    `json:"spellCritRate"`   // 法术暴击率
 	SpellCritDamage float64    `json:"spellCritDamage"` // 法术暴击伤害
+	DodgeRate       float64    `json:"dodgeRate"`       // 闪避率
 	TotalKills      int        `json:"totalKills"`
 	TotalDeaths     int        `json:"totalDeaths"`
 	CreatedAt       time.Time  `json:"createdAt"`
@@ -176,21 +177,22 @@ type Zone struct {
 
 // Monster 怪物
 type Monster struct {
-	ID              string `json:"id"`
-	ZoneID          string `json:"zoneId"`
-	Name            string `json:"name"`
-	Level           int    `json:"level"`
-	Type            string `json:"type"` // normal/elite/boss
-	HP              int    `json:"hp"`
-	MaxHP           int    `json:"maxHp"`
-	PhysicalAttack  int    `json:"physicalAttack"`
-	MagicAttack     int    `json:"magicAttack"`
-	PhysicalDefense int    `json:"physicalDefense"`
-	MagicDefense    int    `json:"magicDefense"`
-	ExpReward       int    `json:"expReward"`
-	GoldMin         int    `json:"goldMin"`
-	GoldMax         int    `json:"goldMax"`
-	SpawnWeight     int    `json:"spawnWeight"`
+	ID              string  `json:"id"`
+	ZoneID          string  `json:"zoneId"`
+	Name            string  `json:"name"`
+	Level           int     `json:"level"`
+	Type            string  `json:"type"` // normal/elite/boss
+	HP              int     `json:"hp"`
+	MaxHP           int     `json:"maxHp"`
+	PhysicalAttack  int     `json:"physicalAttack"`
+	MagicAttack     int     `json:"magicAttack"`
+	PhysicalDefense int     `json:"physicalDefense"`
+	MagicDefense    int     `json:"magicDefense"`
+	DodgeRate       float64 `json:"dodgeRate"` // 闪避率
+	ExpReward       int     `json:"expReward"`
+	GoldMin         int     `json:"goldMin"`
+	GoldMax         int     `json:"goldMax"`
+	SpawnWeight     int     `json:"spawnWeight"`
 }
 
 // ═══════════════════════════════════════════════════════════

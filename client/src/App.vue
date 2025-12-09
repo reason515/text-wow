@@ -17,22 +17,32 @@ const initialized = ref(false)
 
 // 初始化
 onMounted(async () => {
-  // 初始化认证状态
-  await authStore.init()
-  
-  // 加载游戏配置
-  await charStore.init()
-
-  if (authStore.isAuthenticated) {
-    // 已登录，加载角色
-    await charStore.fetchCharacters()
+  try {
+    // 初始化认证状态
+    await authStore.init()
     
-    if (charStore.hasCharacters) {
-      currentPage.value = 'game'
+    // 加载游戏配置
+    await charStore.init()
+
+    // 验证用户是否真正登录（有有效的 user 对象且有 id）
+    if (authStore.isAuthenticated && authStore.user?.id) {
+      // 已登录，加载角色
+      await charStore.fetchCharacters()
+      
+      if (charStore.hasCharacters) {
+        currentPage.value = 'game'
+      } else {
+        currentPage.value = 'create-character'
+      }
     } else {
-      currentPage.value = 'create-character'
+      // 未登录或用户数据无效，清理状态并显示登录页
+      authStore.logout()
+      currentPage.value = 'auth'
     }
-  } else {
+  } catch (e) {
+    console.error('Init error:', e)
+    // 发生错误时，清理状态并显示登录页
+    authStore.logout()
     currentPage.value = 'auth'
   }
   

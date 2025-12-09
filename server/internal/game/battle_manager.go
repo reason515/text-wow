@@ -419,6 +419,8 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 			var isCrit bool
 			var damageDetails *DamageCalculationDetails
 			var shouldDealDamage bool // 是否应该造成伤害（只有attack类型的技能才造成伤害）
+			var isDodged bool         // 是否被闪避
+			var ignoresDodge bool     // 技能是否无视闪避
 
 			if skillState != nil && skillState.Skill != nil {
 				// 使用技能
@@ -427,6 +429,9 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 
 				// 判断技能是否应该造成伤害（只有attack类型的技能才造成伤害）
 				shouldDealDamage = skillState.Skill.Type == "attack"
+
+				// 检查技能是否无视闪避
+				ignoresDodge = m.skillIgnoresDodge(skillState.Skill)
 
 				// 检查资源是否足够
 				if resourceCost <= char.Resource {
@@ -580,6 +585,13 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 
 					// 只有attack类型的技能才造成伤害
 					if shouldDealDamage {
+						// 【闪避判定】检查主目标是否闪避（非AOE技能）
+						if skillState.Skill.TargetType != "enemy_all" {
+							if m.checkDodge(target.DodgeRate, ignoresDodge) {
+								isDodged = true
+							}
+						}
+
 						// 处理AOE技能（旋风斩等）
 						if skillState.Skill.TargetType == "enemy_all" {
 							// 根据技能伤害类型获取暴击伤害
@@ -589,9 +601,15 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 							} else {
 								aoeCritDamage = char.SpellCritDamage
 							}
-							// 对所有敌人造成伤害
+							// 对所有敌人造成伤害（AOE技能每个敌人单独判定闪避）
 							for _, enemy := range aliveEnemies {
 								if enemy.HP > 0 {
+									// AOE 技能每个敌人单独判定闪避
+									if m.checkDodge(enemy.DodgeRate, ignoresDodge) {
+										m.addLog(session, "dodge", fmt.Sprintf("%s 闪避了 %s 的攻击！", enemy.Name, char.Name), "#00ffff")
+										logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
+										continue
+									}
 									damage := m.skillManager.CalculateSkillDamage(skillState, char, enemy, m.passiveSkillManager, m.buffManager)
 									if isCrit {
 										// 根据技能伤害类型选择暴击伤害
@@ -606,12 +624,22 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 							// playerDamage用于日志显示（主目标伤害）
 						} else if skillState.SkillID == "warrior_cleave" {
 							// 顺劈斩：主目标+相邻目标
-							target.HP -= playerDamage
+							// 主目标闪避检查已在上方完成，如果未闪避则造成伤害
+							if !isDodged {
+								target.HP -= playerDamage
+							}
 
 							// 对相邻目标造成伤害（最多2个）
 							adjacentCount := 0
 							for _, enemy := range aliveEnemies {
 								if enemy != target && enemy.HP > 0 && adjacentCount < 2 {
+									// 相邻目标单独判定闪避
+									if m.checkDodge(enemy.DodgeRate, ignoresDodge) {
+										m.addLog(session, "dodge", fmt.Sprintf("%s 闪避了 %s 的攻击！", enemy.Name, char.Name), "#00ffff")
+										logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
+										adjacentCount++
+										continue
+									}
 									// 计算相邻目标伤害
 									if effect, ok := skillState.Effect["adjacentMultiplier"].(float64); ok {
 										adjacentDamage := int(float64(char.PhysicalAttack) * effect)
@@ -637,8 +665,10 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 								}
 							}
 						} else {
-							// 单体技能
-							target.HP -= playerDamage
+							// 单体技能 - 如果未闪避则造成伤害
+							if !isDodged {
+								target.HP -= playerDamage
+							}
 						}
 					} else {
 						// buff技能使用后，还需要进行普通攻击
@@ -662,6 +692,12 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 			if skillState == nil {
 				skillName = "普通攻击"
 				shouldDealDamage = true // 普通攻击造成伤害
+				ignoresDodge = false    // 普通攻击不无视闪避
+
+				// 【闪避判定】检查目标是否闪避普通攻击
+				if m.checkDodge(target.DodgeRate, ignoresDodge) {
+					isDodged = true
+				}
 				// 计算实际物理攻击力（应用被动技能加成）
 				actualAttack := float64(char.PhysicalAttack)
 				damageDetails = &DamageCalculationDetails{
@@ -779,14 +815,18 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 					playerDamage = baseDamage
 				}
 				damageDetails.FinalDamage = playerDamage
-				target.HP -= playerDamage
+
+				// 如果未闪避，造成伤害
+				if !isDodged {
+					target.HP -= playerDamage
+				}
 				resourceCost = 0
 				usedSkill = false
 			}
 			// 如果使用了技能，isCrit已经在上面计算了
 
-			// 普通攻击获得怒气（只有普通攻击才获得怒气，使用技能时不获得）
-			if char.ResourceType == "rage" && !usedSkill {
+			// 普通攻击获得怒气（只有普通攻击才获得怒气，使用技能时不获得，闪避时不获得）
+			if char.ResourceType == "rage" && !usedSkill && !isDodged {
 				var baseRageGain int
 				if isCrit {
 					baseRageGain = 10 // 暴击获得10点怒气
@@ -805,8 +845,10 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 				}
 			}
 
-			// 处理被动技能的特殊效果（攻击时触发）
-			m.handlePassiveOnHitEffects(char, playerDamage, usedSkill, session, &logs)
+			// 处理被动技能的特殊效果（攻击时触发）- 闪避时不触发
+			if !isDodged {
+				m.handlePassiveOnHitEffects(char, playerDamage, usedSkill, session, &logs)
+			}
 
 			// 构建战斗日志消息，包含资源变化（带颜色）
 			resourceChangeText := m.formatResourceChange(char.ResourceType, resourceCost, resourceGain)
@@ -817,8 +859,8 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 				formulaText = m.formatDamageFormula(damageDetails)
 			}
 
-			// 处理技能特殊效果日志
-			if skillEffects != nil {
+			// 处理技能特殊效果日志（闪避时不触发伤害相关效果）
+			if skillEffects != nil && !isDodged {
 				if stun, ok := skillEffects["stun"].(bool); ok && stun {
 					m.addLog(session, "combat", fmt.Sprintf("%s 被眩晕了！", target.Name), "#ff00ff")
 					logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
@@ -847,20 +889,25 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 
 			// 记录技能使用日志
 			if shouldDealDamage {
-				// 计算目标HP变化（需要在造成伤害前记录原始HP）
-				// 注意：此时伤害已经造成，target.HP已经是伤害后的值
-				// 所以我们需要在造成伤害前记录原始HP，这里使用伤害值反推
-				targetOldHP := target.HP + playerDamage
-				if targetOldHP > target.MaxHP {
-					targetOldHP = target.MaxHP
-				}
-				hpChangeText := m.formatHPChange(target.Name, targetOldHP, target.HP, target.MaxHP)
-
-				// 攻击类技能：记录伤害
-				if isCrit {
-					m.addLog(session, "combat", fmt.Sprintf("%s 使用 [%s] 💥暴击！对 %s 造成 %d 点伤害%s%s%s", char.Name, skillName, target.Name, playerDamage, formulaText, hpChangeText, resourceChangeText), "#ff6b6b")
+				if isDodged {
+					// 被闪避时显示闪避日志
+					m.addLog(session, "dodge", fmt.Sprintf("%s 闪避了 %s 使用的 [%s]！%s", target.Name, char.Name, skillName, resourceChangeText), "#00ffff")
 				} else {
-					m.addLog(session, "combat", fmt.Sprintf("%s 使用 [%s] 对 %s 造成 %d 点伤害%s%s%s", char.Name, skillName, target.Name, playerDamage, formulaText, hpChangeText, resourceChangeText), "#ffaa00")
+					// 计算目标HP变化（需要在造成伤害前记录原始HP）
+					// 注意：此时伤害已经造成，target.HP已经是伤害后的值
+					// 所以我们需要在造成伤害前记录原始HP，这里使用伤害值反推
+					targetOldHP := target.HP + playerDamage
+					if targetOldHP > target.MaxHP {
+						targetOldHP = target.MaxHP
+					}
+					hpChangeText := m.formatHPChange(target.Name, targetOldHP, target.HP, target.MaxHP)
+
+					// 攻击类技能：记录伤害
+					if isCrit {
+						m.addLog(session, "combat", fmt.Sprintf("%s 使用 [%s] 💥暴击！对 %s 造成 %d 点伤害%s%s%s", char.Name, skillName, target.Name, playerDamage, formulaText, hpChangeText, resourceChangeText), "#ff6b6b")
+					} else {
+						m.addLog(session, "combat", fmt.Sprintf("%s 使用 [%s] 对 %s 造成 %d 点伤害%s%s%s", char.Name, skillName, target.Name, playerDamage, formulaText, hpChangeText, resourceChangeText), "#ffaa00")
+					}
 				}
 			} else {
 				// 非攻击类技能（buff/debuff/control等）：只记录使用，不记录伤害
@@ -945,6 +992,36 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 		// 敌人回合：当前索引的敌人攻击玩家
 		if session.CurrentTurnIndex < len(aliveEnemies) {
 			enemy := aliveEnemies[session.CurrentTurnIndex]
+
+			// 【闪避判定】玩家尝试闪避敌人攻击
+			playerDodgeRate := m.calculateCharacterDodgeRate(char)
+			if m.checkDodge(playerDodgeRate, false) {
+				// 闪避成功！
+				m.addLog(session, "dodge", fmt.Sprintf("%s 闪避了 %s 的攻击！", char.Name, enemy.Name), "#00ffff")
+				logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
+
+				// 移动到下一个敌人或回到玩家回合
+				session.CurrentTurnIndex++
+				if session.CurrentTurnIndex >= len(aliveEnemies) {
+					session.CurrentTurnIndex = -1 // 回到玩家回合
+				}
+
+				// 返回结果（闪避成功，无伤害）
+				return &BattleTickResult{
+					Character:    char,
+					Enemy:        session.CurrentEnemy,
+					Enemies:      session.CurrentEnemies,
+					Logs:         logs,
+					IsRunning:    session.IsRunning,
+					IsResting:    session.IsResting,
+					RestUntil:    session.RestUntil,
+					SessionKills: session.SessionKills,
+					SessionGold:  session.SessionGold,
+					SessionExp:   session.SessionExp,
+					BattleCount:  session.BattleCount,
+				}, nil
+			}
+
 			// 敌人默认使用物理攻击
 			baseEnemyDamage, enemyDamageDetails := m.calculatePhysicalDamageWithDetails(enemy.PhysicalAttack, char.PhysicalDefense)
 			enemyDamageDetails.BaseAttack = enemy.PhysicalAttack
@@ -1471,6 +1548,61 @@ func (m *BattleManager) GetBattleLogs(userID int, limit int) []models.BattleLog 
 		logs = logs[len(logs)-limit:]
 	}
 	return logs
+}
+
+// checkDodge 检查闪避（返回 true 表示闪避成功）
+// dodgeRate: 闪避率（0.0-1.0）
+// ignoresDodge: 技能是否无视闪避
+func (m *BattleManager) checkDodge(dodgeRate float64, ignoresDodge bool) bool {
+	// 如果技能无视闪避，直接返回 false（未闪避）
+	if ignoresDodge {
+		return false
+	}
+
+	// 闪避率上限50%
+	if dodgeRate > 0.5 {
+		dodgeRate = 0.5
+	}
+
+	// 随机判定闪避
+	return rand.Float64() < dodgeRate
+}
+
+// skillIgnoresDodge 检查技能是否无视闪避
+func (m *BattleManager) skillIgnoresDodge(skill *models.Skill) bool {
+	if skill == nil || skill.Tags == "" {
+		return false
+	}
+	// Tags 是 JSON 数组字符串，检查是否包含 "ignores_dodge"
+	return strings.Contains(skill.Tags, "ignores_dodge")
+}
+
+// calculateCharacterDodgeRate 计算角色实际闪避率（包含被动和Buff加成）
+func (m *BattleManager) calculateCharacterDodgeRate(char *models.Character) float64 {
+	baseDodgeRate := char.DodgeRate
+
+	// 应用被动技能的闪避率加成
+	if m.passiveSkillManager != nil {
+		dodgeModifier := m.passiveSkillManager.GetPassiveModifier(char.ID, "dodge_rate")
+		if dodgeModifier > 0 {
+			baseDodgeRate = baseDodgeRate + dodgeModifier/100.0
+		}
+	}
+
+	// 应用Buff的闪避率加成
+	if m.buffManager != nil {
+		dodgeBuffValue := m.buffManager.GetBuffValue(char.ID, "dodge_rate")
+		if dodgeBuffValue > 0 {
+			baseDodgeRate = baseDodgeRate + dodgeBuffValue/100.0
+		}
+	}
+
+	// 闪避率上限50%
+	if baseDodgeRate > 0.5 {
+		baseDodgeRate = 0.5
+	}
+
+	return baseDodgeRate
 }
 
 // DamageCalculationDetails 伤害计算详情

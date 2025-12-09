@@ -25,15 +25,15 @@ func (r *CharacterRepository) Create(char *models.Character) (*models.Character,
 			hp, max_hp, resource, max_resource, resource_type,
 			strength, agility, intellect, stamina, spirit,
 			physical_attack, magic_attack, physical_defense, magic_defense,
-			phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
+			phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage, dodge_rate,
 			created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		char.UserID, char.Name, char.RaceID, char.ClassID, char.Faction, char.TeamSlot,
 		boolToInt(char.IsActive), boolToInt(char.IsDead), char.Level, char.Exp, char.ExpToNext,
 		char.HP, char.MaxHP, char.Resource, char.MaxResource, char.ResourceType,
 		char.Strength, char.Agility, char.Intellect, char.Stamina, char.Spirit,
 		char.PhysicalAttack, char.MagicAttack, char.PhysicalDefense, char.MagicDefense,
-		char.PhysCritRate, char.PhysCritDamage, char.SpellCritRate, char.SpellCritDamage,
+		char.PhysCritRate, char.PhysCritDamage, char.SpellCritRate, char.SpellCritDamage, char.DodgeRate,
 		time.Now(), time.Now(),
 	)
 	if err != nil {
@@ -61,7 +61,7 @@ func (r *CharacterRepository) GetByID(id int) (*models.Character, error) {
 		       hp, max_hp, resource, max_resource, resource_type,
 		       strength, agility, intellect, stamina, spirit,
 		       physical_attack, magic_attack, physical_defense, magic_defense,
-		       phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
+		       phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage, dodge_rate,
 		       total_kills, total_deaths, created_at
 		FROM characters WHERE id = ?`, id,
 	).Scan(
@@ -70,7 +70,7 @@ func (r *CharacterRepository) GetByID(id int) (*models.Character, error) {
 		&char.HP, &char.MaxHP, &char.Resource, &char.MaxResource, &char.ResourceType,
 		&char.Strength, &char.Agility, &char.Intellect, &char.Stamina, &char.Spirit,
 		&char.PhysicalAttack, &char.MagicAttack, &char.PhysicalDefense, &char.MagicDefense,
-		&char.PhysCritRate, &char.PhysCritDamage, &char.SpellCritRate, &char.SpellCritDamage,
+		&char.PhysCritRate, &char.PhysCritDamage, &char.SpellCritRate, &char.SpellCritDamage, &char.DodgeRate,
 		&char.TotalKills, &char.TotalDeaths, &char.CreatedAt,
 	)
 	if err != nil {
@@ -99,7 +99,7 @@ func (r *CharacterRepository) GetByUserID(userID int) ([]*models.Character, erro
 		       hp, max_hp, resource, max_resource, resource_type,
 		       strength, agility, intellect, stamina, spirit,
 		       physical_attack, magic_attack, physical_defense, magic_defense,
-		       phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
+		       phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage, dodge_rate,
 		       total_kills, total_deaths, created_at
 		FROM characters WHERE user_id = ? ORDER BY team_slot`, userID,
 	)
@@ -120,7 +120,7 @@ func (r *CharacterRepository) GetByUserID(userID int) ([]*models.Character, erro
 			&char.HP, &char.MaxHP, &char.Resource, &char.MaxResource, &char.ResourceType,
 			&char.Strength, &char.Agility, &char.Intellect, &char.Stamina, &char.Spirit,
 			&char.PhysicalAttack, &char.MagicAttack, &char.PhysicalDefense, &char.MagicDefense,
-			&char.PhysCritRate, &char.PhysCritDamage, &char.SpellCritRate, &char.SpellCritDamage,
+			&char.PhysCritRate, &char.PhysCritDamage, &char.SpellCritRate, &char.SpellCritDamage, &char.DodgeRate,
 			&char.TotalKills, &char.TotalDeaths, &char.CreatedAt,
 		)
 		if err != nil {
@@ -147,7 +147,7 @@ func (r *CharacterRepository) GetActiveByUserID(userID int) ([]*models.Character
 		       hp, max_hp, resource, max_resource, resource_type,
 		       strength, agility, intellect, stamina, spirit,
 		       physical_attack, magic_attack, physical_defense, magic_defense,
-		       phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
+		       phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage, dodge_rate,
 		       total_kills, total_deaths, created_at
 		FROM characters WHERE user_id = ? AND is_active = 1 ORDER BY team_slot`, userID,
 	)
@@ -168,7 +168,7 @@ func (r *CharacterRepository) GetActiveByUserID(userID int) ([]*models.Character
 			&char.HP, &char.MaxHP, &char.Resource, &char.MaxResource, &char.ResourceType,
 			&char.Strength, &char.Agility, &char.Intellect, &char.Stamina, &char.Spirit,
 			&char.PhysicalAttack, &char.MagicAttack, &char.PhysicalDefense, &char.MagicDefense,
-			&char.PhysCritRate, &char.PhysCritDamage, &char.SpellCritRate, &char.SpellCritDamage,
+			&char.PhysCritRate, &char.PhysCritDamage, &char.SpellCritRate, &char.SpellCritDamage, &char.DodgeRate,
 			&char.TotalKills, &char.TotalDeaths, &char.CreatedAt,
 		)
 		if err != nil {
@@ -243,7 +243,7 @@ func (r *CharacterRepository) Update(char *models.Character) error {
 			hp = ?, max_hp = ?, resource = ?, max_resource = ?,
 			strength = ?, agility = ?, intellect = ?, stamina = ?, spirit = ?,
 			physical_attack = ?, magic_attack = ?, physical_defense = ?, magic_defense = ?,
-			phys_crit_rate = ?, phys_crit_damage = ?, spell_crit_rate = ?, spell_crit_damage = ?,
+			phys_crit_rate = ?, phys_crit_damage = ?, spell_crit_rate = ?, spell_crit_damage = ?, dodge_rate = ?,
 			total_kills = ?, total_deaths = ?, updated_at = ?
 		WHERE id = ?`,
 		boolToInt(char.IsActive), boolToInt(char.IsDead), char.ReviveAt,
@@ -251,7 +251,7 @@ func (r *CharacterRepository) Update(char *models.Character) error {
 		char.HP, char.MaxHP, char.Resource, char.MaxResource,
 		char.Strength, char.Agility, char.Intellect, char.Stamina, char.Spirit,
 		char.PhysicalAttack, char.MagicAttack, char.PhysicalDefense, char.MagicDefense,
-		char.PhysCritRate, char.PhysCritDamage, char.SpellCritRate, char.SpellCritDamage,
+		char.PhysCritRate, char.PhysCritDamage, char.SpellCritRate, char.SpellCritDamage, char.DodgeRate,
 		char.TotalKills, char.TotalDeaths, time.Now(),
 		char.ID,
 	)

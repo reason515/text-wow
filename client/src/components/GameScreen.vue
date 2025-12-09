@@ -901,6 +901,10 @@ function escapeRegex(str: string): string {
             <span class="character-detail-combat-stat-label">法暴伤害</span>
             <span class="character-detail-combat-stat-value">{{ ((selectedCharacter.spellCritDamage || 1.5) * 100).toFixed(0) }}%</span>
           </div>
+          <div class="character-detail-combat-stat" :data-tooltip="`闪避率 = 5% + 敏捷/20\n当前敏捷: ${selectedCharacter.agility || 0}\n计算: 5% + ${selectedCharacter.agility || 0}/20 = ${((selectedCharacter.dodgeRate || 0.05) * 100).toFixed(1)}%\n闪避可以躲避物理和魔法攻击`">
+            <span class="character-detail-combat-stat-label">闪避率</span>
+            <span class="character-detail-combat-stat-value">{{ ((selectedCharacter.dodgeRate || 0.05) * 100).toFixed(1) }}%</span>
+          </div>
         </div>
 
         <!-- Buff/Debuff显示 -->

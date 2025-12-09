@@ -83,16 +83,19 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const response = await get<User>('/user')
       
-      if (response.success && response.data) {
+      // 验证响应有效且包含有效的用户数据（必须有 id）
+      if (response.success && response.data && response.data.id) {
         user.value = response.data
         return true
       } else {
-        // Token可能过期
+        // Token可能过期或用户不存在
+        console.warn('Failed to fetch user:', response.error || 'Invalid user data')
         clearToken()
         user.value = null
         return false
       }
     } catch (e) {
+      console.error('Error fetching current user:', e)
       clearToken()
       user.value = null
       return false
