@@ -105,17 +105,23 @@ func (bm *BuffManager) RemoveBuff(characterID int, effectID string) {
 	}
 }
 
+// ExpiredBuff 过期的Buff信息
+type ExpiredBuff struct {
+	EffectID string
+	Name     string
+}
+
 // TickBuffs 减少所有Buff/Debuff的持续时间（每回合调用）
-func (bm *BuffManager) TickBuffs(characterID int) []string {
+func (bm *BuffManager) TickBuffs(characterID int) []ExpiredBuff {
 	bm.mu.Lock()
 	defer bm.mu.Unlock()
 
-	expired := make([]string, 0)
+	expired := make([]ExpiredBuff, 0)
 	if buffs, exists := bm.characterBuffs[characterID]; exists {
 		for effectID, buff := range buffs {
 			buff.Duration--
 			if buff.Duration <= 0 {
-				expired = append(expired, effectID)
+				expired = append(expired, ExpiredBuff{EffectID: effectID, Name: buff.Name})
 				delete(buffs, effectID)
 			}
 		}

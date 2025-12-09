@@ -302,7 +302,7 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 			logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
 		} else {
 			// 仍在休息中
-			remaining := session.RestUntil.Sub(time.Now())
+			remaining := time.Until(*session.RestUntil)
 			if remaining > 0 {
 				m.addLog(session, "system", fmt.Sprintf(">> 休息中... (剩余 %d 秒)", int(remaining.Seconds())+1), "#888888")
 				logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
@@ -361,9 +361,6 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 
 		// 标记刚遭遇敌人，需要等待1个tick再开始战斗
 		session.JustEncountered = true
-
-		// 更新存活敌人列表
-		aliveEnemies = session.CurrentEnemies
 
 		// 刚遭遇敌人，这个tick只显示信息，不执行战斗
 		return &BattleTickResult{
@@ -821,8 +818,8 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 
 			// 减少Buff/Debuff持续时间
 			expiredBuffs := m.buffManager.TickBuffs(char.ID)
-			for _, effectID := range expiredBuffs {
-				m.addLog(session, "buff", fmt.Sprintf("%s 的 %s 效果消失了", char.Name, effectID), "#888888")
+			for _, expired := range expiredBuffs {
+				m.addLog(session, "buff", fmt.Sprintf("%s 的 %s 效果消失了", char.Name, expired.Name), "#888888")
 				logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
 			}
 
@@ -837,6 +834,10 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 				// 敌人死亡
 				expGain := target.ExpReward
 				goldGain := target.GoldMin + rand.Intn(target.GoldMax-target.GoldMin+1)
+
+				// 记录敌人死亡日志（敌人名字用红色，避免前端错误着色）
+				m.addLog(session, "kill", fmt.Sprintf("💀 <span style=\"color: #ff7777\">%s</span> 被击杀！获得 <span style=\"color: #3d85c6\">%d</span> 经验、<span style=\"color: #ffd700\">%d</span> 金币", target.Name, expGain, goldGain), "#ff6b6b")
+				logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
 
 				session.CurrentBattleExp += expGain
 				session.CurrentBattleGold += goldGain
@@ -913,7 +914,9 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 				enemyDamageDetails.DefenseModifiers = append(enemyDamageDetails.DefenseModifiers,
 					fmt.Sprintf("被动减伤 -%.0f%%", reduction))
 			}
-			enemyDamageDetails.FinalDamage = enemyDamage
+			if enemyDamageDetails != nil {
+				enemyDamageDetails.FinalDamage = enemyDamage
+			}
 
 			// 处理护盾效果（不灭壁垒等）
 			shieldAmount := m.buffManager.GetBuffValue(char.ID, "shield")
@@ -1108,8 +1111,13 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 		// 战斗胜利总结
 		m.addBattleSummary(session, true, &logs)
 
-		// 战斗结束后，所有战士角色的怒气都归0
+		// 战斗结束后，清除所有角色的buff和debuff，怒气归0
 		for _, c := range characters {
+			// 清除所有buff和debuff
+			if m.buffManager != nil {
+				m.buffManager.ClearBuffs(c.ID)
+			}
+			// 战士的怒气归0
 			if c.ResourceType == "rage" {
 				c.Resource = 0
 			}
@@ -1189,11 +1197,6 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 	}, nil
 }
 
-// spawnEnemy 生成敌人（向后兼容）
-func (m *BattleManager) spawnEnemy(session *BattleSession, playerLevel int) error {
-	return m.spawnEnemies(session, playerLevel)
-}
-
 // spawnEnemies 生成多个敌人（1-3个随机）
 func (m *BattleManager) spawnEnemies(session *BattleSession, playerLevel int) error {
 	if session.CurrentZone == nil {
@@ -1257,7 +1260,7 @@ func (m *BattleManager) spawnEnemies(session *BattleSession, playerLevel int) er
 	if len(enemyNames) == 0 {
 		return fmt.Errorf("failed to generate enemies")
 	}
-	enemyList := fmt.Sprintf("%s", enemyNames[0])
+	enemyList := enemyNames[0]
 	if len(enemyNames) > 1 {
 		enemyList = fmt.Sprintf("%s 等 %d 个敌人", enemyNames[0], len(enemyNames))
 	}
@@ -1446,46 +1449,6 @@ func (m *BattleManager) calculatePhysicalDamageWithDetails(attack, defense int) 
 	details.FinalDamage = int(baseDamage)
 
 	return int(baseDamage), details
-}
-
-// calculatePhysicalDamage 计算物理伤害（保持向后兼容）
-func (m *BattleManager) calculatePhysicalDamage(attack, defense int) int {
-	damage, _ := m.calculatePhysicalDamageWithDetails(attack, defense)
-	return damage
-}
-
-// calculateMagicDamage 计算魔法伤害（返回详情）
-func (m *BattleManager) calculateMagicDamageWithDetails(attack, defense int) (int, *DamageCalculationDetails) {
-	details := &DamageCalculationDetails{
-		BaseAttack:       attack,
-		ActualAttack:     float64(attack),
-		BaseDefense:      defense,
-		ActualDefense:    float64(defense),
-		AttackModifiers:  []string{},
-		DefenseModifiers: []string{},
-	}
-
-	// 基础伤害 = 实际攻击力 - 目标防御力（不再除以2）
-	baseDamage := float64(attack) - float64(defense)
-	if baseDamage < 1 {
-		baseDamage = 1
-	}
-	details.BaseDamage = baseDamage
-	details.Variance = 0 // 不再使用随机波动，未来通过装备的攻击力上下限实现
-	details.FinalDamage = int(baseDamage)
-
-	return int(baseDamage), details
-}
-
-// calculateMagicDamage 计算魔法伤害（保持向后兼容）
-func (m *BattleManager) calculateMagicDamage(attack, defense int) int {
-	damage, _ := m.calculateMagicDamageWithDetails(attack, defense)
-	return damage
-}
-
-// calculateDamage 计算伤害（兼容旧代码，默认使用物理）
-func (m *BattleManager) calculateDamage(attack, defense int) int {
-	return m.calculatePhysicalDamage(attack, defense)
 }
 
 // addLog 添加日志
@@ -1691,50 +1654,6 @@ func (m *BattleManager) formatResourceChange(resourceType string, cost int, gain
 
 	// 使用圆括号，资源名和变化值都带颜色
 	return fmt.Sprintf(" <span style=\"color: %s\">(%s %s)</span>", color, resourceName, changeText)
-}
-
-// getRandomSkillName 获取随机技能名称
-func (m *BattleManager) getRandomSkillName(classID string) string {
-	skills := map[string][]string{
-		"warrior": {"英勇打击", "雷霆一击", "顺劈斩", "致死打击"},
-		"paladin": {"圣光术", "十字军打击", "正义之锤", "审判"},
-		"hunter":  {"奥术射击", "多重射击", "瞄准射击", "稳固射击"},
-		"rogue":   {"邪恶攻击", "剔骨", "背刺", "毒刃"},
-		"priest":  {"惩击", "暗言术:痛", "神圣之火", "心灵震爆"},
-		"mage":    {"火球术", "寒冰箭", "奥术飞弹", "炎爆术"},
-		"warlock": {"暗影箭", "腐蚀术", "献祭", "混乱箭"},
-		"druid":   {"月火术", "愤怒", "挥击", "横扫"},
-		"shaman":  {"闪电箭", "闪电链", "熔岩爆裂", "烈焰震击"},
-	}
-
-	if classSkills, ok := skills[classID]; ok {
-		return classSkills[rand.Intn(len(classSkills))]
-	}
-	return "普通攻击"
-}
-
-// getSkillForAttack 获取攻击技能名称和消耗
-func (m *BattleManager) getSkillForAttack(char *models.Character) (string, int) {
-	// 战士技能及其怒气消耗
-	warriorSkills := []struct {
-		name string
-		cost int
-	}{
-		{"英勇打击", 10},
-		{"雷霆一击", 15},
-		{"顺劈斩", 12},
-		{"致死打击", 20},
-	}
-
-	// 如果是战士，返回随机技能和消耗
-	if char.ResourceType == "rage" {
-		skill := warriorSkills[rand.Intn(len(warriorSkills))]
-		return skill.name, skill.cost
-	}
-
-	// 其他职业使用普通技能，不消耗资源（或消耗法力，但这里简化处理）
-	skillName := m.getRandomSkillName(char.ClassID)
-	return skillName, 0
 }
 
 // calculateReviveTime 计算复活时间（根据死亡人数）

@@ -86,7 +86,8 @@ func TestBuffManager_TickBuffs(t *testing.T) {
 	// 第三次tick：duration 1 -> 0，应该过期
 	expired = bm.TickBuffs(characterID)
 	assert.NotEmpty(t, expired, "Buff应该过期")
-	assert.Contains(t, expired, "battle_shout")
+	assert.Equal(t, "battle_shout", expired[0].EffectID)
+	assert.Equal(t, "战斗怒吼", expired[0].Name)
 	
 	// Buff应该被移除
 	buffs = bm.GetBuffs(characterID)
