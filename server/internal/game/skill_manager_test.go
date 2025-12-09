@@ -40,8 +40,10 @@ func setupSkillManagerTest(t *testing.T) (*SkillManager, *models.Character, *mod
 		MagicAttack:     50,
 		PhysicalDefense: 50,
 		MagicDefense:    30,
-		CritRate:     0.1,
-		CritDamage:   1.5,
+		PhysCritRate:    0.1,
+		PhysCritDamage:  1.5,
+		SpellCritRate:   0.1,
+		SpellCritDamage: 1.5,
 	}
 	
 	enemy := &models.Monster{

@@ -74,8 +74,10 @@ type Character struct {
 	MagicAttack     int        `json:"magicAttack"`
 	PhysicalDefense int        `json:"physicalDefense"`
 	MagicDefense    int        `json:"magicDefense"`
-	CritRate        float64    `json:"critRate"`
-	CritDamage      float64    `json:"critDamage"`
+	PhysCritRate    float64    `json:"physCritRate"`    // 物理暴击率
+	PhysCritDamage  float64    `json:"physCritDamage"`  // 物理暴击伤害
+	SpellCritRate   float64    `json:"spellCritRate"`   // 法术暴击率
+	SpellCritDamage float64    `json:"spellCritDamage"` // 法术暴击伤害
 	TotalKills      int        `json:"totalKills"`
 	TotalDeaths     int        `json:"totalDeaths"`
 	CreatedAt       time.Time  `json:"createdAt"`

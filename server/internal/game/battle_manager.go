@@ -479,25 +479,55 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 						}
 
 						// 计算暴击（技能也可以暴击，应用被动技能和Buff加成）
-						actualCritRate := char.CritRate
-						damageDetails.BaseCritRate = char.CritRate
+						// 根据伤害类型选择使用物理暴击率还是法术暴击率
+						var baseCritRate, baseCritDamage float64
+						var critType string
+						if skillState.Skill.DamageType == "physical" {
+							baseCritRate = char.PhysCritRate
+							baseCritDamage = char.PhysCritDamage
+							critType = "phys_crit_rate"
+						} else {
+							// 法术伤害（magic/fire/frost/shadow/holy/nature）
+							baseCritRate = char.SpellCritRate
+							baseCritDamage = char.SpellCritDamage
+							critType = "spell_crit_rate"
+						}
+
+						actualCritRate := baseCritRate
+						damageDetails.BaseCritRate = baseCritRate
 						damageDetails.CritModifiers = []string{}
 
 						if m.passiveSkillManager != nil {
-							critModifier := m.passiveSkillManager.GetPassiveModifier(char.ID, "crit_rate")
+							// 检查特定类型暴击率加成
+							critModifier := m.passiveSkillManager.GetPassiveModifier(char.ID, critType)
 							if critModifier > 0 {
-								actualCritRate = char.CritRate + critModifier/100.0
+								actualCritRate = baseCritRate + critModifier/100.0
 								damageDetails.CritModifiers = append(damageDetails.CritModifiers,
 									fmt.Sprintf("被动暴击+%.0f%%", critModifier))
+							}
+							// 检查通用暴击率加成（同时影响物理和法术）
+							generalCritModifier := m.passiveSkillManager.GetPassiveModifier(char.ID, "crit_rate")
+							if generalCritModifier > 0 {
+								actualCritRate = actualCritRate + generalCritModifier/100.0
+								damageDetails.CritModifiers = append(damageDetails.CritModifiers,
+									fmt.Sprintf("被动暴击+%.0f%%", generalCritModifier))
 							}
 						}
 						// 应用Buff的暴击率加成（鲁莽等）
 						if m.buffManager != nil {
-							critBuffValue := m.buffManager.GetBuffValue(char.ID, "crit_rate")
+							// 检查特定类型暴击率加成
+							critBuffValue := m.buffManager.GetBuffValue(char.ID, critType)
 							if critBuffValue > 0 {
 								actualCritRate = actualCritRate + critBuffValue/100.0
 								damageDetails.CritModifiers = append(damageDetails.CritModifiers,
 									fmt.Sprintf("Buff暴击+%.0f%%", critBuffValue))
+							}
+							// 检查通用暴击率加成（同时影响物理和法术）
+							generalCritBuffValue := m.buffManager.GetBuffValue(char.ID, "crit_rate")
+							if generalCritBuffValue > 0 {
+								actualCritRate = actualCritRate + generalCritBuffValue/100.0
+								damageDetails.CritModifiers = append(damageDetails.CritModifiers,
+									fmt.Sprintf("Buff暴击+%.0f%%", generalCritBuffValue))
 							}
 						}
 						if actualCritRate > 1.0 {
@@ -508,10 +538,10 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 						damageDetails.RandomRoll = randomRoll
 						isCrit = randomRoll < actualCritRate
 						damageDetails.IsCrit = isCrit
-						damageDetails.CritMultiplier = char.CritDamage
+						damageDetails.CritMultiplier = baseCritDamage
 
 						if isCrit {
-							playerDamage = int(float64(baseDamage) * char.CritDamage)
+							playerDamage = int(float64(baseDamage) * baseCritDamage)
 						} else {
 							playerDamage = baseDamage
 						}
@@ -552,12 +582,20 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 					if shouldDealDamage {
 						// 处理AOE技能（旋风斩等）
 						if skillState.Skill.TargetType == "enemy_all" {
+							// 根据技能伤害类型获取暴击伤害
+							var aoeCritDamage float64
+							if skillState.Skill.DamageType == "physical" {
+								aoeCritDamage = char.PhysCritDamage
+							} else {
+								aoeCritDamage = char.SpellCritDamage
+							}
 							// 对所有敌人造成伤害
 							for _, enemy := range aliveEnemies {
 								if enemy.HP > 0 {
 									damage := m.skillManager.CalculateSkillDamage(skillState, char, enemy, m.passiveSkillManager, m.buffManager)
 									if isCrit {
-										damage = int(float64(damage) * char.CritDamage)
+										// 根据技能伤害类型选择暴击伤害
+										damage = int(float64(damage) * aoeCritDamage)
 									}
 									enemy.HP -= damage
 									if enemy.HP < 0 {
@@ -583,7 +621,8 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 											adjacentDamage = 1
 										}
 										if isCrit {
-											adjacentDamage = int(float64(adjacentDamage) * char.CritDamage)
+											// 顺劈斩是物理技能，使用物理暴击伤害
+											adjacentDamage = int(float64(adjacentDamage) * char.PhysCritDamage)
 										}
 										adjacentOldHP := enemy.HP
 										enemy.HP -= adjacentDamage
@@ -686,26 +725,42 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 				damageDetails.BaseAttack = attackUsedInCalc // 确保公式显示的是实际用于计算的值
 				damageDetails.Variance = calcDetails.Variance
 
-				// 计算暴击率（应用被动技能和Buff加成）
-				actualCritRate := char.CritRate
-				damageDetails.BaseCritRate = char.CritRate
+				// 计算暴击率（普通攻击使用物理暴击率，应用被动技能和Buff加成）
+				actualCritRate := char.PhysCritRate
+				damageDetails.BaseCritRate = char.PhysCritRate
 				damageDetails.CritModifiers = []string{}
 
 				if m.passiveSkillManager != nil {
-					critModifier := m.passiveSkillManager.GetPassiveModifier(char.ID, "crit_rate")
+					// 检查物理暴击率加成
+					critModifier := m.passiveSkillManager.GetPassiveModifier(char.ID, "phys_crit_rate")
 					if critModifier > 0 {
-						actualCritRate = char.CritRate + critModifier/100.0
+						actualCritRate = char.PhysCritRate + critModifier/100.0
 						damageDetails.CritModifiers = append(damageDetails.CritModifiers,
 							fmt.Sprintf("被动暴击+%.0f%%", critModifier))
+					}
+					// 检查通用暴击率加成（同时影响物理和法术）
+					generalCritModifier := m.passiveSkillManager.GetPassiveModifier(char.ID, "crit_rate")
+					if generalCritModifier > 0 {
+						actualCritRate = actualCritRate + generalCritModifier/100.0
+						damageDetails.CritModifiers = append(damageDetails.CritModifiers,
+							fmt.Sprintf("被动暴击+%.0f%%", generalCritModifier))
 					}
 				}
 				// 应用Buff的暴击率加成（鲁莽等）
 				if m.buffManager != nil {
-					critBuffValue := m.buffManager.GetBuffValue(char.ID, "crit_rate")
+					// 检查物理暴击率加成
+					critBuffValue := m.buffManager.GetBuffValue(char.ID, "phys_crit_rate")
 					if critBuffValue > 0 {
 						actualCritRate = actualCritRate + critBuffValue/100.0
 						damageDetails.CritModifiers = append(damageDetails.CritModifiers,
 							fmt.Sprintf("Buff暴击+%.0f%%", critBuffValue))
+					}
+					// 检查通用暴击率加成（同时影响物理和法术）
+					generalCritBuffValue := m.buffManager.GetBuffValue(char.ID, "crit_rate")
+					if generalCritBuffValue > 0 {
+						actualCritRate = actualCritRate + generalCritBuffValue/100.0
+						damageDetails.CritModifiers = append(damageDetails.CritModifiers,
+							fmt.Sprintf("Buff暴击+%.0f%%", generalCritBuffValue))
 					}
 				}
 				if actualCritRate > 1.0 {
@@ -716,10 +771,10 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 				damageDetails.RandomRoll = randomRoll
 				isCrit = randomRoll < actualCritRate
 				damageDetails.IsCrit = isCrit
-				damageDetails.CritMultiplier = char.CritDamage
+				damageDetails.CritMultiplier = char.PhysCritDamage
 
 				if isCrit {
-					playerDamage = int(float64(baseDamage) * char.CritDamage)
+					playerDamage = int(float64(baseDamage) * char.PhysCritDamage)
 				} else {
 					playerDamage = baseDamage
 				}
@@ -1370,10 +1425,21 @@ func (m *BattleManager) getBuffDescription(buff *BuffInstance) string {
 	case "damage_taken":
 		return fmt.Sprintf("减少%.0f%%受到的伤害", -buff.Value)
 	case "crit_rate":
+		// 通用暴击率（同时影响物理和法术）
 		if buff.IsBuff {
 			return fmt.Sprintf("提升%.0f%%暴击率", buff.Value)
 		}
 		return fmt.Sprintf("降低%.0f%%暴击率", -buff.Value)
+	case "phys_crit_rate":
+		if buff.IsBuff {
+			return fmt.Sprintf("提升%.0f%%物理暴击率", buff.Value)
+		}
+		return fmt.Sprintf("降低%.0f%%物理暴击率", -buff.Value)
+	case "spell_crit_rate":
+		if buff.IsBuff {
+			return fmt.Sprintf("提升%.0f%%法术暴击率", buff.Value)
+		}
+		return fmt.Sprintf("降低%.0f%%法术暴击率", -buff.Value)
 	case "healing_received":
 		return fmt.Sprintf("降低%.0f%%治疗效果", buff.Value)
 	case "shield":

@@ -65,8 +65,10 @@ export interface Character {
   magicAttack: number
   physicalDefense: number
   magicDefense: number
-  critRate: number
-  critDamage: number
+  physCritRate: number      // 物理暴击率
+  physCritDamage: number    // 物理暴击伤害
+  spellCritRate: number     // 法术暴击率
+  spellCritDamage: number   // 法术暴击伤害
   totalKills: number
   totalDeaths: number
   createdAt: string

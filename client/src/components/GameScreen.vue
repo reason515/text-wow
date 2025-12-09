@@ -869,29 +869,37 @@ function escapeRegex(str: string): string {
 
         <!-- 战斗统计 -->
         <div class="character-detail-combat-stats">
-          <div class="character-detail-combat-stat" :data-tooltip="`物理攻击力 = 力量 / 2\n当前: ${selectedCharacter.strength || 0} / 2 = ${selectedCharacter.physicalAttack || 0}`">
+          <div class="character-detail-combat-stat" :data-tooltip="`物理攻击 = 力量×1.0 + 敏捷×0.2\n力量: ${selectedCharacter.strength || 0}, 敏捷: ${selectedCharacter.agility || 0}\n计算: ${selectedCharacter.strength || 0}×1.0 + ${selectedCharacter.agility || 0}×0.2 = ${selectedCharacter.physicalAttack || 0}`">
             <span class="character-detail-combat-stat-label">物理攻击</span>
             <span class="character-detail-combat-stat-value">{{ selectedCharacter.physicalAttack || 0 }}</span>
           </div>
-          <div class="character-detail-combat-stat" :data-tooltip="`魔法攻击力 = 智力 / 2\n当前: ${selectedCharacter.intellect || 0} / 2 = ${selectedCharacter.magicAttack || 0}`">
+          <div class="character-detail-combat-stat" :data-tooltip="`魔法攻击 = 智力×1.0 + 精神×0.2\n智力: ${selectedCharacter.intellect || 0}, 精神: ${selectedCharacter.spirit || 0}\n计算: ${selectedCharacter.intellect || 0}×1.0 + ${selectedCharacter.spirit || 0}×0.2 = ${selectedCharacter.magicAttack || 0}`">
             <span class="character-detail-combat-stat-label">魔法攻击</span>
             <span class="character-detail-combat-stat-value">{{ selectedCharacter.magicAttack || 0 }}</span>
           </div>
-          <div class="character-detail-combat-stat" :data-tooltip="`物理防御力 = 耐力 / 3\n当前: ${selectedCharacter.stamina || 0} / 3 = ${selectedCharacter.physicalDefense || 0}`">
+          <div class="character-detail-combat-stat" :data-tooltip="`物理防御 = 力量×0.2 + 耐力×0.3\n力量: ${selectedCharacter.strength || 0}, 耐力: ${selectedCharacter.stamina || 0}\n计算: ${selectedCharacter.strength || 0}×0.2 + ${selectedCharacter.stamina || 0}×0.3 = ${selectedCharacter.physicalDefense || 0}`">
             <span class="character-detail-combat-stat-label">物理防御</span>
             <span class="character-detail-combat-stat-value">{{ selectedCharacter.physicalDefense || 0 }}</span>
           </div>
-          <div class="character-detail-combat-stat" :data-tooltip="`魔法防御力 = (智力 + 精神) / 4\n当前: (${selectedCharacter.intellect || 0} + ${selectedCharacter.spirit || 0}) / 4 = ${selectedCharacter.magicDefense || 0}`">
+          <div class="character-detail-combat-stat" :data-tooltip="`魔法防御 = 智力×0.2 + 精神×0.3\n智力: ${selectedCharacter.intellect || 0}, 精神: ${selectedCharacter.spirit || 0}\n计算: ${selectedCharacter.intellect || 0}×0.2 + ${selectedCharacter.spirit || 0}×0.3 = ${selectedCharacter.magicDefense || 0}`">
             <span class="character-detail-combat-stat-label">魔法防御</span>
             <span class="character-detail-combat-stat-value">{{ selectedCharacter.magicDefense || 0 }}</span>
           </div>
-          <div class="character-detail-combat-stat" :data-tooltip="`暴击率 = 基础值 + 被动技能加成 + Buff加成\n基础值: 5%\n当前: ${((selectedCharacter.critRate || 0.05) * 100).toFixed(1)}%`">
-            <span class="character-detail-combat-stat-label">暴击率</span>
-            <span class="character-detail-combat-stat-value">{{ ((selectedCharacter.critRate || 0.05) * 100).toFixed(1) }}%</span>
+          <div class="character-detail-combat-stat" :data-tooltip="`物理暴击率 = 5% + 敏捷/20\n当前敏捷: ${selectedCharacter.agility || 0}\n计算: 5% + ${selectedCharacter.agility || 0}/20 = ${((selectedCharacter.physCritRate || 0.05) * 100).toFixed(1)}%`">
+            <span class="character-detail-combat-stat-label">物理暴击</span>
+            <span class="character-detail-combat-stat-value">{{ ((selectedCharacter.physCritRate || 0.05) * 100).toFixed(1) }}%</span>
           </div>
-          <div class="character-detail-combat-stat" :data-tooltip="`暴击伤害 = 基础值 × 暴击伤害倍率\n基础值: 150%\n当前: ${((selectedCharacter.critDamage || 1.5) * 100).toFixed(0)}%`">
-            <span class="character-detail-combat-stat-label">暴击伤害</span>
-            <span class="character-detail-combat-stat-value">{{ ((selectedCharacter.critDamage || 1.5) * 100).toFixed(0) }}%</span>
+          <div class="character-detail-combat-stat" :data-tooltip="`物理暴击伤害 = 150% + 力量×0.3%\n当前力量: ${selectedCharacter.strength || 0}\n计算: 150% + ${selectedCharacter.strength || 0}×0.3% = ${((selectedCharacter.physCritDamage || 1.5) * 100).toFixed(0)}%`">
+            <span class="character-detail-combat-stat-label">物暴伤害</span>
+            <span class="character-detail-combat-stat-value">{{ ((selectedCharacter.physCritDamage || 1.5) * 100).toFixed(0) }}%</span>
+          </div>
+          <div class="character-detail-combat-stat" :data-tooltip="`法术暴击率 = 5% + 精神/20\n当前精神: ${selectedCharacter.spirit || 0}\n计算: 5% + ${selectedCharacter.spirit || 0}/20 = ${((selectedCharacter.spellCritRate || 0.05) * 100).toFixed(1)}%`">
+            <span class="character-detail-combat-stat-label">法术暴击</span>
+            <span class="character-detail-combat-stat-value">{{ ((selectedCharacter.spellCritRate || 0.05) * 100).toFixed(1) }}%</span>
+          </div>
+          <div class="character-detail-combat-stat" :data-tooltip="`法术暴击伤害 = 150% + 智力×0.3%\n当前智力: ${selectedCharacter.intellect || 0}\n计算: 150% + ${selectedCharacter.intellect || 0}×0.3% = ${((selectedCharacter.spellCritDamage || 1.5) * 100).toFixed(0)}%`">
+            <span class="character-detail-combat-stat-label">法暴伤害</span>
+            <span class="character-detail-combat-stat-value">{{ ((selectedCharacter.spellCritDamage || 1.5) * 100).toFixed(0) }}%</span>
           </div>
         </div>
 

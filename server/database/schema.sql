@@ -62,8 +62,10 @@ CREATE TABLE IF NOT EXISTS characters (
     magic_attack INTEGER DEFAULT 10,
     physical_defense INTEGER DEFAULT 5,
     magic_defense INTEGER DEFAULT 5,
-    crit_rate REAL DEFAULT 0.05,
-    crit_damage REAL DEFAULT 1.5,
+    phys_crit_rate REAL DEFAULT 0.05,         -- 物理暴击率
+    phys_crit_damage REAL DEFAULT 1.5,        -- 物理暴击伤害
+    spell_crit_rate REAL DEFAULT 0.05,        -- 法术暴击率
+    spell_crit_damage REAL DEFAULT 1.5,       -- 法术暴击伤害
     total_kills INTEGER DEFAULT 0,            -- 该角色击杀数
     total_deaths INTEGER DEFAULT 0,           -- 该角色死亡数
     total_damage_dealt INTEGER DEFAULT 0,     -- 该角色总伤害

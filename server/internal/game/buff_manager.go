@@ -261,7 +261,11 @@ func (bm *BuffManager) ApplyBuffToCharacter(character *models.Character) {
 		case "damage_taken":
 			// 减伤效果在受到伤害时应用
 		case "crit_rate":
-			// 暴击率加成在计算暴击时应用
+			// 通用暴击率加成在计算暴击时应用（同时影响物理和法术）
+		case "phys_crit_rate":
+			// 物理暴击率加成在计算暴击时应用
+		case "spell_crit_rate":
+			// 法术暴击率加成在计算暴击时应用
 		}
 	}
 }

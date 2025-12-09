@@ -351,8 +351,6 @@ func (h *Handler) CreateCharacter(c *gin.Context) {
 		Exp:          0,
 		ExpToNext:    100,
 		ResourceType: class.ResourceType,
-		CritRate:     0.05,
-		CritDamage:   1.5,
 	}
 
 	// 计算基础属性 = 职业基础 + 种族加成
@@ -363,25 +361,44 @@ func (h *Handler) CreateCharacter(c *gin.Context) {
 	char.Spirit = class.BaseSpirit + race.SpiritBase
 
 	// 计算HP和资源
+	// 最大HP = 职业基础HP + 耐力×2
 	char.MaxHP = class.BaseHP + char.Stamina*2
 	char.HP = char.MaxHP
 
 	// 战士的怒气最大值固定为100，初始值为0
+	// 其他职业：最大MP = 职业基础MP + 精神×2
 	if class.ResourceType == "rage" {
 		char.MaxResource = 100
 		char.Resource = 0
+	} else if class.ResourceType == "energy" {
+		// 能量职业（盗贼）固定100
+		char.MaxResource = 100
+		char.Resource = char.MaxResource
 	} else {
-		char.MaxResource = class.BaseResource
+		// 法力职业：最大MP = 基础MP + 精神×2
+		char.MaxResource = class.BaseResource + char.Spirit*2
 		char.Resource = char.MaxResource
 	}
 
 	// 计算物理和魔法攻击/防御
-	// 物理攻击主要基于力量，魔法攻击主要基于智力
-	char.PhysicalAttack = char.Strength / 2
-	char.MagicAttack = char.Intellect / 2
-	// 物理防御主要基于耐力，魔法防御主要基于精神和智力
-	char.PhysicalDefense = char.Stamina / 3
-	char.MagicDefense = (char.Intellect + char.Spirit) / 4
+	// 物理攻击 = 力量×1.0 + 敏捷×0.2
+	char.PhysicalAttack = int(float64(char.Strength)*1.0 + float64(char.Agility)*0.2)
+	// 魔法攻击 = 智力×1.0 + 精神×0.2
+	char.MagicAttack = int(float64(char.Intellect)*1.0 + float64(char.Spirit)*0.2)
+	// 物理防御 = 力量×0.2 + 耐力×0.3
+	char.PhysicalDefense = int(float64(char.Strength)*0.2 + float64(char.Stamina)*0.3)
+	// 魔法防御 = 智力×0.2 + 精神×0.3
+	char.MagicDefense = int(float64(char.Intellect)*0.2 + float64(char.Spirit)*0.3)
+
+	// 计算暴击属性
+	// 物理暴击率 = 基础5% + 敏捷/20
+	char.PhysCritRate = 0.05 + float64(char.Agility)/20.0/100.0
+	// 物理暴击伤害 = 150% + 力量×0.3%
+	char.PhysCritDamage = 1.5 + float64(char.Strength)*0.3/100.0
+	// 法术暴击率 = 基础5% + 精神/20
+	char.SpellCritRate = 0.05 + float64(char.Spirit)/20.0/100.0
+	// 法术暴击伤害 = 150% + 智力×0.3%
+	char.SpellCritDamage = 1.5 + float64(char.Intellect)*0.3/100.0
 
 	// 创建角色
 	char, err = h.charRepo.Create(char)
