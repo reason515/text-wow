@@ -184,7 +184,13 @@ export interface BattleLog {
   source?: string
   target?: string
   value?: number
-  createdAt: string
+  color?: string
+  damageType?: 'physical' | 'magic'
+  actor?: string
+  action?: string
+  time?: string
+  type?: string
+  createdAt?: string
 }
 
 export interface BattleStatus {

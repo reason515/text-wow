@@ -659,7 +659,7 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 										}
 										adjacentCount++
 										adjacentHPChange := m.formatHPChange(enemy.Name, adjacentOldHP, enemy.HP, enemy.MaxHP)
-										m.addLog(session, "combat", fmt.Sprintf("%s 的顺劈斩波及到 %s，造成 %d 点伤害%s", char.Name, enemy.Name, adjacentDamage, adjacentHPChange), "#ffaa00")
+										m.addLog(session, "combat", fmt.Sprintf("%s 的顺劈斩波及到 %s，造成 %d 点伤害%s", char.Name, enemy.Name, adjacentDamage, adjacentHPChange), "#ffaa00", withDamageType("physical"))
 										logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
 									}
 								}
@@ -901,12 +901,18 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 						targetOldHP = target.MaxHP
 					}
 					hpChangeText := m.formatHPChange(target.Name, targetOldHP, target.HP, target.MaxHP)
+					playerDamageType := "physical"
+					if skillState != nil && skillState.Skill != nil {
+						if dt := normalizeDamageType(skillState.Skill.DamageType); dt != "" {
+							playerDamageType = dt
+						}
+					}
 
 					// 攻击类技能：记录伤害
 					if isCrit {
-						m.addLog(session, "combat", fmt.Sprintf("%s 使用 [%s] 💥暴击！对 %s 造成 %d 点伤害%s%s%s", char.Name, skillName, target.Name, playerDamage, formulaText, hpChangeText, resourceChangeText), "#ff6b6b")
+						m.addLog(session, "combat", fmt.Sprintf("%s 使用 [%s] 💥暴击！对 %s 造成 %d 点伤害%s%s%s", char.Name, skillName, target.Name, playerDamage, formulaText, hpChangeText, resourceChangeText), "#ff6b6b", withDamageType(playerDamageType))
 					} else {
-						m.addLog(session, "combat", fmt.Sprintf("%s 使用 [%s] 对 %s 造成 %d 点伤害%s%s%s", char.Name, skillName, target.Name, playerDamage, formulaText, hpChangeText, resourceChangeText), "#ffaa00")
+						m.addLog(session, "combat", fmt.Sprintf("%s 使用 [%s] 对 %s 造成 %d 点伤害%s%s%s", char.Name, skillName, target.Name, playerDamage, formulaText, hpChangeText, resourceChangeText), "#ffaa00", withDamageType(playerDamageType))
 					}
 				}
 			} else {
@@ -1167,9 +1173,9 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 				attackLabel = "魔法"
 			}
 			if isEnemyCrit {
-				m.addLog(session, "combat", fmt.Sprintf("%s 进行了💥%s暴击，对 %s 造成 %d 点伤害%s%s%s", enemy.Name, attackLabel, char.Name, enemyDamage, enemyFormulaText, playerHPChangeText, resourceChangeText), damageColor)
+				m.addLog(session, "combat", fmt.Sprintf("%s 进行了💥%s暴击，对 %s 造成 %d 点伤害%s%s%s", enemy.Name, attackLabel, char.Name, enemyDamage, enemyFormulaText, playerHPChangeText, resourceChangeText), damageColor, withDamageType(attackType))
 			} else {
-				m.addLog(session, "combat", fmt.Sprintf("%s 的%s攻击命中 %s，造成 %d 点伤害%s%s%s", enemy.Name, attackLabel, char.Name, enemyDamage, enemyFormulaText, playerHPChangeText, resourceChangeText), damageColor)
+				m.addLog(session, "combat", fmt.Sprintf("%s 的%s攻击命中 %s，造成 %d 点伤害%s%s%s", enemy.Name, attackLabel, char.Name, enemyDamage, enemyFormulaText, playerHPChangeText, resourceChangeText), damageColor, withDamageType(attackType))
 			}
 			logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
 
@@ -1720,11 +1726,37 @@ func (m *BattleManager) resolveEnemyAttackType(enemy *models.Monster) string {
 }
 
 // addLog 添加日志
-func (m *BattleManager) addLog(session *BattleSession, logType, message, color string) {
+type logOption func(*models.BattleLog)
+
+func withDamageType(damageType string) logOption {
+	return func(log *models.BattleLog) {
+		if damageType != "" {
+			log.DamageType = damageType
+		}
+	}
+}
+
+func normalizeDamageType(damageType string) string {
+	switch strings.ToLower(damageType) {
+	case "physical":
+		return "physical"
+	case "magic", "fire", "frost", "shadow", "holy", "nature", "arcane":
+		return "magic"
+	default:
+		return ""
+	}
+}
+
+func (m *BattleManager) addLog(session *BattleSession, logType, message, color string, opts ...logOption) {
 	log := models.BattleLog{
 		Message:   message,
 		LogType:   logType,
+		Color:     color,
 		CreatedAt: time.Now(),
+	}
+
+	for _, opt := range opts {
+		opt(&log)
 	}
 	session.BattleLogs = append(session.BattleLogs, log)
 
@@ -2312,7 +2344,7 @@ func (m *BattleManager) handleCounterAttacks(character *models.Character, attack
 				attacker.HP = 0
 			}
 			counterHPChange := m.formatHPChange(attacker.Name, attackerOldHP, attacker.HP, attacker.MaxHP)
-			m.addLog(session, "combat", fmt.Sprintf("%s 的反击风暴对 %s 造成 %d 点反击伤害%s", character.Name, attacker.Name, counterDamage, counterHPChange), "#ff8800")
+			m.addLog(session, "combat", fmt.Sprintf("%s 的反击风暴对 %s 造成 %d 点反击伤害%s", character.Name, attacker.Name, counterDamage, counterHPChange), "#ff8800", withDamageType("physical"))
 			*logs = append(*logs, session.BattleLogs[len(session.BattleLogs)-1])
 		}
 	}
@@ -2351,7 +2383,7 @@ func (m *BattleManager) handleCounterAttacks(character *models.Character, attack
 						attacker.HP = 0
 					}
 					revengeHPChange := m.formatHPChange(attacker.Name, revengeOldHP, attacker.HP, attacker.MaxHP)
-					m.addLog(session, "combat", fmt.Sprintf("%s 的复仇对 %s 造成 %d 点反击伤害%s", character.Name, attacker.Name, counterDamage, revengeHPChange), "#ff8800")
+					m.addLog(session, "combat", fmt.Sprintf("%s 的复仇对 %s 造成 %d 点反击伤害%s", character.Name, attacker.Name, counterDamage, revengeHPChange), "#ff8800", withDamageType("physical"))
 					*logs = append(*logs, session.BattleLogs[len(session.BattleLogs)-1])
 				}
 			}
@@ -2430,7 +2462,7 @@ func (m *BattleManager) handleActiveReflectEffects(character *models.Character, 
 					attacker.HP = 0
 				}
 				reflectHPChange := m.formatHPChange(attacker.Name, reflectOldHP, attacker.HP, attacker.MaxHP)
-				m.addLog(session, "combat", fmt.Sprintf("%s 的盾牌反射对 %s 造成 %d 点反射伤害%s", character.Name, attacker.Name, reflectDamage, reflectHPChange), "#ff8800")
+				m.addLog(session, "combat", fmt.Sprintf("%s 的盾牌反射对 %s 造成 %d 点反射伤害%s", character.Name, attacker.Name, reflectDamage, reflectHPChange), "#ff8800", withDamageType("magic"))
 				*logs = append(*logs, session.BattleLogs[len(session.BattleLogs)-1])
 			}
 		}
@@ -2517,7 +2549,7 @@ func (m *BattleManager) handlePassiveReflectEffects(character *models.Character,
 					attacker.HP = 0
 				}
 				passiveReflectHPChange := m.formatHPChange(attacker.Name, passiveReflectOldHP, attacker.HP, attacker.MaxHP)
-				m.addLog(session, "combat", fmt.Sprintf("%s 的盾牌反射对 %s 造成 %d 点反射伤害%s", character.Name, attacker.Name, reflectDamage, passiveReflectHPChange), "#ff8800")
+				m.addLog(session, "combat", fmt.Sprintf("%s 的盾牌反射对 %s 造成 %d 点反射伤害%s", character.Name, attacker.Name, reflectDamage, passiveReflectHPChange), "#ff8800", withDamageType("magic"))
 				*logs = append(*logs, session.BattleLogs[len(session.BattleLogs)-1])
 			}
 		}

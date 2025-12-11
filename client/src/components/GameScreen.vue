@@ -577,6 +577,17 @@ function formatLogTime(log: any): string {
   return new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
+function getDamageBadge(damageType?: string): string {
+  const type = (damageType || '').toLowerCase()
+  if (type === 'physical') {
+    return '<span class="damage-badge damage-badge-physical">物理</span>'
+  }
+  if (type === 'magic') {
+    return '<span class="damage-badge damage-badge-magic">魔法</span>'
+  }
+  return ''
+}
+
 // 格式化日志消息，添加颜色标记
 function formatLogMessage(log: any): string {
   let message = ''
@@ -590,6 +601,12 @@ function formatLogMessage(log: any): string {
   
   // 如果没有消息，直接返回
   if (!message) return ''
+  
+  // 伤害类型徽标
+  const badge = getDamageBadge(log.damageType || log.damage_type)
+  if (badge) {
+    message = `${badge} ${message}`
+  }
   
   // 获取角色名（我方）
   const playerName = game.character?.name || '你'

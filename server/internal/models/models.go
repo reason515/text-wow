@@ -207,13 +207,15 @@ type Monster struct {
 
 // BattleLog 战斗日志
 type BattleLog struct {
-	ID        int       `json:"id"`
-	Message   string    `json:"message"`
-	LogType   string    `json:"logType"` // combat/loot/system/levelup/damage/heal/buff
-	Source    string    `json:"source,omitempty"`
-	Target    string    `json:"target,omitempty"`
-	Value     int       `json:"value,omitempty"`
-	CreatedAt time.Time `json:"createdAt"`
+	ID         int       `json:"id"`
+	Message    string    `json:"message"`
+	LogType    string    `json:"logType"` // combat/loot/system/levelup/damage/heal/buff
+	Source     string    `json:"source,omitempty"`
+	Target     string    `json:"target,omitempty"`
+	Value      int       `json:"value,omitempty"`
+	Color      string    `json:"color,omitempty"`
+	DamageType string    `json:"damageType,omitempty"` // physical/magic
+	CreatedAt  time.Time `json:"createdAt"`
 }
 
 // BattleStatus 战斗状态

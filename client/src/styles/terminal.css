@@ -334,6 +334,28 @@ body, body *, input, button, select, textarea {
   flex: 1;
 }
 
+.damage-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  margin-right: 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.damage-badge-physical {
+  color: #ffb347;
+  background: rgba(255, 179, 71, 0.12);
+  border: 1px solid rgba(255, 179, 71, 0.45);
+}
+
+.damage-badge-magic {
+  color: #7ec8ff;
+  background: rgba(126, 200, 255, 0.12);
+  border: 1px solid rgba(126, 200, 255, 0.45);
+}
+
 /* 日志类型颜色 */
 .log-type-info { color: var(--text-primary); }
 .log-type-damage { color: var(--text-damage); }
