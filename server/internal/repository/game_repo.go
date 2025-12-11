@@ -168,7 +168,11 @@ func (r *GameRepository) GetZoneByID(id string) (*models.Zone, error) {
 // GetMonstersByZone 获取区域内的怪物
 func (r *GameRepository) GetMonstersByZone(zoneID string) ([]models.Monster, error) {
 	rows, err := database.DB.Query(`
-		SELECT id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense, COALESCE(dodge_rate, 0.05), exp_reward, gold_min, gold_max, spawn_weight
+		SELECT id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
+		       COALESCE(attack_type, 'physical'),
+		       COALESCE(phys_crit_rate, 0.05), COALESCE(phys_crit_damage, 1.5),
+		       COALESCE(spell_crit_rate, 0.05), COALESCE(spell_crit_damage, 1.5),
+		       COALESCE(dodge_rate, 0.05), exp_reward, gold_min, gold_max, spawn_weight
 		FROM monsters WHERE zone_id = ? ORDER BY level`, zoneID)
 	if err != nil {
 		return nil, err
@@ -179,11 +183,15 @@ func (r *GameRepository) GetMonstersByZone(zoneID string) ([]models.Monster, err
 	for rows.Next() {
 		m := models.Monster{}
 		err := rows.Scan(
-			&m.ID, &m.ZoneID, &m.Name, &m.Level, &m.Type, &m.HP, &m.PhysicalAttack, &m.MagicAttack, &m.PhysicalDefense, &m.MagicDefense, &m.DodgeRate,
+			&m.ID, &m.ZoneID, &m.Name, &m.Level, &m.Type, &m.HP, &m.PhysicalAttack, &m.MagicAttack, &m.PhysicalDefense, &m.MagicDefense,
+			&m.AttackType, &m.PhysCritRate, &m.PhysCritDamage, &m.SpellCritRate, &m.SpellCritDamage, &m.DodgeRate,
 			&m.ExpReward, &m.GoldMin, &m.GoldMax, &m.SpawnWeight,
 		)
 		if err != nil {
 			return nil, err
+		}
+		if m.AttackType == "" {
+			m.AttackType = "physical"
 		}
 		m.MaxHP = m.HP
 		monsters = append(monsters, m)
@@ -191,4 +199,3 @@ func (r *GameRepository) GetMonstersByZone(zoneID string) ([]models.Monster, err
 
 	return monsters, nil
 }
-

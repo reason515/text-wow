@@ -21,6 +21,7 @@ const showCharacterDetail = ref(false)
 const selectedCharacter = ref<any>(null)
 const characterSkills = ref<any[]>([])
 const loadingSkills = ref(false)
+const allocating = ref(false)
 
 // 显示角色详情
 async function showDetail(char: any) {
@@ -158,6 +159,121 @@ function getSkillTooltip(skill: any): string {
   
   const result = parts.join('\n')
   return result || skillName // 至少返回技能名称
+}
+
+type PrimaryStatKey = 'strength' | 'agility' | 'intellect' | 'stamina' | 'spirit'
+
+// 主属性 tooltip：说明该属性对派生数值的影响
+function getPrimaryStatTooltip(statKey: PrimaryStatKey): string {
+  const char = selectedCharacter.value
+  if (!char) return ''
+
+  const str = char.strength || 0
+  const agi = char.agility || 0
+  const intl = char.intellect || 0
+  const sta = char.stamina || 0
+  const spr = char.spirit || 0
+
+  switch (statKey) {
+    case 'strength': {
+      const physAtk = (str * 1).toFixed(1)
+      const physDef = (str * 0.2).toFixed(1)
+      const critDmg = ((char.physCritDamage ?? (1.5 + str * 0.003)) * 100).toFixed(1)
+      return [
+        '力量',
+        `- 每点提供 1.0 物理攻击 (当前贡献: +${physAtk})`,
+        `- 每点提供 0.2 物理防御 (当前贡献: +${physDef})`,
+        `- 物理暴击伤害 = 150% + 力量×0.3% (当前: ${critDmg}%)`
+      ].join('\n')
+    }
+    case 'agility': {
+      const physAtk = (agi * 0.2).toFixed(1)
+      const critRate = ((char.physCritRate ?? (0.05 + agi / 20)) * 100).toFixed(1)
+      const dodge = ((char.dodgeRate ?? (0.05 + agi / 20)) * 100).toFixed(1)
+      return [
+        '敏捷',
+        `- 每点提供 0.2 物理攻击 (当前贡献: +${physAtk})`,
+        `- 物理暴击率 = 5% + 敏捷/20 (当前: ${critRate}%)`,
+        `- 闪避率 = 5% + 敏捷/20 (当前: ${dodge}%)`
+      ].join('\n')
+    }
+    case 'intellect': {
+      const magicAtk = (intl * 1).toFixed(1)
+      const magicDef = (intl * 0.2).toFixed(1)
+      const spellCritDmg = ((char.spellCritDamage ?? (1.5 + intl * 0.003)) * 100).toFixed(1)
+      return [
+        '智力',
+        `- 每点提供 1.0 魔法攻击 (当前贡献: +${magicAtk})`,
+        `- 每点提供 0.2 魔法防御 (当前贡献: +${magicDef})`,
+        `- 法术暴击伤害 = 150% + 智力×0.3% (当前: ${spellCritDmg}%)`
+      ].join('\n')
+    }
+    case 'stamina': {
+      const physDef = (sta * 0.3).toFixed(1)
+      return [
+        '耐力',
+        `- 每点提供 0.3 物理防御 (当前贡献: +${physDef})`,
+        '- 提升生存能力，适合坦克/前排'
+      ].join('\n')
+    }
+    case 'spirit': {
+      const magicAtk = (spr * 0.2).toFixed(1)
+      const magicDef = (spr * 0.3).toFixed(1)
+      const spellCritRate = ((char.spellCritRate ?? (0.05 + spr / 20)) * 100).toFixed(1)
+      return [
+        '精神',
+        `- 每点提供 0.2 魔法攻击 (当前贡献: +${magicAtk})`,
+        `- 每点提供 0.3 魔法防御 (当前贡献: +${magicDef})`,
+        `- 法术暴击率 = 5% + 精神/20 (当前: ${spellCritRate}%)`
+      ].join('\n')
+    }
+    default:
+      return ''
+  }
+}
+
+// 分配单点主属性
+async function allocateStat(statKey: PrimaryStatKey) {
+  if (!selectedCharacter.value) return
+  if (allocating.value) return
+  if (!selectedCharacter.value.unspentPoints || selectedCharacter.value.unspentPoints <= 0) return
+
+  allocating.value = true
+  try {
+    const body: Record<string, number> = {
+      strength: 0,
+      agility: 0,
+      intellect: 0,
+      stamina: 0,
+      spirit: 0
+    }
+    body[statKey] = 1
+
+    const resp = await fetch(`/api/characters/${selectedCharacter.value.id}/allocate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+      },
+      body: JSON.stringify(body)
+    })
+
+    const data = await resp.json()
+    if (data.success && data.data) {
+      selectedCharacter.value = data.data
+      // 同步到 charStore 列表
+      const idx = charStore.characters.findIndex(c => c.id === data.data.id)
+      if (idx >= 0) {
+        charStore.characters[idx] = data.data
+      }
+    } else {
+      console.error('Allocate stat failed:', data.error || data.message)
+    }
+  } catch (e) {
+    console.error('Allocate stat failed:', e)
+  } finally {
+    allocating.value = false
+  }
 }
 
 // 处理buff tooltip显示（使用fixed定位，智能调整位置避免超出屏幕）
@@ -844,26 +960,54 @@ function escapeRegex(str: string): string {
         </div>
 
         <!-- 属性 -->
+        <div class="character-detail-unspent" v-if="selectedCharacter.unspentPoints !== undefined">
+          剩余点数: {{ selectedCharacter.unspentPoints || 0 }}
+        </div>
         <div class="character-detail-stats">
-          <div class="character-detail-stat">
+          <div class="character-detail-stat" :data-tooltip="getPrimaryStatTooltip('strength')">
             <span class="character-detail-stat-label">力量</span>
             <span class="character-detail-stat-value">{{ selectedCharacter.strength || 0 }}</span>
+            <button 
+              class="stat-allocate-btn" 
+              @click.stop="allocateStat('strength')" 
+              :disabled="!selectedCharacter.unspentPoints || allocating"
+            >+</button>
           </div>
-          <div class="character-detail-stat">
+          <div class="character-detail-stat" :data-tooltip="getPrimaryStatTooltip('agility')">
             <span class="character-detail-stat-label">敏捷</span>
             <span class="character-detail-stat-value">{{ selectedCharacter.agility || 0 }}</span>
+            <button 
+              class="stat-allocate-btn" 
+              @click.stop="allocateStat('agility')" 
+              :disabled="!selectedCharacter.unspentPoints || allocating"
+            >+</button>
           </div>
-          <div class="character-detail-stat">
+          <div class="character-detail-stat" :data-tooltip="getPrimaryStatTooltip('intellect')">
             <span class="character-detail-stat-label">智力</span>
             <span class="character-detail-stat-value">{{ selectedCharacter.intellect || 0 }}</span>
+            <button 
+              class="stat-allocate-btn" 
+              @click.stop="allocateStat('intellect')" 
+              :disabled="!selectedCharacter.unspentPoints || allocating"
+            >+</button>
           </div>
-          <div class="character-detail-stat">
+          <div class="character-detail-stat" :data-tooltip="getPrimaryStatTooltip('stamina')">
             <span class="character-detail-stat-label">耐力</span>
             <span class="character-detail-stat-value">{{ selectedCharacter.stamina || 0 }}</span>
+            <button 
+              class="stat-allocate-btn" 
+              @click.stop="allocateStat('stamina')" 
+              :disabled="!selectedCharacter.unspentPoints || allocating"
+            >+</button>
           </div>
-          <div class="character-detail-stat">
+          <div class="character-detail-stat" :data-tooltip="getPrimaryStatTooltip('spirit')">
             <span class="character-detail-stat-label">精神</span>
             <span class="character-detail-stat-value">{{ selectedCharacter.spirit || 0 }}</span>
+            <button 
+              class="stat-allocate-btn" 
+              @click.stop="allocateStat('spirit')" 
+              :disabled="!selectedCharacter.unspentPoints || allocating"
+            >+</button>
           </div>
         </div>
 
@@ -1445,6 +1589,7 @@ function escapeRegex(str: string): string {
 .character-detail-stat {
   display: flex;
   justify-content: space-between;
+  align-items: center;
 }
 
 .character-detail-stat-label {
@@ -1453,6 +1598,38 @@ function escapeRegex(str: string): string {
 
 .character-detail-stat-value {
   color: var(--text-white);
+}
+
+.character-detail-unspent {
+  color: var(--terminal-cyan);
+  font-size: 12px;
+  margin-bottom: 6px;
+  text-align: right;
+}
+
+.stat-allocate-btn {
+  margin-left: 6px;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--terminal-green);
+  background: rgba(0, 0, 0, 0.4);
+  color: var(--terminal-green);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  transition: all 0.15s ease;
+}
+
+.stat-allocate-btn:disabled {
+  border-color: var(--text-dim);
+  color: var(--text-dim);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.stat-allocate-btn:not(:disabled):hover {
+  background: var(--terminal-green);
+  color: var(--terminal-bg);
 }
 
 .character-detail-combat-stats {

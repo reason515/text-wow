@@ -501,38 +501,53 @@ INSERT OR REPLACE INTO zones (id, name, description, min_level, max_level, facti
 -- ═══════════════════════════════════════════════════════════
 
 -- 艾尔文森林 (1-10级) - HP: 15~45, 攻击: 3~10
-INSERT OR REPLACE INTO monsters (id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense, exp_reward, gold_min, gold_max, spawn_weight) VALUES
-('wolf', 'elwynn', '森林狼', 1, 'normal', 15, 3, 0, 1, 1, 5, 1, 2, 100),
-('young_boar', 'elwynn', '小野猪', 1, 'normal', 12, 3, 0, 1, 1, 4, 1, 1, 100),
-('kobold_worker', 'elwynn', '狗头人矿工', 2, 'normal', 18, 4, 0, 1, 1, 6, 1, 2, 80),
-('kobold_tunneler', 'elwynn', '狗头人掘地工', 3, 'normal', 22, 5, 0, 2, 2, 7, 1, 3, 60),
-('defias_thug', 'elwynn', '迪菲亚暴徒', 4, 'normal', 26, 6, 0, 2, 2, 8, 2, 3, 50),
-('defias_bandit', 'elwynn', '迪菲亚劫匪', 5, 'normal', 30, 7, 0, 3, 3, 10, 2, 4, 40),
-('murloc', 'elwynn', '鱼人', 3, 'normal', 20, 5, 0, 2, 2, 7, 1, 3, 70),
-('murloc_warrior', 'elwynn', '鱼人战士', 5, 'normal', 28, 7, 0, 3, 3, 9, 2, 4, 30),
-('prowler', 'elwynn', '潜伏者', 6, 'normal', 32, 8, 0, 3, 3, 11, 2, 5, 25),
-('hogger', 'elwynn', '霍格', 8, 'elite', 80, 12, 0, 5, 5, 35, 5, 12, 5);
+INSERT OR REPLACE INTO monsters (
+    id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
+    attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
+    exp_reward, gold_min, gold_max, spawn_weight
+) VALUES
+('wolf', 'elwynn', '森林狼', 1, 'normal', 15, 3, 0, 1, 1, 'physical', 0.05, 1.5, 0.05, 1.5, 5, 1, 2, 100),
+('young_boar', 'elwynn', '小野猪', 1, 'normal', 12, 3, 0, 1, 1, 'physical', 0.05, 1.5, 0.05, 1.5, 4, 1, 1, 100),
+('kobold_worker', 'elwynn', '狗头人矿工', 2, 'normal', 18, 4, 0, 1, 1, 'physical', 0.05, 1.5, 0.05, 1.5, 6, 1, 2, 80),
+('kobold_tunneler', 'elwynn', '狗头人掘地工', 3, 'normal', 22, 5, 0, 2, 2, 'physical', 0.05, 1.5, 0.05, 1.5, 7, 1, 3, 60),
+('defias_thug', 'elwynn', '迪菲亚暴徒', 4, 'normal', 26, 6, 0, 2, 2, 'physical', 0.05, 1.5, 0.05, 1.5, 8, 2, 3, 50),
+('defias_bandit', 'elwynn', '迪菲亚劫匪', 5, 'normal', 30, 7, 0, 3, 3, 'physical', 0.05, 1.5, 0.05, 1.5, 10, 2, 4, 40),
+('murloc', 'elwynn', '鱼人', 3, 'normal', 20, 5, 0, 2, 2, 'physical', 0.05, 1.5, 0.05, 1.5, 7, 1, 3, 70),
+('murloc_warrior', 'elwynn', '鱼人战士', 5, 'normal', 28, 7, 0, 3, 3, 'physical', 0.05, 1.5, 0.05, 1.5, 9, 2, 4, 30),
+('kobold_geomancer', 'elwynn', '狗头人地卜师', 6, 'normal', 30, 4, 10, 2, 3, 'magic', 0.05, 1.5, 0.08, 1.6, 12, 2, 5, 35),
+('prowler', 'elwynn', '潜伏者', 6, 'normal', 32, 8, 0, 3, 3, 'physical', 0.05, 1.5, 0.05, 1.5, 11, 2, 5, 25),
+('hogger', 'elwynn', '霍格', 8, 'elite', 80, 12, 0, 5, 5, 'physical', 0.08, 1.6, 0.05, 1.5, 35, 5, 12, 5);
 
 -- 西部荒野 (10-20级) - HP: 35~80, 攻击: 9~18
-INSERT OR REPLACE INTO monsters (id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense, exp_reward, gold_min, gold_max, spawn_weight) VALUES
-('harvest_golem', 'westfall', '收割傀儡', 10, 'normal', 40, 10, 0, 5, 5, 14, 2, 5, 100),
-('defias_rogue', 'westfall', '迪菲亚盗贼', 11, 'normal', 44, 11, 0, 5, 5, 16, 3, 6, 80),
-('defias_highwayman', 'westfall', '迪菲亚拦路贼', 12, 'normal', 48, 12, 0, 6, 6, 18, 3, 7, 60),
-('gnoll_brute', 'westfall', '豺狼人蛮兵', 13, 'normal', 52, 13, 0, 6, 6, 20, 4, 8, 50),
-('gnoll_mystic', 'westfall', '豺狼人秘法师', 14, 'normal', 45, 8, 15, 5, 8, 22, 4, 9, 40),
-('defias_overlord', 'westfall', '迪菲亚霸主', 16, 'elite', 120, 20, 0, 10, 10, 50, 10, 20, 5),
-('dust_devil', 'westfall', '尘土恶魔', 15, 'normal', 55, 14, 0, 6, 6, 24, 5, 10, 30);
+INSERT OR REPLACE INTO monsters (
+    id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
+    attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
+    exp_reward, gold_min, gold_max, spawn_weight
+) VALUES
+('harvest_golem', 'westfall', '收割傀儡', 10, 'normal', 40, 10, 0, 5, 5, 'physical', 0.06, 1.5, 0.05, 1.5, 14, 2, 5, 100),
+('defias_rogue', 'westfall', '迪菲亚盗贼', 11, 'normal', 44, 11, 0, 5, 5, 'physical', 0.08, 1.6, 0.05, 1.5, 16, 3, 6, 80),
+('defias_highwayman', 'westfall', '迪菲亚拦路贼', 12, 'normal', 48, 12, 0, 6, 6, 'physical', 0.08, 1.6, 0.05, 1.5, 18, 3, 7, 60),
+('gnoll_brute', 'westfall', '豺狼人蛮兵', 13, 'normal', 52, 13, 0, 6, 6, 'physical', 0.07, 1.5, 0.05, 1.5, 20, 4, 8, 50),
+('gnoll_mystic', 'westfall', '豺狼人秘法师', 14, 'normal', 45, 8, 15, 5, 8, 'magic', 0.05, 1.5, 0.1, 1.6, 22, 4, 9, 40),
+('defias_pyromancer', 'westfall', '迪菲亚纵火者', 15, 'normal', 50, 9, 18, 6, 8, 'magic', 0.05, 1.5, 0.12, 1.65, 26, 6, 12, 25),
+('defias_overlord', 'westfall', '迪菲亚霸主', 16, 'elite', 120, 20, 0, 10, 10, 'physical', 0.12, 1.7, 0.05, 1.5, 50, 10, 20, 5),
+('dust_devil', 'westfall', '尘土恶魔', 15, 'normal', 55, 14, 0, 6, 6, 'physical', 0.07, 1.5, 0.05, 1.5, 24, 5, 10, 30);
 
 -- 暮色森林 (20-30级) - HP: 55~150, 攻击: 16~35
-INSERT OR REPLACE INTO monsters (id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense, exp_reward, gold_min, gold_max, spawn_weight) VALUES
-('skeleton_warrior', 'duskwood', '骷髅战士', 20, 'normal', 65, 18, 0, 9, 9, 28, 5, 10, 100),
-('skeleton_mage', 'duskwood', '骷髅法师', 21, 'normal', 55, 8, 22, 7, 12, 30, 5, 11, 80),
-('ghoul', 'duskwood', '食尸鬼', 22, 'normal', 70, 20, 0, 9, 9, 32, 6, 12, 70),
-('dire_wolf', 'duskwood', '恐狼', 23, 'normal', 75, 22, 0, 10, 10, 34, 6, 13, 60),
-('worgen', 'duskwood', '狼人', 24, 'normal', 85, 25, 0, 11, 11, 36, 7, 14, 50),
-('worgen_alpha', 'duskwood', '狼人首领', 26, 'elite', 180, 35, 0, 15, 15, 65, 12, 25, 5),
-('abomination', 'duskwood', '憎恶', 28, 'elite', 220, 40, 0, 18, 18, 75, 15, 30, 3),
-('stitches', 'duskwood', '缝合怪', 30, 'boss', 350, 50, 0, 22, 22, 100, 25, 50, 1);
+INSERT OR REPLACE INTO monsters (
+    id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
+    attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
+    exp_reward, gold_min, gold_max, spawn_weight
+) VALUES
+('skeleton_warrior', 'duskwood', '骷髅战士', 20, 'normal', 65, 18, 0, 9, 9, 'physical', 0.08, 1.6, 0.05, 1.5, 28, 5, 10, 100),
+('skeleton_mage', 'duskwood', '骷髅法师', 21, 'normal', 55, 8, 22, 7, 12, 'magic', 0.05, 1.5, 0.12, 1.65, 30, 5, 11, 80),
+('ghoul', 'duskwood', '食尸鬼', 22, 'normal', 70, 20, 0, 9, 9, 'physical', 0.08, 1.6, 0.05, 1.5, 32, 6, 12, 70),
+('dire_wolf', 'duskwood', '恐狼', 23, 'normal', 75, 22, 0, 10, 10, 'physical', 0.09, 1.6, 0.05, 1.5, 34, 6, 13, 60),
+('worgen', 'duskwood', '狼人', 24, 'normal', 85, 25, 0, 11, 11, 'physical', 0.1, 1.6, 0.05, 1.5, 36, 7, 14, 50),
+('shadow_cultist', 'duskwood', '暗影邪教徒', 25, 'normal', 90, 12, 28, 11, 14, 'magic', 0.06, 1.5, 0.14, 1.7, 40, 8, 18, 35),
+('worgen_alpha', 'duskwood', '狼人首领', 26, 'elite', 180, 35, 0, 15, 15, 'physical', 0.14, 1.7, 0.05, 1.5, 65, 12, 25, 5),
+('abomination', 'duskwood', '憎恶', 28, 'elite', 220, 40, 0, 18, 18, 'physical', 0.15, 1.7, 0.05, 1.5, 75, 15, 30, 3),
+('stitches', 'duskwood', '缝合怪', 30, 'boss', 350, 50, 0, 22, 22, 'physical', 0.18, 1.8, 0.05, 1.5, 100, 25, 50, 1);
 
 -- ═══════════════════════════════════════════════════════════
 -- 物品数据

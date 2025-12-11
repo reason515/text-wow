@@ -23,15 +23,23 @@ func (r *CharacterRepository) Create(char *models.Character) (*models.Character,
 			user_id, name, race_id, class_id, faction, team_slot,
 			is_active, is_dead, level, exp, exp_to_next,
 			hp, max_hp, resource, max_resource, resource_type,
-			strength, agility, intellect, stamina, spirit,
+			strength, agility, intellect, stamina, spirit, unspent_points,
 			physical_attack, magic_attack, physical_defense, magic_defense,
 			phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage, dodge_rate,
 			created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		) VALUES (
+			?, ?, ?, ?, ?, ?,          -- 6
+			?, ?, ?, ?, ?,             -- 5
+			?, ?, ?, ?, ?,             -- 5
+			?, ?, ?, ?, ?, ?,          -- 6
+			?, ?, ?, ?,                -- 4 (physical/magic atk/def)
+			?, ?, ?, ?, ?,             -- 5
+			?, ?                       -- 2
+		)`,
 		char.UserID, char.Name, char.RaceID, char.ClassID, char.Faction, char.TeamSlot,
 		boolToInt(char.IsActive), boolToInt(char.IsDead), char.Level, char.Exp, char.ExpToNext,
 		char.HP, char.MaxHP, char.Resource, char.MaxResource, char.ResourceType,
-		char.Strength, char.Agility, char.Intellect, char.Stamina, char.Spirit,
+		char.Strength, char.Agility, char.Intellect, char.Stamina, char.Spirit, char.UnspentPoints,
 		char.PhysicalAttack, char.MagicAttack, char.PhysicalDefense, char.MagicDefense,
 		char.PhysCritRate, char.PhysCritDamage, char.SpellCritRate, char.SpellCritDamage, char.DodgeRate,
 		time.Now(), time.Now(),
@@ -59,7 +67,7 @@ func (r *CharacterRepository) GetByID(id int) (*models.Character, error) {
 		SELECT id, user_id, name, race_id, class_id, faction, team_slot,
 		       is_active, is_dead, revive_at, level, exp, exp_to_next,
 		       hp, max_hp, resource, max_resource, resource_type,
-		       strength, agility, intellect, stamina, spirit,
+		       strength, agility, intellect, stamina, spirit, unspent_points,
 		       physical_attack, magic_attack, physical_defense, magic_defense,
 		       phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage, dodge_rate,
 		       total_kills, total_deaths, created_at
@@ -68,7 +76,7 @@ func (r *CharacterRepository) GetByID(id int) (*models.Character, error) {
 		&char.ID, &char.UserID, &char.Name, &char.RaceID, &char.ClassID, &char.Faction, &char.TeamSlot,
 		&isActive, &isDead, &reviveAt, &char.Level, &char.Exp, &char.ExpToNext,
 		&char.HP, &char.MaxHP, &char.Resource, &char.MaxResource, &char.ResourceType,
-		&char.Strength, &char.Agility, &char.Intellect, &char.Stamina, &char.Spirit,
+		&char.Strength, &char.Agility, &char.Intellect, &char.Stamina, &char.Spirit, &char.UnspentPoints,
 		&char.PhysicalAttack, &char.MagicAttack, &char.PhysicalDefense, &char.MagicDefense,
 		&char.PhysCritRate, &char.PhysCritDamage, &char.SpellCritRate, &char.SpellCritDamage, &char.DodgeRate,
 		&char.TotalKills, &char.TotalDeaths, &char.CreatedAt,
@@ -83,9 +91,14 @@ func (r *CharacterRepository) GetByID(id int) (*models.Character, error) {
 			char.ReviveAt = &reviveAt.Time
 		}
 
-		// 确保战士的怒气上限为100
+		// 确保怒气/能量上限为100
 		if char.ResourceType == "rage" {
 			char.MaxResource = 100
+		} else if char.ResourceType == "energy" {
+			char.MaxResource = 100
+		}
+		if char.Resource > char.MaxResource {
+			char.Resource = char.MaxResource
 		}
 
 		return char, nil
@@ -97,7 +110,7 @@ func (r *CharacterRepository) GetByUserID(userID int) ([]*models.Character, erro
 		SELECT id, user_id, name, race_id, class_id, faction, team_slot,
 		       is_active, is_dead, revive_at, level, exp, exp_to_next,
 		       hp, max_hp, resource, max_resource, resource_type,
-		       strength, agility, intellect, stamina, spirit,
+		       strength, agility, intellect, stamina, spirit, unspent_points,
 		       physical_attack, magic_attack, physical_defense, magic_defense,
 		       phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage, dodge_rate,
 		       total_kills, total_deaths, created_at
@@ -118,7 +131,7 @@ func (r *CharacterRepository) GetByUserID(userID int) ([]*models.Character, erro
 			&char.ID, &char.UserID, &char.Name, &char.RaceID, &char.ClassID, &char.Faction, &char.TeamSlot,
 			&isActive, &isDead, &reviveAt, &char.Level, &char.Exp, &char.ExpToNext,
 			&char.HP, &char.MaxHP, &char.Resource, &char.MaxResource, &char.ResourceType,
-			&char.Strength, &char.Agility, &char.Intellect, &char.Stamina, &char.Spirit,
+			&char.Strength, &char.Agility, &char.Intellect, &char.Stamina, &char.Spirit, &char.UnspentPoints,
 			&char.PhysicalAttack, &char.MagicAttack, &char.PhysicalDefense, &char.MagicDefense,
 			&char.PhysCritRate, &char.PhysCritDamage, &char.SpellCritRate, &char.SpellCritDamage, &char.DodgeRate,
 			&char.TotalKills, &char.TotalDeaths, &char.CreatedAt,
@@ -133,6 +146,16 @@ func (r *CharacterRepository) GetByUserID(userID int) ([]*models.Character, erro
 			char.ReviveAt = &reviveAt.Time
 		}
 
+		// 确保怒气/能量上限为100
+		if char.ResourceType == "rage" {
+			char.MaxResource = 100
+		} else if char.ResourceType == "energy" {
+			char.MaxResource = 100
+		}
+		if char.Resource > char.MaxResource {
+			char.Resource = char.MaxResource
+		}
+
 		characters = append(characters, char)
 	}
 
@@ -145,7 +168,7 @@ func (r *CharacterRepository) GetActiveByUserID(userID int) ([]*models.Character
 		SELECT id, user_id, name, race_id, class_id, faction, team_slot,
 		       is_active, is_dead, revive_at, level, exp, exp_to_next,
 		       hp, max_hp, resource, max_resource, resource_type,
-		       strength, agility, intellect, stamina, spirit,
+		       strength, agility, intellect, stamina, spirit, unspent_points,
 		       physical_attack, magic_attack, physical_defense, magic_defense,
 		       phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage, dodge_rate,
 		       total_kills, total_deaths, created_at
@@ -166,7 +189,7 @@ func (r *CharacterRepository) GetActiveByUserID(userID int) ([]*models.Character
 			&char.ID, &char.UserID, &char.Name, &char.RaceID, &char.ClassID, &char.Faction, &char.TeamSlot,
 			&isActive, &isDead, &reviveAt, &char.Level, &char.Exp, &char.ExpToNext,
 			&char.HP, &char.MaxHP, &char.Resource, &char.MaxResource, &char.ResourceType,
-			&char.Strength, &char.Agility, &char.Intellect, &char.Stamina, &char.Spirit,
+			&char.Strength, &char.Agility, &char.Intellect, &char.Stamina, &char.Spirit, &char.UnspentPoints,
 			&char.PhysicalAttack, &char.MagicAttack, &char.PhysicalDefense, &char.MagicDefense,
 			&char.PhysCritRate, &char.PhysCritDamage, &char.SpellCritRate, &char.SpellCritDamage, &char.DodgeRate,
 			&char.TotalKills, &char.TotalDeaths, &char.CreatedAt,
@@ -181,9 +204,14 @@ func (r *CharacterRepository) GetActiveByUserID(userID int) ([]*models.Character
 			char.ReviveAt = &reviveAt.Time
 		}
 
-		// 确保战士的怒气上限为100
+		// 确保怒气/能量上限为100
 		if char.ResourceType == "rage" {
 			char.MaxResource = 100
+		} else if char.ResourceType == "energy" {
+			char.MaxResource = 100
+		}
+		if char.Resource > char.MaxResource {
+			char.Resource = char.MaxResource
 		}
 
 		characters = append(characters, char)
@@ -241,7 +269,7 @@ func (r *CharacterRepository) Update(char *models.Character) error {
 			is_active = ?, is_dead = ?, revive_at = ?,
 			level = ?, exp = ?, exp_to_next = ?,
 			hp = ?, max_hp = ?, resource = ?, max_resource = ?,
-			strength = ?, agility = ?, intellect = ?, stamina = ?, spirit = ?,
+			strength = ?, agility = ?, intellect = ?, stamina = ?, spirit = ?, unspent_points = ?,
 			physical_attack = ?, magic_attack = ?, physical_defense = ?, magic_defense = ?,
 			phys_crit_rate = ?, phys_crit_damage = ?, spell_crit_rate = ?, spell_crit_damage = ?, dodge_rate = ?,
 			total_kills = ?, total_deaths = ?, updated_at = ?
@@ -249,7 +277,7 @@ func (r *CharacterRepository) Update(char *models.Character) error {
 		boolToInt(char.IsActive), boolToInt(char.IsDead), char.ReviveAt,
 		char.Level, char.Exp, char.ExpToNext,
 		char.HP, char.MaxHP, char.Resource, char.MaxResource,
-		char.Strength, char.Agility, char.Intellect, char.Stamina, char.Spirit,
+		char.Strength, char.Agility, char.Intellect, char.Stamina, char.Spirit, char.UnspentPoints,
 		char.PhysicalAttack, char.MagicAttack, char.PhysicalDefense, char.MagicDefense,
 		char.PhysCritRate, char.PhysCritDamage, char.SpellCritRate, char.SpellCritDamage, char.DodgeRate,
 		char.TotalKills, char.TotalDeaths, time.Now(),
@@ -283,17 +311,24 @@ func (r *CharacterRepository) Delete(id int) error {
 }
 
 // UpdateAfterBattle 战斗后更新角色数据
-func (r *CharacterRepository) UpdateAfterBattle(id int, hp, resource, exp, level, expToNext, maxHP, maxResource, physicalAttack, magicAttack, physicalDefense, magicDefense, strength, agility, stamina, totalKills int) error {
+func (r *CharacterRepository) UpdateAfterBattle(
+	id int,
+	hp, resource, exp, level, expToNext int,
+	maxHP, maxResource int,
+	physicalAttack, magicAttack, physicalDefense, magicDefense int,
+	strength, agility, intellect, stamina, spirit, unspentPoints int,
+	totalKills int,
+) error {
 	_, err := database.DB.Exec(`
 		UPDATE characters SET 
 			hp = ?, resource = ?, exp = ?, level = ?, exp_to_next = ?,
 			max_hp = ?, max_resource = ?, physical_attack = ?, magic_attack = ?, physical_defense = ?, magic_defense = ?,
-			strength = ?, agility = ?, stamina = ?,
+			strength = ?, agility = ?, intellect = ?, stamina = ?, spirit = ?, unspent_points = ?,
 			total_kills = ?, updated_at = ?
 		WHERE id = ?`,
 		hp, resource, exp, level, expToNext,
 		maxHP, maxResource, physicalAttack, magicAttack, physicalDefense, magicDefense,
-		strength, agility, stamina,
+		strength, agility, intellect, stamina, spirit, unspentPoints,
 		totalKills, time.Now(), id,
 	)
 	return err

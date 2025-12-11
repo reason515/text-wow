@@ -47,41 +47,42 @@ type AuthResponse struct {
 
 // Character 角色
 type Character struct {
-	ID              int        `json:"id"`
-	UserID          int        `json:"userId"`
-	Name            string     `json:"name"`
-	RaceID          string     `json:"raceId"`
-	ClassID         string     `json:"classId"`
-	Faction         string     `json:"faction"`  // alliance, horde
-	TeamSlot        int        `json:"teamSlot"` // 1-5
-	IsActive        bool       `json:"isActive"`
-	IsDead          bool       `json:"isDead"`
-	ReviveAt        *time.Time `json:"reviveAt,omitempty"`
-	Level           int        `json:"level"`
-	Exp             int        `json:"exp"`
-	ExpToNext       int        `json:"expToNext"`
-	HP              int        `json:"hp"`
-	MaxHP           int        `json:"maxHp"`
-	Resource        int        `json:"resource"`     // 当前能量
-	MaxResource     int        `json:"maxResource"`  // 最大能量
-	ResourceType    string     `json:"resourceType"` // mana/rage/energy
-	Strength        int        `json:"strength"`
-	Agility         int        `json:"agility"`
-	Intellect       int        `json:"intellect"`
-	Stamina         int        `json:"stamina"`
-	Spirit          int        `json:"spirit"`
-	PhysicalAttack  int        `json:"physicalAttack"`
-	MagicAttack     int        `json:"magicAttack"`
-	PhysicalDefense int        `json:"physicalDefense"`
-	MagicDefense    int        `json:"magicDefense"`
-	PhysCritRate    float64    `json:"physCritRate"`    // 物理暴击率
-	PhysCritDamage  float64    `json:"physCritDamage"`  // 物理暴击伤害
-	SpellCritRate   float64    `json:"spellCritRate"`   // 法术暴击率
-	SpellCritDamage float64    `json:"spellCritDamage"` // 法术暴击伤害
-	DodgeRate       float64    `json:"dodgeRate"`       // 闪避率
-	TotalKills      int        `json:"totalKills"`
-	TotalDeaths     int        `json:"totalDeaths"`
-	CreatedAt       time.Time  `json:"createdAt"`
+	ID              int         `json:"id"`
+	UserID          int         `json:"userId"`
+	Name            string      `json:"name"`
+	RaceID          string      `json:"raceId"`
+	ClassID         string      `json:"classId"`
+	Faction         string      `json:"faction"`  // alliance, horde
+	TeamSlot        int         `json:"teamSlot"` // 1-5
+	IsActive        bool        `json:"isActive"`
+	IsDead          bool        `json:"isDead"`
+	ReviveAt        *time.Time  `json:"reviveAt,omitempty"`
+	Level           int         `json:"level"`
+	Exp             int         `json:"exp"`
+	ExpToNext       int         `json:"expToNext"`
+	HP              int         `json:"hp"`
+	MaxHP           int         `json:"maxHp"`
+	Resource        int         `json:"resource"`     // 当前能量
+	MaxResource     int         `json:"maxResource"`  // 最大能量
+	ResourceType    string      `json:"resourceType"` // mana/rage/energy
+	Strength        int         `json:"strength"`
+	Agility         int         `json:"agility"`
+	Intellect       int         `json:"intellect"`
+	Stamina         int         `json:"stamina"`
+	Spirit          int         `json:"spirit"`
+	UnspentPoints   int         `json:"unspentPoints"`
+	PhysicalAttack  int         `json:"physicalAttack"`
+	MagicAttack     int         `json:"magicAttack"`
+	PhysicalDefense int         `json:"physicalDefense"`
+	MagicDefense    int         `json:"magicDefense"`
+	PhysCritRate    float64     `json:"physCritRate"`    // 物理暴击率
+	PhysCritDamage  float64     `json:"physCritDamage"`  // 物理暴击伤害
+	SpellCritRate   float64     `json:"spellCritRate"`   // 法术暴击率
+	SpellCritDamage float64     `json:"spellCritDamage"` // 法术暴击伤害
+	DodgeRate       float64     `json:"dodgeRate"`       // 闪避率
+	TotalKills      int         `json:"totalKills"`
+	TotalDeaths     int         `json:"totalDeaths"`
+	CreatedAt       time.Time   `json:"createdAt"`
 	Buffs           []*BuffInfo `json:"buffs,omitempty"` // Buff/Debuff信息（不存储在数据库）
 }
 
@@ -188,7 +189,12 @@ type Monster struct {
 	MagicAttack     int     `json:"magicAttack"`
 	PhysicalDefense int     `json:"physicalDefense"`
 	MagicDefense    int     `json:"magicDefense"`
-	DodgeRate       float64 `json:"dodgeRate"` // 闪避率
+	AttackType      string  `json:"attackType"`      // physical/magic
+	PhysCritRate    float64 `json:"physCritRate"`    // 物理暴击率
+	PhysCritDamage  float64 `json:"physCritDamage"`  // 物理暴击伤害
+	SpellCritRate   float64 `json:"spellCritRate"`   // 法术暴击率
+	SpellCritDamage float64 `json:"spellCritDamage"` // 法术暴击伤害
+	DodgeRate       float64 `json:"dodgeRate"`       // 闪避率
 	ExpReward       int     `json:"expReward"`
 	GoldMin         int     `json:"goldMin"`
 	GoldMax         int     `json:"goldMax"`

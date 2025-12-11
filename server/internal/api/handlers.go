@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"text-wow/internal/auth"
@@ -527,6 +528,134 @@ func (h *Handler) GetTeam(c *gin.Context) {
 	})
 }
 
+// AllocateAttributePoints 分配属性点
+func (h *Handler) AllocateAttributePoints(c *gin.Context) {
+	userID := c.GetInt("userID")
+
+	charID, err := strconv.Atoi(c.Param("characterId"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Success: false,
+			Error:   "invalid character id",
+		})
+		return
+	}
+
+	// 载入角色并校验归属
+	char, err := h.charRepo.GetByID(charID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, models.APIResponse{
+			Success: false,
+			Error:   "character not found",
+		})
+		return
+	}
+	if char.UserID != userID {
+		c.JSON(http.StatusForbidden, models.APIResponse{
+			Success: false,
+			Error:   "not your character",
+		})
+		return
+	}
+
+	var req struct {
+		Strength int `json:"strength"`
+		Agility  int `json:"agility"`
+		Intellect int `json:"intellect"`
+		Stamina  int `json:"stamina"`
+		Spirit   int `json:"spirit"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Success: false,
+			Error:   "invalid request body",
+		})
+		return
+	}
+
+	if req.Strength < 0 || req.Agility < 0 || req.Intellect < 0 || req.Stamina < 0 || req.Spirit < 0 {
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Success: false,
+			Error:   "points must be non-negative",
+		})
+		return
+	}
+
+	// 校验点数
+	toSpend := req.Strength + req.Agility + req.Intellect + req.Stamina + req.Spirit
+	if toSpend == 0 {
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Success: false,
+			Error:   "no points to allocate",
+		})
+		return
+	}
+	if toSpend > char.UnspentPoints {
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Success: false,
+			Error:   "not enough unspent points",
+		})
+		return
+	}
+
+	// 应用加点
+	char.Strength += req.Strength
+	char.Agility += req.Agility
+	char.Intellect += req.Intellect
+	char.Stamina += req.Stamina
+	char.Spirit += req.Spirit
+	char.UnspentPoints -= toSpend
+
+	// 重新计算派生属性（与创建时保持一致）
+	class, err := h.gameRepo.GetClassByID(char.ClassID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Error:   "failed to load class config",
+		})
+		return
+	}
+
+	char.MaxHP = class.BaseHP + char.Stamina*2
+	char.HP = char.MaxHP
+
+	switch char.ResourceType {
+	case "rage":
+		char.MaxResource = 100
+		// 怒气不回满
+	case "energy":
+		char.MaxResource = 100
+		char.Resource = char.MaxResource
+	default:
+		char.MaxResource = class.BaseResource + char.Spirit*2
+		char.Resource = char.MaxResource
+	}
+
+	char.PhysicalAttack = int(float64(char.Strength)*1.0 + float64(char.Agility)*0.2)
+	char.MagicAttack = int(float64(char.Intellect)*1.0 + float64(char.Spirit)*0.2)
+	char.PhysicalDefense = int(float64(char.Strength)*0.2 + float64(char.Stamina)*0.3)
+	char.MagicDefense = int(float64(char.Intellect)*0.2 + float64(char.Spirit)*0.3)
+	char.PhysCritRate = 0.05 + float64(char.Agility)/20.0/100.0
+	char.PhysCritDamage = 1.5 + float64(char.Strength)*0.3/100.0
+	char.SpellCritRate = 0.05 + float64(char.Spirit)/20.0/100.0
+	char.SpellCritDamage = 1.5 + float64(char.Intellect)*0.3/100.0
+	char.DodgeRate = 0.05 + float64(char.Agility)/20.0/100.0
+
+	// 持久化
+	if err := h.charRepo.Update(char); err != nil {
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Error:   "failed to save allocation",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.APIResponse{
+		Success: true,
+		Message: fmt.Sprintf("分配成功，剩余点数 %d", char.UnspentPoints),
+		Data:    char,
+	})
+}
 // SetCharacterActive 设置角色激活状态
 func (h *Handler) SetCharacterActive(c *gin.Context) {
 	userID := c.GetInt("userID")

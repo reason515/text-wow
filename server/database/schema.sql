@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS characters (
     intellect INTEGER DEFAULT 10,
     stamina INTEGER DEFAULT 10,
     spirit INTEGER DEFAULT 10,
+    unspent_points INTEGER DEFAULT 0,          -- 未分配属性点
     physical_attack INTEGER DEFAULT 10,
     magic_attack INTEGER DEFAULT 10,
     physical_defense INTEGER DEFAULT 5,
@@ -323,6 +324,11 @@ CREATE TABLE IF NOT EXISTS monsters (
     magic_attack INTEGER NOT NULL,
     physical_defense INTEGER NOT NULL,
     magic_defense INTEGER NOT NULL,
+    attack_type VARCHAR(16) DEFAULT 'physical',   -- 攻击类型: physical/magic
+    phys_crit_rate REAL DEFAULT 0.05,             -- 物理暴击率
+    phys_crit_damage REAL DEFAULT 1.5,            -- 物理暴击伤害
+    spell_crit_rate REAL DEFAULT 0.05,            -- 法术暴击率
+    spell_crit_damage REAL DEFAULT 1.5,           -- 法术暴击伤害
     dodge_rate REAL DEFAULT 0.05,             -- 闪避率 (基础5%)
     exp_reward INTEGER NOT NULL,
     gold_min INTEGER DEFAULT 0,

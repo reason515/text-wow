@@ -61,6 +61,7 @@ export interface Character {
   intellect: number
   stamina: number
   spirit: number
+  unspentPoints?: number
   physicalAttack: number
   magicAttack: number
   physicalDefense: number
@@ -161,6 +162,11 @@ export interface Monster {
   magicAttack: number
   physicalDefense: number
   magicDefense: number
+  attackType: string         // physical/magic
+  physCritRate: number       // 物理暴击率
+  physCritDamage: number     // 物理暴击伤害
+  spellCritRate: number      // 法术暴击率
+  spellCritDamage: number    // 法术暴击伤害
   dodgeRate: number         // 闪避率
   expReward: number
   goldMin: number

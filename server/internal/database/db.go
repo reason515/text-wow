@@ -122,6 +122,7 @@ func createBasicTables() error {
 		intellect INTEGER DEFAULT 10,
 		stamina INTEGER DEFAULT 10,
 		spirit INTEGER DEFAULT 10,
+		unspent_points INTEGER DEFAULT 0,
 		physical_attack INTEGER DEFAULT 10,
 		magic_attack INTEGER DEFAULT 10,
 		physical_defense INTEGER DEFAULT 5,

@@ -73,6 +73,7 @@ func main() {
 			protected.GET("/characters", h.GetCharacters)
 			protected.POST("/characters", h.CreateCharacter)
 			protected.PUT("/characters/active", h.SetCharacterActive)
+			protected.POST("/characters/:characterId/allocate", h.AllocateAttributePoints)
 
 			// 技能选择
 			protected.GET("/characters/:characterId/skills/initial", h.GetInitialSkillSelection)

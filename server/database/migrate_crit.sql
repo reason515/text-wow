@@ -16,3 +16,9 @@ UPDATE characters SET
 
 -- 注意：SQLite 不支持 DROP COLUMN，旧字段会保留但不再使用
 
+
+
+
+
+
+

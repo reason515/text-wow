@@ -279,7 +279,7 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 			// 休息结束，保存角色数据
 			m.charRepo.UpdateAfterBattle(char.ID, char.HP, char.Resource, char.Exp, char.Level,
 				char.ExpToNext, char.MaxHP, char.MaxResource, char.PhysicalAttack, char.MagicAttack, char.PhysicalDefense, char.MagicDefense,
-				char.Strength, char.Agility, char.Stamina, char.TotalKills)
+				char.Strength, char.Agility, char.Intellect, char.Stamina, char.Spirit, char.UnspentPoints, char.TotalKills)
 
 			// 休息结束后，确保返回角色数据，让前端知道休息已结束
 			// 从数据库重新加载角色数据以确保状态正确
@@ -313,7 +313,7 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 		if char.HP != initialHP || char.Resource != initialMP {
 			m.charRepo.UpdateAfterBattle(char.ID, char.HP, char.Resource, char.Exp, char.Level,
 				char.ExpToNext, char.MaxHP, char.MaxResource, char.PhysicalAttack, char.MagicAttack, char.PhysicalDefense, char.MagicDefense,
-				char.Strength, char.Agility, char.Stamina, char.TotalKills)
+				char.Strength, char.Agility, char.Intellect, char.Stamina, char.Spirit, char.UnspentPoints, char.TotalKills)
 		}
 
 		return &BattleTickResult{
@@ -957,28 +957,21 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 					char.Level++
 					char.ExpToNext = int(float64(char.ExpToNext) * 1.5)
 
-					// 升级属性提升
-					char.MaxHP += 15
-					char.HP = char.MaxHP
+					// 获得可分配属性点（不再自动增加主属性）
+					char.UnspentPoints += 5
 
-					// 战士的怒气最大值固定为100，不随升级改变
+					// 升级时回满生命与资源（不改变上限）
+					char.HP = char.MaxHP
 					if char.ResourceType == "rage" {
+						// 战士怒气上限固定为100，不重置怒气值
 						char.MaxResource = 100
-						// 升级时怒气保持不变，不重置为最大值
+					} else if char.ResourceType == "energy" {
+						// 盗贼等能量职业上限固定100，升级回满
+						char.MaxResource = 100
+						char.Resource = char.MaxResource
 					} else {
-						char.MaxResource += 8
 						char.Resource = char.MaxResource
 					}
-
-					char.Strength += 2
-					char.Agility += 1
-					char.Stamina += 2
-					char.Intellect += 1
-					char.Spirit += 1
-					char.PhysicalAttack = char.Strength / 2
-					char.MagicAttack = char.Intellect / 2
-					char.PhysicalDefense = char.Stamina / 3
-					char.MagicDefense = (char.Intellect + char.Spirit) / 4
 
 					m.addLog(session, "levelup", fmt.Sprintf("🎉【升级】恭喜！%s 升到了 %d 级！", char.Name, char.Level), "#ffd700")
 					logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
@@ -1022,16 +1015,49 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 				}, nil
 			}
 
-			// 敌人默认使用物理攻击
-			baseEnemyDamage, enemyDamageDetails := m.calculatePhysicalDamageWithDetails(enemy.PhysicalAttack, char.PhysicalDefense)
-			enemyDamageDetails.BaseAttack = enemy.PhysicalAttack
-			enemyDamageDetails.BaseDefense = char.PhysicalDefense
-			enemyDamageDetails.AttackModifiers = []string{}
-			enemyDamageDetails.DefenseModifiers = []string{}
+			// 决定敌人的攻击类型（物理/魔法）
+			attackType := m.resolveEnemyAttackType(enemy)
+
+			// 基础伤害计算（根据攻击类型选择不同的防御）
+			var baseEnemyDamage int
+			var enemyDamageDetails *DamageCalculationDetails
+			if attackType == "magic" {
+				baseEnemyDamage, enemyDamageDetails = m.calculateMagicDamageWithDetails(enemy.MagicAttack, char.MagicDefense)
+			} else {
+				baseEnemyDamage, enemyDamageDetails = m.calculatePhysicalDamageWithDetails(enemy.PhysicalAttack, char.PhysicalDefense)
+			}
+
+			enemyDamage := baseEnemyDamage
+
+			// 敌人暴击判定
+			var baseCritRate, baseCritDamage float64
+			if attackType == "magic" {
+				baseCritRate = enemy.SpellCritRate
+				baseCritDamage = enemy.SpellCritDamage
+			} else {
+				baseCritRate = enemy.PhysCritRate
+				baseCritDamage = enemy.PhysCritDamage
+			}
+			actualCritRate := baseCritRate
+			if actualCritRate > 1.0 {
+				actualCritRate = 1.0
+			}
+			critRoll := rand.Float64()
+			isEnemyCrit := critRoll < actualCritRate
+			if enemyDamageDetails != nil {
+				enemyDamageDetails.BaseCritRate = baseCritRate
+				enemyDamageDetails.ActualCritRate = actualCritRate
+				enemyDamageDetails.RandomRoll = critRoll
+				enemyDamageDetails.IsCrit = isEnemyCrit
+				enemyDamageDetails.CritMultiplier = baseCritDamage
+			}
+			if isEnemyCrit {
+				enemyDamage = int(float64(enemyDamage) * baseCritDamage)
+			}
 
 			// 应用buff/debuff效果（如盾牌格挡的减伤等）
-			originalDamage := baseEnemyDamage
-			enemyDamage := m.buffManager.CalculateDamageTakenWithBuffs(baseEnemyDamage, char.ID, true)
+			originalDamage := enemyDamage
+			enemyDamage = m.buffManager.CalculateDamageTakenWithBuffs(enemyDamage, char.ID, true)
 			if enemyDamage != originalDamage {
 				reduction := float64(originalDamage-enemyDamage) / float64(originalDamage) * 100.0
 				enemyDamageDetails.DefenseModifiers = append(enemyDamageDetails.DefenseModifiers,
@@ -1045,9 +1071,6 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 				reduction := float64(originalDamage2-enemyDamage) / float64(originalDamage2) * 100.0
 				enemyDamageDetails.DefenseModifiers = append(enemyDamageDetails.DefenseModifiers,
 					fmt.Sprintf("被动减伤 -%.0f%%", reduction))
-			}
-			if enemyDamageDetails != nil {
-				enemyDamageDetails.FinalDamage = enemyDamage
 			}
 
 			// 处理护盾效果（不灭壁垒等）
@@ -1072,6 +1095,10 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 					logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
 					m.updateShieldValue(char.ID, 0)
 				}
+			}
+
+			if enemyDamageDetails != nil {
+				enemyDamageDetails.FinalDamage = enemyDamage
 			}
 
 			// 处理被动技能的生存效果（坚韧不拔等）- 在受到伤害前检查
@@ -1134,7 +1161,16 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 			// 格式化HP变化（使用已保存的originalHP）
 			playerHPChangeText := m.formatHPChange(char.Name, originalHP, char.HP, char.MaxHP)
 
-			m.addLog(session, "combat", fmt.Sprintf("%s 攻击了 %s，造成 %d 点伤害%s%s%s", enemy.Name, char.Name, enemyDamage, enemyFormulaText, playerHPChangeText, resourceChangeText), "#ff4444")
+			damageColor := "#ff4444"
+			attackLabel := "物理"
+			if attackType == "magic" {
+				attackLabel = "魔法"
+			}
+			if isEnemyCrit {
+				m.addLog(session, "combat", fmt.Sprintf("%s 进行了💥%s暴击，对 %s 造成 %d 点伤害%s%s%s", enemy.Name, attackLabel, char.Name, enemyDamage, enemyFormulaText, playerHPChangeText, resourceChangeText), damageColor)
+			} else {
+				m.addLog(session, "combat", fmt.Sprintf("%s 的%s攻击命中 %s，造成 %d 点伤害%s%s%s", enemy.Name, attackLabel, char.Name, enemyDamage, enemyFormulaText, playerHPChangeText, resourceChangeText), damageColor)
+			}
 			logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
 
 			// 检查玩家是否死亡
@@ -1256,7 +1292,7 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 			// 保存所有角色的数据（包括战士的怒气归0）
 			m.charRepo.UpdateAfterBattle(c.ID, c.HP, c.Resource, c.Exp, c.Level,
 				c.ExpToNext, c.MaxHP, c.MaxResource, c.PhysicalAttack, c.MagicAttack, c.PhysicalDefense, c.MagicDefense,
-				c.Strength, c.Agility, c.Stamina, c.TotalKills)
+				c.Strength, c.Agility, c.Intellect, c.Stamina, c.Spirit, c.UnspentPoints, c.TotalKills)
 		}
 
 		// 计算并开始休息
@@ -1312,7 +1348,7 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 	// 保存角色数据更新
 	m.charRepo.UpdateAfterBattle(char.ID, char.HP, char.Resource, char.Exp, char.Level,
 		char.ExpToNext, char.MaxHP, char.MaxResource, char.PhysicalAttack, char.MagicAttack, char.PhysicalDefense, char.MagicDefense,
-		char.Strength, char.Agility, char.Stamina, char.TotalKills)
+		char.Strength, char.Agility, char.Intellect, char.Stamina, char.Spirit, char.UnspentPoints, char.TotalKills)
 
 	return &BattleTickResult{
 		Character:    char,
@@ -1626,6 +1662,28 @@ type DamageCalculationDetails struct {
 	ScaledDamage     float64  // 技能倍率后的伤害（攻击×倍率）
 }
 
+// calculateMagicDamageWithDetails 计算魔法伤害（返回详情）
+func (m *BattleManager) calculateMagicDamageWithDetails(attack, defense int) (int, *DamageCalculationDetails) {
+	details := &DamageCalculationDetails{
+		BaseAttack:       attack,
+		ActualAttack:     float64(attack),
+		BaseDefense:      defense,
+		ActualDefense:    float64(defense),
+		AttackModifiers:  []string{},
+		DefenseModifiers: []string{},
+	}
+
+	baseDamage := float64(attack) - float64(defense)
+	if baseDamage < 1 {
+		baseDamage = 1
+	}
+	details.BaseDamage = baseDamage
+	details.Variance = 0
+	details.FinalDamage = int(baseDamage)
+
+	return int(baseDamage), details
+}
+
 // calculatePhysicalDamage 计算物理伤害（返回详情）
 func (m *BattleManager) calculatePhysicalDamageWithDetails(attack, defense int) (int, *DamageCalculationDetails) {
 	details := &DamageCalculationDetails{
@@ -1647,6 +1705,18 @@ func (m *BattleManager) calculatePhysicalDamageWithDetails(attack, defense int) 
 	details.FinalDamage = int(baseDamage)
 
 	return int(baseDamage), details
+}
+
+// resolveEnemyAttackType 决定敌人的攻击类型，如果未配置则按数值推断
+func (m *BattleManager) resolveEnemyAttackType(enemy *models.Monster) string {
+	if enemy.AttackType != "" {
+		return enemy.AttackType
+	}
+	// 简单推断：如果魔法攻击更高且大于0，则使用魔法，否则物理
+	if enemy.MagicAttack > enemy.PhysicalAttack && enemy.MagicAttack > 0 {
+		return "magic"
+	}
+	return "physical"
 }
 
 // addLog 添加日志
@@ -1968,7 +2038,7 @@ func (m *BattleManager) processRest(session *BattleSession, char *models.Charact
 			// 更新角色HP
 			m.charRepo.UpdateAfterBattle(char.ID, char.HP, char.Resource, char.Exp, char.Level,
 				char.ExpToNext, char.MaxHP, char.MaxResource, char.PhysicalAttack, char.MagicAttack, char.PhysicalDefense, char.MagicDefense,
-				char.Strength, char.Agility, char.Stamina, char.TotalKills)
+				char.Strength, char.Agility, char.Intellect, char.Stamina, char.Spirit, char.UnspentPoints, char.TotalKills)
 
 			// 记录复活日志
 			m.addLog(session, "revive", fmt.Sprintf("%s 已复活，HP恢复至 %d/%d", char.Name, char.HP, char.MaxHP), "#00ff00")
