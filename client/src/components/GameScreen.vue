@@ -338,6 +338,7 @@ function hideBuffTooltip() {
 
 // 处理技能tooltip显示（使用fixed定位避免被overflow裁剪）
 let skillTooltipEl: HTMLElement | null = null
+let attrTooltipEl: HTMLElement | null = null
 
 function handleSkillTooltip(event: MouseEvent, skill: any) {
   const tooltipText = getSkillTooltip(skill)
@@ -378,6 +379,61 @@ function hideSkillTooltip() {
   if (skillTooltipEl) {
     skillTooltipEl.remove()
     skillTooltipEl = null
+  }
+}
+
+// 属性tooltip（使用fixed，避免被面板裁剪）
+function handleAttrTooltip(event: MouseEvent, statKey: PrimaryStatKey) {
+  const tooltipText = getPrimaryStatTooltip(statKey)
+  if (!tooltipText) return
+
+  if (attrTooltipEl) {
+    attrTooltipEl.remove()
+  }
+
+  attrTooltipEl = document.createElement('div')
+  attrTooltipEl.className = 'attr-tooltip-fixed'
+  attrTooltipEl.textContent = tooltipText
+  document.body.appendChild(attrTooltipEl)
+
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+  const tooltipRect = attrTooltipEl.getBoundingClientRect()
+
+  // 默认在右侧居中
+  let left = rect.right + 12
+  let top = rect.top + rect.height / 2 - tooltipRect.height / 2
+
+  // 如果右侧超出，放到左侧
+  if (left + tooltipRect.width > window.innerWidth - 10) {
+    left = rect.left - tooltipRect.width - 12
+  }
+
+  // 如果左右都不够，居中放上方
+  if (left < 10) {
+    left = rect.left + rect.width / 2 - tooltipRect.width / 2
+    top = rect.top - tooltipRect.height - 10
+  }
+
+  // 视口保护
+  if (left < 10) left = 10
+  if (left + tooltipRect.width > window.innerWidth - 10) {
+    left = window.innerWidth - tooltipRect.width - 10
+  }
+  if (top < 10) {
+    top = rect.bottom + 10
+  }
+  if (top + tooltipRect.height > window.innerHeight - 10) {
+    top = window.innerHeight - tooltipRect.height - 10
+  }
+
+  attrTooltipEl.style.left = `${left}px`
+  attrTooltipEl.style.top = `${top}px`
+}
+
+function hideAttrTooltip() {
+  if (attrTooltipEl) {
+    attrTooltipEl.remove()
+    attrTooltipEl = null
   }
 }
 
@@ -964,7 +1020,11 @@ function escapeRegex(str: string): string {
           剩余点数: {{ selectedCharacter.unspentPoints || 0 }}
         </div>
         <div class="character-detail-stats">
-          <div class="character-detail-stat" :data-tooltip="getPrimaryStatTooltip('strength')">
+          <div
+            class="character-detail-stat"
+            @mouseenter="handleAttrTooltip($event, 'strength')"
+            @mouseleave="hideAttrTooltip"
+          >
             <span class="character-detail-stat-label">力量</span>
             <span class="character-detail-stat-value">{{ selectedCharacter.strength || 0 }}</span>
             <button 
@@ -973,7 +1033,11 @@ function escapeRegex(str: string): string {
               :disabled="!selectedCharacter.unspentPoints || allocating"
             >+</button>
           </div>
-          <div class="character-detail-stat" :data-tooltip="getPrimaryStatTooltip('agility')">
+          <div
+            class="character-detail-stat"
+            @mouseenter="handleAttrTooltip($event, 'agility')"
+            @mouseleave="hideAttrTooltip"
+          >
             <span class="character-detail-stat-label">敏捷</span>
             <span class="character-detail-stat-value">{{ selectedCharacter.agility || 0 }}</span>
             <button 
@@ -982,7 +1046,11 @@ function escapeRegex(str: string): string {
               :disabled="!selectedCharacter.unspentPoints || allocating"
             >+</button>
           </div>
-          <div class="character-detail-stat" :data-tooltip="getPrimaryStatTooltip('intellect')">
+          <div
+            class="character-detail-stat"
+            @mouseenter="handleAttrTooltip($event, 'intellect')"
+            @mouseleave="hideAttrTooltip"
+          >
             <span class="character-detail-stat-label">智力</span>
             <span class="character-detail-stat-value">{{ selectedCharacter.intellect || 0 }}</span>
             <button 
@@ -991,7 +1059,11 @@ function escapeRegex(str: string): string {
               :disabled="!selectedCharacter.unspentPoints || allocating"
             >+</button>
           </div>
-          <div class="character-detail-stat" :data-tooltip="getPrimaryStatTooltip('stamina')">
+          <div
+            class="character-detail-stat"
+            @mouseenter="handleAttrTooltip($event, 'stamina')"
+            @mouseleave="hideAttrTooltip"
+          >
             <span class="character-detail-stat-label">耐力</span>
             <span class="character-detail-stat-value">{{ selectedCharacter.stamina || 0 }}</span>
             <button 
@@ -1000,7 +1072,11 @@ function escapeRegex(str: string): string {
               :disabled="!selectedCharacter.unspentPoints || allocating"
             >+</button>
           </div>
-          <div class="character-detail-stat" :data-tooltip="getPrimaryStatTooltip('spirit')">
+          <div
+            class="character-detail-stat"
+            @mouseenter="handleAttrTooltip($event, 'spirit')"
+            @mouseleave="hideAttrTooltip"
+          >
             <span class="character-detail-stat-label">精神</span>
             <span class="character-detail-stat-value">{{ selectedCharacter.spirit || 0 }}</span>
             <button 
