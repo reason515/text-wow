@@ -8,6 +8,9 @@ import (
 	"text-wow/internal/repository"
 )
 
+// initialActiveSkillBaseline 表示创建角色时自带的主动技能等级总和（2个技能，各1级）
+const initialActiveSkillBaseline = 2
+
 // SkillService 技能服务
 type SkillService struct {
 	skillRepo     *repository.SkillRepository
@@ -93,6 +96,54 @@ func (s *SkillService) SelectInitialSkills(req *models.InitialSkillSelectionRequ
 	return nil
 }
 
+// availablePassiveSelections 计算当前可用但尚未使用的被动技能选择次数
+func (s *SkillService) availablePassiveSelections(character *models.Character) (int, error) {
+	passives, err := s.skillRepo.GetCharacterPassiveSkills(character.ID)
+	if err != nil {
+		return 0, err
+	}
+
+	used := 0
+	for _, p := range passives {
+		used += p.Level
+	}
+
+	total := character.Level / 3
+	available := total - used
+	if available < 0 {
+		available = 0
+	}
+
+	return available, nil
+}
+
+// availableActiveSelections 计算当前可用但尚未使用的主动技能选择次数
+func (s *SkillService) availableActiveSelections(character *models.Character) (int, error) {
+	skills, err := s.skillRepo.GetCharacterSkills(character.ID)
+	if err != nil {
+		return 0, err
+	}
+
+	totalLevels := 0
+	for _, skill := range skills {
+		totalLevels += skill.SkillLevel
+	}
+
+	// 扣除角色创建时的2个初始主动技能（各1级），避免把基础技能计入可用次数
+	used := totalLevels - initialActiveSkillBaseline
+	if used < 0 {
+		used = 0
+	}
+
+	total := character.Level / 5
+	available := total - used
+	if available < 0 {
+		available = 0
+	}
+
+	return available, nil
+}
+
 // CheckSkillSelectionOpportunity 检查是否有技能选择机会
 func (s *SkillService) CheckSkillSelectionOpportunity(characterID int) (*models.SkillSelection, error) {
 	character, err := s.characterRepo.GetByID(characterID)
@@ -100,15 +151,21 @@ func (s *SkillService) CheckSkillSelectionOpportunity(characterID int) (*models.
 		return nil, err
 	}
 
-	level := character.Level
-
-	// 检查被动技能选择机会（3的倍数）
-	if level%3 == 0 && level >= 3 {
+	// 先处理被动技能的待选机会
+	passiveAvailable, err := s.availablePassiveSelections(character)
+	if err != nil {
+		return nil, err
+	}
+	if passiveAvailable > 0 {
 		return s.GetPassiveSkillSelection(characterID)
 	}
 
-	// 检查主动技能选择机会（5的倍数）
-	if level%5 == 0 && level >= 5 {
+	// 再检查主动技能的待选机会
+	activeAvailable, err := s.availableActiveSelections(character)
+	if err != nil {
+		return nil, err
+	}
+	if activeAvailable > 0 {
 		return s.GetActiveSkillSelection(characterID)
 	}
 
@@ -200,15 +257,17 @@ func (s *SkillService) SelectSkill(req *models.SkillSelectionRequest) error {
 		return err
 	}
 
-	level := character.Level
-
-	// 验证选择机会
 	if req.SkillID != "" {
-		// 主动技能选择
-		if level%5 != 0 || level < 5 {
-			return errors.New("当前等级没有主动技能选择机会")
+		// 主动技能选择：只要仍有未用完的主动选择次数即可（避免跨等级漏掉）
+		activeAvailable, err := s.availableActiveSelections(character)
+		if err != nil {
+			return err
+		}
+		if activeAvailable <= 0 {
+			return errors.New("当前没有主动技能选择机会")
 		}
 
+		// 主动技能选择
 		if req.IsUpgrade {
 			// 升级现有技能
 			return s.skillRepo.UpgradeCharacterSkill(req.CharacterID, req.SkillID)
@@ -217,11 +276,16 @@ func (s *SkillService) SelectSkill(req *models.SkillSelectionRequest) error {
 			return s.skillRepo.AddCharacterSkill(req.CharacterID, req.SkillID, 1)
 		}
 	} else if req.PassiveID != "" {
-		// 被动技能选择
-		if level%3 != 0 || level < 3 {
-			return errors.New("当前等级没有被动技能选择机会")
+		// 被动技能选择：按累计等级/3 计算剩余次数，防止跨级跳过
+		passiveAvailable, err := s.availablePassiveSelections(character)
+		if err != nil {
+			return err
+		}
+		if passiveAvailable <= 0 {
+			return errors.New("当前没有被动技能选择机会")
 		}
 
+		// 被动技能选择
 		if req.IsUpgrade {
 			// 升级现有被动技能
 			return s.skillRepo.UpgradeCharacterPassiveSkill(req.CharacterID, req.PassiveID)
@@ -258,7 +322,7 @@ func (s *SkillService) CalculateSkillEffect(skill *models.Skill, skillLevel int)
 	if skill == nil {
 		return map[string]interface{}{}
 	}
-	
+
 	// 基础效果
 	effect := map[string]interface{}{
 		"baseDamage":     skill.BaseValue,
@@ -387,4 +451,3 @@ func max(a, b int) int {
 	}
 	return b
 }
-
