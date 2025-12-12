@@ -2,10 +2,13 @@ package api
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"text-wow/internal/auth"
 	"text-wow/internal/game"
@@ -1004,6 +1007,48 @@ func (h *Handler) GetCharacterSkills(c *gin.Context) {
 		})
 		return
 	}
+
+	// #region agent log
+	activeCount := 0
+	activeSample := ""
+	if arr, ok := skills["activeSkills"].([]*models.CharacterSkill); ok {
+		activeCount = len(arr)
+		if len(arr) > 0 {
+			activeSample = arr[0].SkillID
+		}
+	}
+
+	passiveCount := 0
+	passiveSample := ""
+	if arr, ok := skills["passiveSkills"].([]*models.CharacterPassiveSkill); ok {
+		passiveCount = len(arr)
+		if len(arr) > 0 {
+			passiveSample = arr[0].PassiveID
+		}
+	}
+
+	logEntry := map[string]interface{}{
+		"sessionId":    "debug-session",
+		"runId":        "run2",
+		"hypothesisId": "H-backend-skill-fetch",
+		"location":     "handlers.go:GetCharacterSkills",
+		"message":      "returning character skills",
+		"data": map[string]interface{}{
+			"characterId":    charID,
+			"activeCount":    activeCount,
+			"passiveCount":   passiveCount,
+			"activeSampleId": activeSample,
+			"passiveSampleId": passiveSample,
+		},
+		"timestamp": time.Now().UnixMilli(),
+	}
+	if f, err := os.OpenFile("d:\\code\\text-wow\\.cursor\\debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+		defer f.Close()
+		if b, err := json.Marshal(logEntry); err == nil {
+			_, _ = f.Write(append(b, '\n'))
+		}
+	}
+	// #endregion
 
 	c.JSON(http.StatusOK, models.APIResponse{
 		Success: true,

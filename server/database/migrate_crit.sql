@@ -22,3 +22,6 @@ UPDATE characters SET
 
 
 
+
+
+

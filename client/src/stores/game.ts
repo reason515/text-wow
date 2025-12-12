@@ -36,6 +36,9 @@ export const useGameStore = defineStore('game', () => {
   const isLoading = ref(false)
   const battleInterval = ref<number | null>(null)
   const currentZone = ref<Zone | null>(null)
+  const skillSelection = ref<any | null>(null)            // 待处理的技能选择机会
+  const skillSelectionLoading = ref(false)
+  const lastSelectionCheckLevel = ref<number | null>(null)
 
   // 计算属性
   const hasCharacter = computed(() => character.value !== null)
@@ -255,6 +258,7 @@ export const useGameStore = defineStore('game', () => {
       
       if (response.success && response.data) {
         const result = response.data
+        const prevLevel = character.value?.level ?? null
         character.value = result.character
         
         // 战斗后刷新战斗状态以获取最新的角色数据（包括所有角色的HP/MP等）
@@ -323,6 +327,19 @@ export const useGameStore = defineStore('game', () => {
           battleStatus.value.current_enemies = status.current_enemies ?? null
           battleStatus.value.currentEnemies = status.current_enemies ?? null
         }
+
+        // 检查是否出现技能选择机会（被动/主动）
+        const newLevel = character.value?.level ?? null
+        if (character.value) {
+          // 若等级提升或当前等级为里程碑（3或5的倍数）且还没有待选机会，则尝试查询
+          const milestone = newLevel !== null && (newLevel % 3 === 0 || newLevel % 5 === 0)
+          if (skillSelection.value) {
+            // 保留已有的待选机会，避免被覆盖
+            lastSelectionCheckLevel.value = newLevel
+          } else if (newLevel !== null && (newLevel !== prevLevel || milestone)) {
+            await checkSkillSelection(true)
+          }
+        }
         
         // 添加新日志
         if (result.logs && result.logs.length > 0) {
@@ -339,6 +356,61 @@ export const useGameStore = defineStore('game', () => {
     } catch (e) {
       console.error('Battle tick failed:', e)
       return null
+    }
+  }
+
+  // 获取技能选择机会（被动/主动）
+  async function checkSkillSelection(force = false) {
+    if (!character.value) return null
+
+    const level = character.value.level ?? 0
+    if (!force && skillSelection.value) {
+      return skillSelection.value
+    }
+    if (!force && lastSelectionCheckLevel.value === level) {
+      return skillSelection.value
+    }
+
+    skillSelectionLoading.value = true
+    try {
+      const response = await get<any>(`/characters/${character.value.id}/skills/selection`)
+      if (response.success && response.data) {
+        skillSelection.value = response.data
+      } else {
+        skillSelection.value = null
+      }
+      lastSelectionCheckLevel.value = level
+      return skillSelection.value
+    } catch (e) {
+      console.error('Failed to check skill selection:', e)
+      return null
+    } finally {
+      skillSelectionLoading.value = false
+    }
+  }
+
+  // 提交技能选择
+  async function submitSkillSelection(payload: { skillId?: string; passiveId?: string; isUpgrade: boolean }): Promise<boolean> {
+    if (!character.value) return false
+    try {
+      const requestBody = {
+        ...payload,
+        characterId: character.value.id,
+      }
+
+      const response = await post(`/characters/${character.value.id}/skills/select`, requestBody)
+      if (response.success) {
+        // 选择成功后，清空待选机会并刷新角色数据
+        skillSelection.value = null
+        await fetchCharacter()
+        return true
+      } else {
+        console.error('Select skill failed:', response.error)
+        return false
+      }
+    } catch (e) {
+      console.error('Select skill failed:', e)
+      return false
     }
   }
 
@@ -547,6 +619,10 @@ export const useGameStore = defineStore('game', () => {
     toggleBattle,
     battleTick,
     changeZone,
+    skillSelection,
+    skillSelectionLoading,
+    checkSkillSelection,
+    submitSkillSelection,
     addLocalLog,
     addLog,
     clearLogs,
