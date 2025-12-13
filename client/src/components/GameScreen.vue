@@ -648,9 +648,10 @@ function hideBuffTooltip() {
   }
 }
 
-// 处理技能tooltip显示（使用fixed定位避免被overflow裁剪）
+// 处理技能/属性/战斗统计 tooltip（使用 fixed，避免被面板裁剪）
 let skillTooltipEl: HTMLElement | null = null
 let attrTooltipEl: HTMLElement | null = null
+let combatTooltipEl: HTMLElement | null = null
 
 function handleSkillTooltip(event: MouseEvent, skill: any) {
   const tooltipText = getSkillTooltip(skill)
@@ -746,6 +747,51 @@ function hideAttrTooltip() {
   if (attrTooltipEl) {
     attrTooltipEl.remove()
     attrTooltipEl = null
+  }
+}
+
+// 战斗统计 tooltip（fixed，避免被面板 overflow 裁剪）
+function handleCombatTooltip(event: MouseEvent, tooltipText?: string) {
+  if (!tooltipText) return
+
+  if (combatTooltipEl) {
+    combatTooltipEl.remove()
+  }
+
+  combatTooltipEl = document.createElement('div')
+  combatTooltipEl.className = 'attr-tooltip-fixed'
+  combatTooltipEl.textContent = tooltipText
+  document.body.appendChild(combatTooltipEl)
+
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+  const tooltipRect = combatTooltipEl.getBoundingClientRect()
+
+  // 默认显示在元素上方居中
+  let left = rect.left + rect.width / 2 - tooltipRect.width / 2
+  let top = rect.top - tooltipRect.height - 10
+
+  // 若上方空间不足，放到底部
+  if (top < 10) {
+    top = rect.bottom + 10
+  }
+
+  // 视口保护
+  if (left < 10) left = 10
+  if (left + tooltipRect.width > window.innerWidth - 10) {
+    left = window.innerWidth - tooltipRect.width - 10
+  }
+  if (top + tooltipRect.height > window.innerHeight - 10) {
+    top = window.innerHeight - tooltipRect.height - 10
+  }
+
+  combatTooltipEl.style.left = `${left}px`
+  combatTooltipEl.style.top = `${top}px`
+}
+
+function hideCombatTooltip() {
+  if (combatTooltipEl) {
+    combatTooltipEl.remove()
+    combatTooltipEl = null
   }
 }
 
@@ -1514,39 +1560,75 @@ function escapeRegex(str: string): string {
 
         <!-- 战斗统计 -->
         <div class="character-detail-combat-stats">
-          <div class="character-detail-combat-stat" :data-tooltip="getCombatStatTooltip('physicalAttack')">
+          <div
+            class="character-detail-combat-stat"
+            @mouseenter="handleCombatTooltip($event, getCombatStatTooltip('physicalAttack'))"
+            @mouseleave="hideCombatTooltip"
+          >
             <span class="character-detail-combat-stat-label">物理攻击</span>
             <span class="character-detail-combat-stat-value">{{ displayedStats.physicalAttack }}</span>
           </div>
-          <div class="character-detail-combat-stat" :data-tooltip="getCombatStatTooltip('magicAttack')">
+          <div
+            class="character-detail-combat-stat"
+            @mouseenter="handleCombatTooltip($event, getCombatStatTooltip('magicAttack'))"
+            @mouseleave="hideCombatTooltip"
+          >
             <span class="character-detail-combat-stat-label">魔法攻击</span>
             <span class="character-detail-combat-stat-value">{{ displayedStats.magicAttack }}</span>
           </div>
-          <div class="character-detail-combat-stat" :data-tooltip="getCombatStatTooltip('physicalDefense')">
+          <div
+            class="character-detail-combat-stat"
+            @mouseenter="handleCombatTooltip($event, getCombatStatTooltip('physicalDefense'))"
+            @mouseleave="hideCombatTooltip"
+          >
             <span class="character-detail-combat-stat-label">物理防御</span>
             <span class="character-detail-combat-stat-value">{{ displayedStats.physicalDefense }}</span>
           </div>
-          <div class="character-detail-combat-stat" :data-tooltip="getCombatStatTooltip('magicDefense')">
+          <div
+            class="character-detail-combat-stat"
+            @mouseenter="handleCombatTooltip($event, getCombatStatTooltip('magicDefense'))"
+            @mouseleave="hideCombatTooltip"
+          >
             <span class="character-detail-combat-stat-label">魔法防御</span>
             <span class="character-detail-combat-stat-value">{{ displayedStats.magicDefense }}</span>
           </div>
-          <div class="character-detail-combat-stat" :data-tooltip="getCombatStatTooltip('physCritRate')">
+          <div
+            class="character-detail-combat-stat"
+            @mouseenter="handleCombatTooltip($event, getCombatStatTooltip('physCritRate'))"
+            @mouseleave="hideCombatTooltip"
+          >
             <span class="character-detail-combat-stat-label">物理暴击</span>
             <span class="character-detail-combat-stat-value">{{ (displayedStats.physCritRate * 100).toFixed(1) }}%</span>
           </div>
-          <div class="character-detail-combat-stat" :data-tooltip="getCombatStatTooltip('physCritDamage')">
+          <div
+            class="character-detail-combat-stat"
+            @mouseenter="handleCombatTooltip($event, getCombatStatTooltip('physCritDamage'))"
+            @mouseleave="hideCombatTooltip"
+          >
             <span class="character-detail-combat-stat-label">物暴伤害</span>
             <span class="character-detail-combat-stat-value">{{ (displayedStats.physCritDamage * 100).toFixed(0) }}%</span>
           </div>
-          <div class="character-detail-combat-stat" :data-tooltip="getCombatStatTooltip('spellCritRate')">
+          <div
+            class="character-detail-combat-stat"
+            @mouseenter="handleCombatTooltip($event, getCombatStatTooltip('spellCritRate'))"
+            @mouseleave="hideCombatTooltip"
+          >
             <span class="character-detail-combat-stat-label">法术暴击</span>
             <span class="character-detail-combat-stat-value">{{ (displayedStats.spellCritRate * 100).toFixed(1) }}%</span>
           </div>
-          <div class="character-detail-combat-stat" :data-tooltip="getCombatStatTooltip('spellCritDamage')">
+          <div
+            class="character-detail-combat-stat"
+            @mouseenter="handleCombatTooltip($event, getCombatStatTooltip('spellCritDamage'))"
+            @mouseleave="hideCombatTooltip"
+          >
             <span class="character-detail-combat-stat-label">法暴伤害</span>
             <span class="character-detail-combat-stat-value">{{ (displayedStats.spellCritDamage * 100).toFixed(0) }}%</span>
           </div>
-          <div class="character-detail-combat-stat" :data-tooltip="getCombatStatTooltip('dodgeRate')">
+          <div
+            class="character-detail-combat-stat"
+            @mouseenter="handleCombatTooltip($event, getCombatStatTooltip('dodgeRate'))"
+            @mouseleave="hideCombatTooltip"
+          >
             <span class="character-detail-combat-stat-label">闪避率</span>
             <span class="character-detail-combat-stat-value">{{ (displayedStats.dodgeRate * 100).toFixed(1) }}%</span>
           </div>
