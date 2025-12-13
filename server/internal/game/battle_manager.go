@@ -1,11 +1,9 @@
 package game
 
 import (
-	"encoding/json"
 	"fmt"
 	"math"
 	"math/rand"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -552,37 +550,6 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 						} else {
 							playerDamage = baseDamage
 						}
-
-						// #region agent log
-						logEntry := map[string]interface{}{
-							"sessionId":    "debug-session",
-							"runId":        "run4",
-							"hypothesisId": "H-crit-roll-skill",
-							"location":     "battle_manager.go:skillCrit",
-							"message":      "skill crit roll",
-							"data": map[string]interface{}{
-								"characterId":       char.ID,
-								"skillId":           skillState.SkillID,
-								"baseCritRate":      baseCritRate,
-								"critType":          critType,
-								"passiveCrit":       m.passiveSkillManager.GetPassiveModifier(char.ID, critType),
-								"passiveCritGeneral": m.passiveSkillManager.GetPassiveModifier(char.ID, "crit_rate"),
-								"buffCrit":          m.buffManager.GetBuffValue(char.ID, critType),
-								"buffCritGeneral":   m.buffManager.GetBuffValue(char.ID, "crit_rate"),
-								"finalCritRate":     actualCritRate,
-								"randomRoll":        randomRoll,
-								"isCrit":            isCrit,
-							},
-							"timestamp": time.Now().UnixMilli(),
-						}
-						if f, err := os.OpenFile("d:\\code\\text-wow\\.cursor\\debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-							defer f.Close()
-							if b, err := json.Marshal(logEntry); err == nil {
-								_, _ = f.Write(append(b, '\n'))
-							}
-						}
-						// #endregion
-
 						damageDetails.FinalDamage = playerDamage
 					}
 
@@ -814,31 +781,6 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 						damageDetails.CritModifiers = append(damageDetails.CritModifiers,
 							fmt.Sprintf("被动暴击+%.0f%%", generalCritModifier))
 					}
-
-					// #region agent log
-					logEntry := map[string]interface{}{
-						"sessionId":    "debug-session",
-						"runId":        "run3",
-						"hypothesisId": "H-crit-calc",
-						"location":     "battle_manager.go:normalAttackCrit",
-						"message":      "crit calculation (normal attack)",
-						"data": map[string]interface{}{
-							"characterId":          char.ID,
-							"basePhysCritRate":     char.PhysCritRate,
-							"physCritPassive":      critModifier,
-							"critRatePassive":      generalCritModifier,
-							"finalCritRate":        actualCritRate,
-							"attack":               char.PhysicalAttack,
-						},
-						"timestamp": time.Now().UnixMilli(),
-					}
-					if f, err := os.OpenFile("d:\\code\\text-wow\\.cursor\\debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-						defer f.Close()
-						if b, err := json.Marshal(logEntry); err == nil {
-							_, _ = f.Write(append(b, '\n'))
-						}
-					}
-					// #endregion
 				}
 				// 应用Buff的暴击率加成（鲁莽等）
 				if m.buffManager != nil {

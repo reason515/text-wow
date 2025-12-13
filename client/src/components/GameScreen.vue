@@ -24,7 +24,6 @@ const selectionError = ref('')
 const showCharacterDetail = ref(false)
 const selectedCharacter = ref<any>(null)
 const characterSkills = ref<any[]>([])
-const characterPassiveSkills = ref<any[]>([])
 const loadingSkills = ref(false)
 const allocating = ref(false)
 
@@ -46,40 +45,15 @@ async function fetchCharacterSkills(characterId: number) {
       }
     })
     const data = await response.json()
-
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/fad871c4-f6d8-4362-acff-6b131865ac59', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: 'debug-session',
-        runId: 'run2',
-        hypothesisId: 'H-frontend-skill-display',
-        location: 'GameScreen.vue:fetchCharacterSkills',
-        message: 'skills api response',
-        data: {
-          characterId,
-          success: data?.success,
-          hasActive: Array.isArray(data?.data?.activeSkills) ? data.data.activeSkills.length : null,
-          hasPassive: Array.isArray(data?.data?.passiveSkills) ? data.data.passiveSkills.length : null,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {})
-    // #endregion
-
     if (data.success && data.data) {
       // API返回格式: { activeSkills: [...], passiveSkills: [...] }
       characterSkills.value = data.data.activeSkills || []
-      characterPassiveSkills.value = data.data.passiveSkills || []
     } else {
       characterSkills.value = []
-      characterPassiveSkills.value = []
     }
   } catch (e) {
     console.error('Failed to fetch character skills:', e)
     characterSkills.value = []
-    characterPassiveSkills.value = []
   } finally {
     loadingSkills.value = false
   }
@@ -112,59 +86,6 @@ function getPassiveName(passive: any): string {
   return passive.passive?.name || passive.name || passive.passiveId || '未知被动'
 }
 
-function matchesPassiveStat(effectStat: string | undefined, target: string): boolean {
-  if (!effectStat) return false
-  if (effectStat === target) return true
-  // 处理多属性被动映射
-  if (effectStat === 'attack_and_crit' && (target === 'crit_rate' || target === 'phys_crit_rate' || target === 'spell_crit_rate')) {
-    return true
-  }
-  return false
-}
-
-function getPassiveStatBonus(statType: string): number {
-  let total = 0
-  for (const p of characterPassiveSkills.value) {
-    const passive = p.passive || p
-    if (!passive || passive.effectType !== 'stat_mod') continue
-    if (!matchesPassiveStat(passive.effectStat, statType)) continue
-    const level = p.level ?? p.Level ?? 1
-    const base = passive.effectValue ?? 0
-    const scaling = passive.levelScaling ?? passive.LevelScaling ?? 0
-    total += base + (level - 1) * scaling
-  }
-  return total
-}
-
-function getEffectivePhysCritRate(char: any): number {
-  const base = char?.physCritRate ?? 0.05 + (char?.agility ?? 0) / 20
-  const passiveBonus = getPassiveStatBonus('phys_crit_rate') + getPassiveStatBonus('crit_rate')
-  return base + passiveBonus / 100
-}
-
-function getPassiveTooltip(passive: any): string {
-  if (!passive) return ''
-  const name = getPassiveName(passive)
-  const id = passive.passiveId || passive.passive?.id
-  const level = passive.level ?? passive.Level ?? 1
-  const desc = passive.passive?.description || passive.description || ''
-  const effectType = passive.passive?.effectType || passive.effectType || ''
-  const effectValue = passive.passive?.effectValue ?? passive.effectValue
-  const levelScaling = passive.passive?.levelScaling ?? passive.levelScaling ?? 0
-  const effectiveValue = effectValue !== undefined ? effectValue + (level - 1) * levelScaling : undefined
-  const parts = [`【${name}】`, `等级: ${level}`]
-  if (desc) parts.push(desc)
-  if (effectType) parts.push(`类型: ${effectType}`)
-  if (effectiveValue !== undefined) {
-    if (id === 'warrior_passive_weapon_expertise') {
-      parts.push(`效果: 物理暴击率 +${Math.round(effectiveValue * 100) / 100}%`)
-    } else {
-      parts.push(`数值: ${Math.round(effectiveValue * 100) / 100}`)
-    }
-  }
-  return parts.filter(Boolean).join('\n')
-}
-
 function getSkillName(skill: any): string {
   if (!skill) return '未知技能'
   return skill.skill?.name || skill.name || skill.skillId || '未知技能'
@@ -175,7 +96,6 @@ function closeDetail() {
   showCharacterDetail.value = false
   selectedCharacter.value = null
   characterSkills.value = []
-  characterPassiveSkills.value = []
   hideSkillTooltip() // 关闭时也隐藏tooltip
   hideBuffTooltip() // 关闭时也隐藏buff tooltip
 }
@@ -289,9 +209,6 @@ function getPrimaryStatTooltip(statKey: PrimaryStatKey): string {
   const intl = char.intellect || 0
   const sta = char.stamina || 0
   const spr = char.spirit || 0
-  const passiveCritBonus = getPassiveStatBonus('crit_rate')
-  const passivePhysCritBonus = getPassiveStatBonus('phys_crit_rate')
-  const effPhysCrit = getEffectivePhysCritRate(char)
 
   switch (statKey) {
     case 'strength': {
@@ -307,15 +224,12 @@ function getPrimaryStatTooltip(statKey: PrimaryStatKey): string {
     }
     case 'agility': {
       const physAtk = (agi * 0.2).toFixed(1)
-      const critRateBase = ((char.physCritRate ?? (0.05 + agi / 20)) * 100).toFixed(1)
-      const critRateWithPassive = (effPhysCrit * 100).toFixed(1)
+      const critRate = ((char.physCritRate ?? (0.05 + agi / 20)) * 100).toFixed(1)
       const dodge = ((char.dodgeRate ?? (0.05 + agi / 20)) * 100).toFixed(1)
       return [
         '敏捷',
         `- 每点提供 0.2 物理攻击 (当前贡献: +${physAtk})`,
-        `- 物理暴击率 = 5% + 敏捷/20 (当前: ${critRateBase}% 基础)`,
-        `- 被动暴击加成: 通用 +${passiveCritBonus.toFixed(1)}%，物理 +${passivePhysCritBonus.toFixed(1)}%`,
-        `- 应用被动后物理暴击率: ${critRateWithPassive}%`,
+        `- 物理暴击率 = 5% + 敏捷/20 (当前: ${critRate}%)`,
         `- 闪避率 = 5% + 敏捷/20 (当前: ${dodge}%)`
       ].join('\n')
     }
@@ -384,7 +298,9 @@ async function allocateStat(statKey: PrimaryStatKey) {
     if (data.success && data.data) {
       selectedCharacter.value = data.data
       // 同步到 charStore 列表
-      const idx = charStore.characters.findIndex((c: any) => c.id === data.data.id)
+      const idx = (charStore.characters as Array<{ id: number }>).findIndex(
+        (c: { id: number }) => c.id === data.data.id
+      )
       if (idx >= 0) {
         charStore.characters[idx] = data.data
       }
@@ -502,37 +418,6 @@ function hideSkillTooltip() {
     skillTooltipEl.remove()
     skillTooltipEl = null
   }
-}
-
-function handlePassiveTooltip(event: MouseEvent, passive: any) {
-  const tooltipText = getPassiveTooltip(passive)
-  if (!tooltipText) return
-
-  if (skillTooltipEl) {
-    skillTooltipEl.remove()
-  }
-
-  skillTooltipEl = document.createElement('div')
-  skillTooltipEl.className = 'skill-tooltip-fixed'
-  skillTooltipEl.textContent = tooltipText
-  document.body.appendChild(skillTooltipEl)
-
-  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
-  const tooltipRect = skillTooltipEl.getBoundingClientRect()
-
-  let left = rect.left + (rect.width / 2) - (tooltipRect.width / 2)
-  let top = rect.top - tooltipRect.height - 8
-
-  if (left < 10) left = 10
-  if (left + tooltipRect.width > window.innerWidth - 10) {
-    left = window.innerWidth - tooltipRect.width - 10
-  }
-  if (top < 10) {
-    top = rect.bottom + 8
-  }
-
-  skillTooltipEl.style.left = left + 'px'
-  skillTooltipEl.style.top = top + 'px'
 }
 
 // 属性tooltip（使用fixed，避免被面板裁剪）
@@ -1371,9 +1256,9 @@ function escapeRegex(str: string): string {
             <span class="character-detail-combat-stat-label">魔法防御</span>
             <span class="character-detail-combat-stat-value">{{ selectedCharacter.magicDefense || 0 }}</span>
           </div>
-          <div class="character-detail-combat-stat" :data-tooltip="`物理暴击率 = 5% + 敏捷/20 + 被动加成\n当前敏捷: ${selectedCharacter.agility || 0}\n基础计算: 5% + ${selectedCharacter.agility || 0}/20 = ${((selectedCharacter.physCritRate || 0.05) * 100).toFixed(1)}%\n被动暴击加成: 通用 ${getPassiveStatBonus('crit_rate').toFixed(1)}% + 物理 ${getPassiveStatBonus('phys_crit_rate').toFixed(1)}%\n最终物理暴击率: ${(getEffectivePhysCritRate(selectedCharacter) * 100).toFixed(1)}%`">
+          <div class="character-detail-combat-stat" :data-tooltip="`物理暴击率 = 5% + 敏捷/20\n当前敏捷: ${selectedCharacter.agility || 0}\n计算: 5% + ${selectedCharacter.agility || 0}/20 = ${((selectedCharacter.physCritRate || 0.05) * 100).toFixed(1)}%`">
             <span class="character-detail-combat-stat-label">物理暴击</span>
-            <span class="character-detail-combat-stat-value">{{ (getEffectivePhysCritRate(selectedCharacter) * 100).toFixed(1) }}%</span>
+            <span class="character-detail-combat-stat-value">{{ ((selectedCharacter.physCritRate || 0.05) * 100).toFixed(1) }}%</span>
           </div>
           <div class="character-detail-combat-stat" :data-tooltip="`物理暴击伤害 = 150% + 力量×0.3%\n当前力量: ${selectedCharacter.strength || 0}\n计算: 150% + ${selectedCharacter.strength || 0}×0.3% = ${((selectedCharacter.physCritDamage || 1.5) * 100).toFixed(0)}%`">
             <span class="character-detail-combat-stat-label">物暴伤害</span>
@@ -1435,31 +1320,6 @@ function escapeRegex(str: string): string {
                 <span v-if="skill.skill?.cooldown" class="skill-item-cooldown">
                   CD:{{ skill.skill.cooldown }}
                 </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 被动技能列表 -->
-        <div class="character-detail-skills">
-          <div class="character-detail-section-title">已掌握的被动技能 ({{ characterPassiveSkills.length }})</div>
-          <div v-if="loadingSkills" class="character-detail-loading">加载中...</div>
-          <div v-else-if="characterPassiveSkills.length === 0" class="character-detail-no-skills">暂无被动技能</div>
-          <div v-else class="character-detail-skills-list">
-            <div
-              v-for="passive in characterPassiveSkills"
-              :key="passive.id || passive.passiveId"
-              class="character-detail-skill-item"
-              :data-tooltip="getPassiveTooltip(passive)"
-              @mouseenter="handlePassiveTooltip($event, passive)"
-              @mouseleave="hideSkillTooltip"
-            >
-              <div class="skill-item-main">
-                <span class="skill-item-name">{{ getPassiveName(passive) }}</span>
-                <span class="skill-item-level">Lv.{{ passive.level ?? passive.Level ?? 1 }}</span>
-              </div>
-              <div class="skill-item-meta">
-                <span class="skill-item-cost">类型: 被动</span>
               </div>
             </div>
           </div>

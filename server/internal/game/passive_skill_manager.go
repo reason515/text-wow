@@ -3,10 +3,6 @@ package game
 import (
 	"sync"
 
-	"encoding/json"
-	"os"
-	"time"
-
 	"text-wow/internal/models"
 	"text-wow/internal/repository"
 )
@@ -64,33 +60,6 @@ func (psm *PassiveSkillManager) LoadCharacterPassiveSkills(characterID int) erro
 	}
 
 	psm.characterPassives[characterID] = passiveStates
-
-	// #region agent log
-	logEntry := map[string]interface{}{
-		"sessionId":    "debug-session",
-		"runId":        "run3",
-		"hypothesisId": "H-passive-loaded",
-		"location":     "passive_skill_manager.go:LoadCharacterPassiveSkills",
-		"message":      "loaded passive skills for character",
-		"data": map[string]interface{}{
-			"characterId":  characterID,
-			"count":        len(passiveStates),
-			"sampleId": func() string {
-				if len(passiveStates) > 0 {
-					return passiveStates[0].PassiveID
-				}
-				return ""
-			}(),
-		},
-		"timestamp": time.Now().UnixMilli(),
-	}
-	if f, err := os.OpenFile("d:\\code\\text-wow\\.cursor\\debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-		defer f.Close()
-		if b, err := json.Marshal(logEntry); err == nil {
-			_, _ = f.Write(append(b, '\n'))
-		}
-	}
-	// #endregion
 
 	return nil
 }
@@ -153,37 +122,8 @@ func (psm *PassiveSkillManager) GetPassiveModifier(characterID int, statType str
 	
 	totalModifier := 0.0
 	for _, passive := range passives {
-		if passive.Passive.EffectType == "stat_mod" {
-			// 检查是否影响该属性
-			if psm.matchesEffectStat(passive.Passive.EffectStat, statType) {
-				totalModifier += passive.EffectValue
-				if statType == "crit_rate" || statType == "phys_crit_rate" {
-					// #region agent log
-					logEntry := map[string]interface{}{
-						"sessionId":    "debug-session",
-						"runId":        "run3",
-						"hypothesisId": "H-passive-crit-mod",
-						"location":     "passive_skill_manager.go:GetPassiveModifier",
-						"message":      "crit modifier applied",
-						"data": map[string]interface{}{
-							"characterId": characterID,
-							"statType":    statType,
-							"passiveId":   passive.PassiveID,
-							"effectValue": passive.EffectValue,
-							"totalBefore": totalModifier - passive.EffectValue,
-							"totalAfter":  totalModifier,
-						},
-						"timestamp": time.Now().UnixMilli(),
-					}
-					if f, err := os.OpenFile("d:\\code\\text-wow\\.cursor\\debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-						defer f.Close()
-						if b, err := json.Marshal(logEntry); err == nil {
-							_, _ = f.Write(append(b, '\n'))
-						}
-					}
-					// #endregion
-				}
-			}
+		if passive.Passive.EffectType == "stat_mod" && psm.matchesEffectStat(passive.Passive.EffectStat, statType) {
+			totalModifier += passive.EffectValue
 		}
 	}
 	return totalModifier

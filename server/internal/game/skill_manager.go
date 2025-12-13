@@ -1,13 +1,10 @@
 package game
 
 import (
-	"encoding/json"
 	"fmt"
 	"math"
 	"math/rand"
-	"os"
 	"sync"
-	"time"
 
 	"text-wow/internal/models"
 	"text-wow/internal/repository"
@@ -346,31 +343,6 @@ func (sm *SkillManager) CalculateSkillDamage(skillState *CharacterSkillState, ch
 		damageModifier := passiveSkillManager.GetPassiveModifier(character.ID, "damage")
 		baseDamage = baseDamage * (1.0 + damageModifier/100.0)
 	}
-
-	// #region agent log
-	logEntry := map[string]interface{}{
-		"sessionId":    "debug-session",
-		"runId":        "run3",
-		"hypothesisId": "H-passive-damage",
-		"location":     "skill_manager.go:CalculateSkillDamage",
-		"message":      "calculated damage with passives",
-		"data": map[string]interface{}{
-			"characterId":     character.ID,
-			"skillId":         skill.ID,
-			"isMagic":         isMagic,
-			"attackBefore":    baseAttack,
-			"actualAttack":    actualAttack,
-			"damageModifier":  baseDamage, // note: baseDamage after passive damage modifier
-		},
-		"timestamp": time.Now().UnixMilli(),
-	}
-	if f, err := os.OpenFile("d:\\code\\text-wow\\.cursor\\debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-		defer f.Close()
-		if b, err := json.Marshal(logEntry); err == nil {
-			_, _ = f.Write(append(b, '\n'))
-		}
-	}
-	// #endregion
 
 	// 计算目标实际防御力（应用Debuff效果）
 	actualDefense := float64(baseDefense)
