@@ -24,6 +24,7 @@ const selectionError = ref('')
 const showCharacterDetail = ref(false)
 const selectedCharacter = ref<any>(null)
 const characterSkills = ref<any[]>([])
+const passiveSkills = ref<any[]>([])
 const loadingSkills = ref(false)
 const allocating = ref(false)
 
@@ -48,12 +49,15 @@ async function fetchCharacterSkills(characterId: number) {
     if (data.success && data.data) {
       // API返回格式: { activeSkills: [...], passiveSkills: [...] }
       characterSkills.value = data.data.activeSkills || []
+      passiveSkills.value = data.data.passiveSkills || []
     } else {
       characterSkills.value = []
+      passiveSkills.value = []
     }
   } catch (e) {
     console.error('Failed to fetch character skills:', e)
     characterSkills.value = []
+    passiveSkills.value = []
   } finally {
     loadingSkills.value = false
   }
@@ -96,6 +100,7 @@ function closeDetail() {
   showCharacterDetail.value = false
   selectedCharacter.value = null
   characterSkills.value = []
+  passiveSkills.value = []
   hideSkillTooltip() // 关闭时也隐藏tooltip
   hideBuffTooltip() // 关闭时也隐藏buff tooltip
 }
@@ -195,6 +200,277 @@ function getSkillTooltip(skill: any): string {
   
   const result = parts.join('\n')
   return result || skillName // 至少返回技能名称
+}
+
+// 计算被动技能的实际效果值（含等级成长）
+function calculatePassiveEffectValue(passive: any, level: number): number {
+  const base = passive?.effectValue ?? passive?.EffectValue ?? 0
+  const scaling = passive?.levelScaling ?? passive?.LevelScaling ?? 0
+  const lvl = Math.max(1, level || passive?.level || passive?.Level || 1)
+  return base + (lvl - 1) * scaling
+}
+
+// 汇总所有被动的属性加成（百分比数值）
+const passiveStatModifiers = computed<Record<string, number>>(() => {
+  const mods: Record<string, number> = {}
+  passiveSkills.value.forEach(ps => {
+    const passive = ps.passive || ps.Passive || ps
+    if (!passive || passive.effectType !== 'stat_mod') return
+    const stat = passive.effectStat || passive.effect_stat
+    if (!stat) return
+    const level = ps.level || ps.Level || ps.passiveLevel || ps.skillLevel || 1
+    const value = calculatePassiveEffectValue(passive, level)
+    mods[stat] = (mods[stat] || 0) + value
+  })
+  return mods
+})
+
+// 计算包含被动加成后的展示属性
+const displayedStats = computed(() => {
+  const zero = {
+    physicalAttack: 0,
+    magicAttack: 0,
+    physicalDefense: 0,
+    magicDefense: 0,
+    physCritRate: 0,
+    physCritDamage: 0,
+    spellCritRate: 0,
+    spellCritDamage: 0,
+    dodgeRate: 0,
+    physicalAttackBonusPct: 0,
+    magicAttackBonusPct: 0,
+    physicalDefenseBonusPct: 0,
+    magicDefenseBonusPct: 0,
+    physCritBonusPct: 0,
+    spellCritBonusPct: 0,
+    physCritDamageBonusPct: 0,
+    spellCritDamageBonusPct: 0,
+    dodgeBonusPct: 0,
+  }
+  const char = selectedCharacter.value
+  if (!char) return zero
+
+  const str = char.strength || 0
+  const agi = char.agility || 0
+  const intl = char.intellect || 0
+  const spr = char.spirit || 0
+
+  const basePhysicalAttack = char.physicalAttack ?? (str * 1 + agi * 0.2)
+  const baseMagicAttack = char.magicAttack ?? (intl * 1 + spr * 0.2)
+  const basePhysicalDefense = char.physicalDefense ?? (str * 0.2 + (char.stamina || 0) * 0.3)
+  const baseMagicDefense = char.magicDefense ?? (intl * 0.2 + spr * 0.3)
+  const basePhysCritRate = char.physCritRate ?? (0.05 + agi / 20)
+  const basePhysCritDamage = char.physCritDamage ?? (1.5 + str * 0.003)
+  const baseSpellCritRate = char.spellCritRate ?? (0.05 + spr / 20)
+  const baseSpellCritDamage = char.spellCritDamage ?? (1.5 + intl * 0.003)
+  const baseDodgeRate = char.dodgeRate ?? (0.05 + agi / 20)
+
+  const physicalAttackBonusPct = passiveStatModifiers.value['physical_attack'] || 0
+  const magicAttackBonusPct = passiveStatModifiers.value['magic_attack'] || 0
+  const physicalDefenseBonusPct = passiveStatModifiers.value['physical_defense'] || 0
+  const magicDefenseBonusPct = passiveStatModifiers.value['magic_defense'] || 0
+  const physCritBonusPct = (passiveStatModifiers.value['phys_crit_rate'] || 0) + (passiveStatModifiers.value['crit_rate'] || 0)
+  const spellCritBonusPct = (passiveStatModifiers.value['spell_crit_rate'] || 0) + (passiveStatModifiers.value['crit_rate'] || 0)
+  const physCritDamageBonusPct = passiveStatModifiers.value['phys_crit_damage'] || 0
+  const spellCritDamageBonusPct = passiveStatModifiers.value['spell_crit_damage'] || 0
+  const dodgeBonusPct = passiveStatModifiers.value['dodge_rate'] || 0
+
+  return {
+    physicalAttack: Math.round(basePhysicalAttack * (1 + physicalAttackBonusPct / 100)),
+    magicAttack: Math.round(baseMagicAttack * (1 + magicAttackBonusPct / 100)),
+    physicalDefense: Math.round(basePhysicalDefense * (1 + physicalDefenseBonusPct / 100)),
+    magicDefense: Math.round(baseMagicDefense * (1 + magicDefenseBonusPct / 100)),
+    physCritRate: basePhysCritRate + physCritBonusPct / 100,
+    physCritDamage: basePhysCritDamage + physCritDamageBonusPct / 100,
+    spellCritRate: baseSpellCritRate + spellCritBonusPct / 100,
+    spellCritDamage: baseSpellCritDamage + spellCritDamageBonusPct / 100,
+    dodgeRate: Math.min(0.5, baseDodgeRate + dodgeBonusPct / 100),
+    physicalAttackBonusPct,
+    magicAttackBonusPct,
+    physicalDefenseBonusPct,
+    magicDefenseBonusPct,
+    physCritBonusPct,
+    spellCritBonusPct,
+    physCritDamageBonusPct,
+    spellCritDamageBonusPct,
+    dodgeBonusPct,
+  }
+})
+
+function getEffectStatLabel(stat: string | undefined): string {
+  const map: Record<string, string> = {
+    physical_attack: '物理攻击',
+    magic_attack: '魔法攻击',
+    physical_defense: '物理防御',
+    magic_defense: '魔法防御',
+    phys_crit_rate: '物理暴击率',
+    spell_crit_rate: '法术暴击率',
+    crit_rate: '通用暴击率',
+    phys_crit_damage: '物理暴击伤害',
+    spell_crit_damage: '法术暴击伤害',
+    dodge_rate: '闪避率',
+    hp: '生命值',
+  }
+  return map[stat || ''] || (stat || '未知属性')
+}
+
+function formatPassiveEffect(passiveSkill: any): string {
+  const passive = passiveSkill?.passive || passiveSkill?.Passive || passiveSkill
+  if (!passive) return ''
+  const level = passiveSkill.level || passiveSkill.Level || passiveSkill.passiveLevel || passiveSkill.skillLevel || 1
+  const value = calculatePassiveEffectValue(passive, level)
+  if (passive.effectType === 'stat_mod') {
+    return `+${value}% ${getEffectStatLabel(passive.effectStat || passive.effect_stat)}`
+  }
+  return passive.description || ''
+}
+
+// 获取被动技能tooltip
+function getPassiveTooltip(passiveSkill: any): string {
+  if (!passiveSkill) return ''
+  const passive = passiveSkill.passive || passiveSkill.Passive || passiveSkill
+  const level = passiveSkill.level || passiveSkill.Level || passiveSkill.passiveLevel || passiveSkill.skillLevel || 1
+  const parts: string[] = []
+  const name = passive?.name || passiveSkill.passiveId || '未知被动'
+  parts.push(name)
+  if (passive?.description) {
+    parts.push(passive.description)
+  }
+  if (passive?.effectType === 'stat_mod') {
+    const value = calculatePassiveEffectValue(passive, level)
+    parts.push(`效果: +${value}% ${getEffectStatLabel(passive.effectStat || passive.effect_stat)}`)
+  }
+  parts.push(`等级: ${level}/${passive?.maxLevel ?? passive?.MaxLevel ?? 5}`)
+  return parts.filter(Boolean).join('\n')
+}
+
+// 被动技能tooltip展示
+function handlePassiveTooltip(event: MouseEvent, passiveSkill: any) {
+  const tooltipText = getPassiveTooltip(passiveSkill)
+  if (!tooltipText) return
+  if (skillTooltipEl) {
+    skillTooltipEl.remove()
+  }
+  skillTooltipEl = document.createElement('div')
+  skillTooltipEl.className = 'skill-tooltip-fixed'
+  skillTooltipEl.textContent = tooltipText
+  document.body.appendChild(skillTooltipEl)
+
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+  const tooltipRect = skillTooltipEl.getBoundingClientRect()
+  let left = rect.left + (rect.width / 2) - (tooltipRect.width / 2)
+  let top = rect.top - tooltipRect.height - 8
+  if (left < 10) left = 10
+  if (left + tooltipRect.width > window.innerWidth - 10) {
+    left = window.innerWidth - tooltipRect.width - 10
+  }
+  if (top < 10) {
+    top = rect.bottom + 8
+  }
+  skillTooltipEl.style.left = left + 'px'
+  skillTooltipEl.style.top = top + 'px'
+}
+
+// 战斗属性 tooltip，包含被动加成说明
+function getCombatStatTooltip(statKey: string): string {
+  const char = selectedCharacter.value
+  if (!char) return ''
+  const stats = displayedStats.value
+  const agi = char.agility || 0
+  const str = char.strength || 0
+  const intl = char.intellect || 0
+  const spr = char.spirit || 0
+  const sta = char.stamina || 0
+
+  switch (statKey) {
+    case 'physicalAttack': {
+      const base = (str * 1 + agi * 0.2).toFixed(1)
+      const bonus = stats.physicalAttackBonusPct
+      return [
+        `物理攻击 = 力量×1.0 + 敏捷×0.2${bonus ? `，再乘(1 + 被动${bonus.toFixed(1)}%)` : ''}`,
+        `力量: ${str}, 敏捷: ${agi}`,
+        `基础计算: ${str}×1.0 + ${agi}×0.2 = ${base}`,
+        bonus ? `被动加成: +${bonus.toFixed(1)}%` : '',
+        `最终: ${stats.physicalAttack}`
+      ].filter(Boolean).join('\n')
+    }
+    case 'magicAttack': {
+      const base = (intl * 1 + spr * 0.2).toFixed(1)
+      const bonus = stats.magicAttackBonusPct
+      return [
+        `魔法攻击 = 智力×1.0 + 精神×0.2${bonus ? `，再乘(1 + 被动${bonus.toFixed(1)}%)` : ''}`,
+        `智力: ${intl}, 精神: ${spr}`,
+        `基础计算: ${intl}×1.0 + ${spr}×0.2 = ${base}`,
+        bonus ? `被动加成: +${bonus.toFixed(1)}%` : '',
+        `最终: ${stats.magicAttack}`
+      ].filter(Boolean).join('\n')
+    }
+    case 'physicalDefense': {
+      const base = (str * 0.2 + sta * 0.3).toFixed(1)
+      const bonus = stats.physicalDefenseBonusPct
+      return [
+        `物理防御 = 力量×0.2 + 耐力×0.3${bonus ? `，再乘(1 + 被动${bonus.toFixed(1)}%)` : ''}`,
+        `力量: ${str}, 耐力: ${sta}`,
+        `基础计算: ${str}×0.2 + ${sta}×0.3 = ${base}`,
+        bonus ? `被动加成: +${bonus.toFixed(1)}%` : '',
+        `最终: ${stats.physicalDefense}`
+      ].filter(Boolean).join('\n')
+    }
+    case 'magicDefense': {
+      const base = (intl * 0.2 + spr * 0.3).toFixed(1)
+      const bonus = stats.magicDefenseBonusPct
+      return [
+        `魔法防御 = 智力×0.2 + 精神×0.3${bonus ? `，再乘(1 + 被动${bonus.toFixed(1)}%)` : ''}`,
+        `智力: ${intl}, 精神: ${spr}`,
+        `基础计算: ${intl}×0.2 + ${spr}×0.3 = ${base}`,
+        bonus ? `被动加成: +${bonus.toFixed(1)}%` : '',
+        `最终: ${stats.magicDefense}`
+      ].filter(Boolean).join('\n')
+    }
+    case 'physCritRate': {
+      const bonus = stats.physCritBonusPct
+      return [
+        `物理暴击率 = 5% + 敏捷/20${bonus ? ` + 被动(${bonus.toFixed(1)}%)` : ''}`,
+        `当前敏捷: ${agi}`,
+        `计算: 5% + ${agi}/20${bonus ? ` + ${bonus.toFixed(1)}%` : ''} = ${(stats.physCritRate * 100).toFixed(1)}%`
+      ].join('\n')
+    }
+    case 'physCritDamage': {
+      const bonus = stats.physCritDamageBonusPct
+      return [
+        `物理暴击伤害 = 150% + 力量×0.3%${bonus ? ` + 被动(${bonus.toFixed(1)}%)` : ''}`,
+        `当前力量: ${str}`,
+        `计算: 150% + ${str}×0.3%${bonus ? ` + ${bonus.toFixed(1)}%` : ''} = ${(stats.physCritDamage * 100).toFixed(1)}%`
+      ].join('\n')
+    }
+    case 'spellCritRate': {
+      const bonus = stats.spellCritBonusPct
+      return [
+        `法术暴击率 = 5% + 精神/20${bonus ? ` + 被动(${bonus.toFixed(1)}%)` : ''}`,
+        `当前精神: ${spr}`,
+        `计算: 5% + ${spr}/20${bonus ? ` + ${bonus.toFixed(1)}%` : ''} = ${(stats.spellCritRate * 100).toFixed(1)}%`
+      ].join('\n')
+    }
+    case 'spellCritDamage': {
+      const bonus = stats.spellCritDamageBonusPct
+      return [
+        `法术暴击伤害 = 150% + 智力×0.3%${bonus ? ` + 被动(${bonus.toFixed(1)}%)` : ''}`,
+        `当前智力: ${intl}`,
+        `计算: 150% + ${intl}×0.3%${bonus ? ` + ${bonus.toFixed(1)}%` : ''} = ${(stats.spellCritDamage * 100).toFixed(1)}%`
+      ].join('\n')
+    }
+    case 'dodgeRate': {
+      const bonus = stats.dodgeBonusPct
+      return [
+        `闪避率 = 5% + 敏捷/20${bonus ? ` + 被动(${bonus.toFixed(1)}%)` : ''}`,
+        `当前敏捷: ${agi}`,
+        `计算: 5% + ${agi}/20${bonus ? ` + ${bonus.toFixed(1)}%` : ''} = ${(stats.dodgeRate * 100).toFixed(1)}%`,
+        '闪避可以躲避物理和魔法攻击'
+      ].join('\n')
+    }
+    default:
+      return ''
+  }
 }
 
 type PrimaryStatKey = 'strength' | 'agility' | 'intellect' | 'stamina' | 'spirit'
@@ -298,9 +574,7 @@ async function allocateStat(statKey: PrimaryStatKey) {
     if (data.success && data.data) {
       selectedCharacter.value = data.data
       // 同步到 charStore 列表
-      const idx = (charStore.characters as Array<{ id: number }>).findIndex(
-        (c: { id: number }) => c.id === data.data.id
-      )
+      const idx = charStore.characters.findIndex((c: any) => c.id === data.data.id)
       if (idx >= 0) {
         charStore.characters[idx] = data.data
       }
@@ -1240,41 +1514,41 @@ function escapeRegex(str: string): string {
 
         <!-- 战斗统计 -->
         <div class="character-detail-combat-stats">
-          <div class="character-detail-combat-stat" :data-tooltip="`物理攻击 = 力量×1.0 + 敏捷×0.2\n力量: ${selectedCharacter.strength || 0}, 敏捷: ${selectedCharacter.agility || 0}\n计算: ${selectedCharacter.strength || 0}×1.0 + ${selectedCharacter.agility || 0}×0.2 = ${selectedCharacter.physicalAttack || 0}`">
+          <div class="character-detail-combat-stat" :data-tooltip="getCombatStatTooltip('physicalAttack')">
             <span class="character-detail-combat-stat-label">物理攻击</span>
-            <span class="character-detail-combat-stat-value">{{ selectedCharacter.physicalAttack || 0 }}</span>
+            <span class="character-detail-combat-stat-value">{{ displayedStats.physicalAttack }}</span>
           </div>
-          <div class="character-detail-combat-stat" :data-tooltip="`魔法攻击 = 智力×1.0 + 精神×0.2\n智力: ${selectedCharacter.intellect || 0}, 精神: ${selectedCharacter.spirit || 0}\n计算: ${selectedCharacter.intellect || 0}×1.0 + ${selectedCharacter.spirit || 0}×0.2 = ${selectedCharacter.magicAttack || 0}`">
+          <div class="character-detail-combat-stat" :data-tooltip="getCombatStatTooltip('magicAttack')">
             <span class="character-detail-combat-stat-label">魔法攻击</span>
-            <span class="character-detail-combat-stat-value">{{ selectedCharacter.magicAttack || 0 }}</span>
+            <span class="character-detail-combat-stat-value">{{ displayedStats.magicAttack }}</span>
           </div>
-          <div class="character-detail-combat-stat" :data-tooltip="`物理防御 = 力量×0.2 + 耐力×0.3\n力量: ${selectedCharacter.strength || 0}, 耐力: ${selectedCharacter.stamina || 0}\n计算: ${selectedCharacter.strength || 0}×0.2 + ${selectedCharacter.stamina || 0}×0.3 = ${selectedCharacter.physicalDefense || 0}`">
+          <div class="character-detail-combat-stat" :data-tooltip="getCombatStatTooltip('physicalDefense')">
             <span class="character-detail-combat-stat-label">物理防御</span>
-            <span class="character-detail-combat-stat-value">{{ selectedCharacter.physicalDefense || 0 }}</span>
+            <span class="character-detail-combat-stat-value">{{ displayedStats.physicalDefense }}</span>
           </div>
-          <div class="character-detail-combat-stat" :data-tooltip="`魔法防御 = 智力×0.2 + 精神×0.3\n智力: ${selectedCharacter.intellect || 0}, 精神: ${selectedCharacter.spirit || 0}\n计算: ${selectedCharacter.intellect || 0}×0.2 + ${selectedCharacter.spirit || 0}×0.3 = ${selectedCharacter.magicDefense || 0}`">
+          <div class="character-detail-combat-stat" :data-tooltip="getCombatStatTooltip('magicDefense')">
             <span class="character-detail-combat-stat-label">魔法防御</span>
-            <span class="character-detail-combat-stat-value">{{ selectedCharacter.magicDefense || 0 }}</span>
+            <span class="character-detail-combat-stat-value">{{ displayedStats.magicDefense }}</span>
           </div>
-          <div class="character-detail-combat-stat" :data-tooltip="`物理暴击率 = 5% + 敏捷/20\n当前敏捷: ${selectedCharacter.agility || 0}\n计算: 5% + ${selectedCharacter.agility || 0}/20 = ${((selectedCharacter.physCritRate || 0.05) * 100).toFixed(1)}%`">
+          <div class="character-detail-combat-stat" :data-tooltip="getCombatStatTooltip('physCritRate')">
             <span class="character-detail-combat-stat-label">物理暴击</span>
-            <span class="character-detail-combat-stat-value">{{ ((selectedCharacter.physCritRate || 0.05) * 100).toFixed(1) }}%</span>
+            <span class="character-detail-combat-stat-value">{{ (displayedStats.physCritRate * 100).toFixed(1) }}%</span>
           </div>
-          <div class="character-detail-combat-stat" :data-tooltip="`物理暴击伤害 = 150% + 力量×0.3%\n当前力量: ${selectedCharacter.strength || 0}\n计算: 150% + ${selectedCharacter.strength || 0}×0.3% = ${((selectedCharacter.physCritDamage || 1.5) * 100).toFixed(0)}%`">
+          <div class="character-detail-combat-stat" :data-tooltip="getCombatStatTooltip('physCritDamage')">
             <span class="character-detail-combat-stat-label">物暴伤害</span>
-            <span class="character-detail-combat-stat-value">{{ ((selectedCharacter.physCritDamage || 1.5) * 100).toFixed(0) }}%</span>
+            <span class="character-detail-combat-stat-value">{{ (displayedStats.physCritDamage * 100).toFixed(0) }}%</span>
           </div>
-          <div class="character-detail-combat-stat" :data-tooltip="`法术暴击率 = 5% + 精神/20\n当前精神: ${selectedCharacter.spirit || 0}\n计算: 5% + ${selectedCharacter.spirit || 0}/20 = ${((selectedCharacter.spellCritRate || 0.05) * 100).toFixed(1)}%`">
+          <div class="character-detail-combat-stat" :data-tooltip="getCombatStatTooltip('spellCritRate')">
             <span class="character-detail-combat-stat-label">法术暴击</span>
-            <span class="character-detail-combat-stat-value">{{ ((selectedCharacter.spellCritRate || 0.05) * 100).toFixed(1) }}%</span>
+            <span class="character-detail-combat-stat-value">{{ (displayedStats.spellCritRate * 100).toFixed(1) }}%</span>
           </div>
-          <div class="character-detail-combat-stat" :data-tooltip="`法术暴击伤害 = 150% + 智力×0.3%\n当前智力: ${selectedCharacter.intellect || 0}\n计算: 150% + ${selectedCharacter.intellect || 0}×0.3% = ${((selectedCharacter.spellCritDamage || 1.5) * 100).toFixed(0)}%`">
+          <div class="character-detail-combat-stat" :data-tooltip="getCombatStatTooltip('spellCritDamage')">
             <span class="character-detail-combat-stat-label">法暴伤害</span>
-            <span class="character-detail-combat-stat-value">{{ ((selectedCharacter.spellCritDamage || 1.5) * 100).toFixed(0) }}%</span>
+            <span class="character-detail-combat-stat-value">{{ (displayedStats.spellCritDamage * 100).toFixed(0) }}%</span>
           </div>
-          <div class="character-detail-combat-stat" :data-tooltip="`闪避率 = 5% + 敏捷/20\n当前敏捷: ${selectedCharacter.agility || 0}\n计算: 5% + ${selectedCharacter.agility || 0}/20 = ${((selectedCharacter.dodgeRate || 0.05) * 100).toFixed(1)}%\n闪避可以躲避物理和魔法攻击`">
+          <div class="character-detail-combat-stat" :data-tooltip="getCombatStatTooltip('dodgeRate')">
             <span class="character-detail-combat-stat-label">闪避率</span>
-            <span class="character-detail-combat-stat-value">{{ ((selectedCharacter.dodgeRate || 0.05) * 100).toFixed(1) }}%</span>
+            <span class="character-detail-combat-stat-value">{{ (displayedStats.dodgeRate * 100).toFixed(1) }}%</span>
           </div>
         </div>
 
@@ -1291,6 +1565,31 @@ function escapeRegex(str: string): string {
               <div class="buff-item-name">{{ buff.name }}</div>
               <div class="buff-item-desc">{{ buff.description || '' }}</div>
               <div class="buff-item-duration">剩余 {{ buff.duration }} 回合</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 被动技能列表 -->
+        <div class="character-detail-skills">
+          <div class="character-detail-section-title">被动技能 ({{ passiveSkills.length }})</div>
+          <div v-if="loadingSkills" class="character-detail-loading">加载中...</div>
+          <div v-else-if="passiveSkills.length === 0" class="character-detail-no-skills">暂无被动技能</div>
+          <div v-else class="character-detail-skills-list">
+            <div
+              v-for="passive in passiveSkills"
+              :key="passive.id || passive.passiveId"
+              class="character-detail-skill-item"
+              :data-tooltip="getPassiveTooltip(passive)"
+              @mouseenter="handlePassiveTooltip($event, passive)"
+              @mouseleave="hideSkillTooltip"
+            >
+              <div class="skill-item-main">
+                <span class="skill-item-name">{{ passive.passive?.name || passive.passiveId }}</span>
+                <span class="skill-item-level">Lv.{{ passive.level || 1 }}</span>
+              </div>
+              <div class="skill-item-meta">
+                <span class="skill-item-cost">{{ formatPassiveEffect(passive) }}</span>
+              </div>
             </div>
           </div>
         </div>
