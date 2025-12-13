@@ -225,6 +225,28 @@ func (sm *SkillManager) UseSkill(characterID int, skillID string) (*CharacterSki
 	return nil, fmt.Errorf("skill not found")
 }
 
+// GetSkillState 获取特定技能的状态（不检查冷却和资源）
+func (sm *SkillManager) GetSkillState(characterID int, skillID string) *CharacterSkillState {
+	sm.mu.RLock()
+	defer sm.mu.RUnlock()
+
+	skillStates, exists := sm.characterSkills[characterID]
+	if !exists {
+		return nil
+	}
+
+	for _, state := range skillStates {
+		if state.SkillID == skillID {
+			// 检查冷却
+			if state.CooldownLeft > 0 {
+				return nil
+			}
+			return state
+		}
+	}
+	return nil
+}
+
 // TickCooldowns 减少所有技能的冷却时间（每回合调用）
 func (sm *SkillManager) TickCooldowns(characterID int) {
 	sm.mu.Lock()
@@ -265,7 +287,7 @@ func (sm *SkillManager) CalculateSkillDamage(skillState *CharacterSkillState, ch
 	// 根据技能伤害类型决定使用物理还是魔法攻击
 	// 默认使用物理攻击，除非技能明确指定为魔法伤害
 	isMagic := skill.DamageType == "magic" || skill.DamageType == "fire" || skill.DamageType == "frost" || skill.DamageType == "shadow" || skill.DamageType == "holy"
-	
+
 	var baseAttack int
 	var baseDefense int
 	if isMagic {
@@ -282,7 +304,7 @@ func (sm *SkillManager) CalculateSkillDamage(skillState *CharacterSkillState, ch
 		// 应用被动技能的攻击力加成（百分比）
 		attackModifier := passiveSkillManager.GetPassiveModifier(character.ID, "attack")
 		actualAttack = actualAttack * (1.0 + attackModifier/100.0)
-		
+
 		// 处理低血量时的攻击力加成（狂暴之心）
 		hpPercent := float64(character.HP) / float64(character.MaxHP)
 		passives := passiveSkillManager.GetPassiveSkills(character.ID)
@@ -356,7 +378,7 @@ func (sm *SkillManager) CalculateSkillDamage(skillState *CharacterSkillState, ch
 			}
 		}
 	}
-	
+
 	// 应用目标防御：基础伤害 = 实际攻击力 - 目标防御力（不再除以2）
 	finalDamage := baseDamage - actualDefense
 	if finalDamage < 1 {
@@ -419,4 +441,3 @@ func (sm *SkillManager) ClearCharacterSkills(characterID int) {
 	defer sm.mu.Unlock()
 	delete(sm.characterSkills, characterID)
 }
-

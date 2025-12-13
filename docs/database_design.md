@@ -1789,55 +1789,45 @@ CREATE INDEX idx_monster_drops_monster_id ON monster_drops(monster_id);
 
 ### 13. battle_strategies - 战斗策略表
 
+> 📎 **详细设计请参阅**: [作战策略系统设计](strategy_design.md)
+
 | 字段 | 类型 | 约束 | 说明 |
 |-----|------|-----|------|
-| id | INTEGER | PRIMARY KEY AUTOINCREMENT | ID |
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT | 策略ID |
 | character_id | INTEGER | NOT NULL FK | 角色ID |
 | name | VARCHAR(32) | NOT NULL | 策略名称 |
-| priority | INTEGER | NOT NULL | 优先级(越小越优先) |
-| condition_type | VARCHAR(32) | NOT NULL | 条件类型 |
-| condition_operator | VARCHAR(8) | NOT NULL | 比较运算符 |
-| condition_value | REAL | NOT NULL | 条件数值 |
-| action_type | VARCHAR(32) | NOT NULL | 动作类型 |
-| action_target | VARCHAR(32) | | 动作目标 |
-| skill_id | VARCHAR(32) | | 使用技能 |
-| item_id | VARCHAR(32) | | 使用物品 |
-| is_active | INTEGER | DEFAULT 1 | 是否激活 |
+| is_active | INTEGER | DEFAULT 0 | 是否当前使用 |
+| skill_priority | TEXT | | 技能优先级 (JSON数组) |
+| conditional_rules | TEXT | | 条件规则 (JSON数组) |
+| target_priority | VARCHAR(32) | DEFAULT 'lowest_hp' | 默认目标选择策略 |
+| skill_target_overrides | TEXT | | 技能目标覆盖 (JSON对象) |
+| resource_threshold | INTEGER | DEFAULT 0 | 资源阈值 |
+| reserved_skills | TEXT | | 保留技能 (JSON数组) |
+| auto_target_settings | TEXT | | 智能目标设置 (JSON对象) |
+| created_at | DATETIME | DEFAULT CURRENT_TIMESTAMP | 创建时间 |
+| updated_at | DATETIME | | 更新时间 |
 
 ```sql
-CREATE TABLE battle_strategies (
+CREATE TABLE IF NOT EXISTS battle_strategies (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     character_id INTEGER NOT NULL,
     name VARCHAR(32) NOT NULL,
-    priority INTEGER NOT NULL,
-    condition_type VARCHAR(32) NOT NULL,
-    condition_operator VARCHAR(8) NOT NULL,
-    condition_value REAL NOT NULL,
-    action_type VARCHAR(32) NOT NULL,
-    action_target VARCHAR(32),
-    skill_id VARCHAR(32),
-    item_id VARCHAR(32),
-    is_active INTEGER DEFAULT 1,
-    FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE,
-    FOREIGN KEY (skill_id) REFERENCES skills(id),
-    FOREIGN KEY (item_id) REFERENCES items(id)
+    is_active INTEGER DEFAULT 0,
+    skill_priority TEXT,
+    conditional_rules TEXT,
+    target_priority VARCHAR(32) DEFAULT 'lowest_hp',
+    skill_target_overrides TEXT,
+    resource_threshold INTEGER DEFAULT 0,
+    reserved_skills TEXT,
+    auto_target_settings TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME,
+    FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_strategies_char_id ON battle_strategies(character_id);
+CREATE INDEX idx_battle_strategies_character ON battle_strategies(character_id);
+CREATE INDEX idx_battle_strategies_active ON battle_strategies(character_id, is_active);
 ```
-
-**条件类型 (condition_type):**
-- `self_hp_percent` - 自身HP百分比
-- `self_mp_percent` - 自身MP百分比
-- `enemy_hp_percent` - 敌人HP百分比
-- `battle_round` - 战斗回合数
-- `always` - 始终触发
-
-**动作类型 (action_type):**
-- `use_skill` - 使用技能
-- `use_item` - 使用物品
-- `normal_attack` - 普通攻击
-- `flee` - 逃跑
 
 ---
 
@@ -3618,151 +3608,10 @@ CREATE TABLE IF NOT EXISTS user_stamina (
 
 ## 🎯 作战策略系统
 
-> 📌 **设计理念**: 易于上手，深度足够，可通过数据验证效果
-
-### 策略配置概览
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                          策略配置理念                                         │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│   设计原则:                                                                  │
-│   ├─ 易于上手: 新手可以用默认策略                                             │
-│   ├─ 深度足够: 高手可以精细调优                                               │
-│   ├─ 可验证性: 每个策略都能看到数据效果                                        │
-│   └─ 无绝对最优: 不同情况需要不同策略                                          │
-│                                                                             │
-│   策略组成:                                                                  │
-│   ├─ 技能优先级: 拖拽排序，决定技能使用顺序                                    │
-│   ├─ 条件规则: IF-THEN逻辑，触发特殊行为                                      │
-│   ├─ 目标选择: 攻击/治疗目标的选择策略                                        │
-│   └─ 资源管理: 资源阈值和保留技能设置                                          │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
-### 策略配置界面示例
-
-```
-╔═══════════════════════════════════════════════════════════════════════════╗
-║                        作战策略 - 战士                                      ║
-╠═══════════════════════════════════════════════════════════════════════════╣
-║                                                                           ║
-║  【技能优先级】拖拽排序                                                     ║
-║  ┌─────────────────────────────────────────────────────────────────────┐ ║
-║  │  1. [冲锋]        - 开场使用，眩晕敌人                               │ ║
-║  │  2. [撕裂]        - 保持DOT                                         │ ║
-║  │  3. [英勇打击]    - 主要输出                                         │ ║
-║  │  4. [战斗怒吼]    - 团队增益                                         │ ║
-║  │  5. [普通攻击]    - 保底技能                                         │ ║
-║  └─────────────────────────────────────────────────────────────────────┘ ║
-║                                                                           ║
-║  【条件规则】点击添加                                                       ║
-║  ┌─────────────────────────────────────────────────────────────────────┐ ║
-║  │  IF [自身HP] [<] [30%] THEN 优先使用 [盾墙]                          │ ║
-║  │  IF [敌人HP] [<] [20%] THEN 优先使用 [斩杀]                          │ ║
-║  │  IF [怒气] [>] [80] THEN 使用 [战斗怒吼]                              │ ║
-║  │  + 添加新规则                                                        │ ║
-║  └─────────────────────────────────────────────────────────────────────┘ ║
-║                                                                           ║
-║  【目标选择】                                                              ║
-║  ┌─────────────────────────────────────────────────────────────────────┐ ║
-║  │  攻击目标:                                                           │ ║
-║  │  ○ 血量最低的敌人 (快速击杀)                                          │ ║
-║  │  ● 血量最高的敌人 (集火坦克)                                          │ ║
-║  │  ○ 攻击力最高的敌人 (优先高威胁)                                      │ ║
-║  │  ○ 随机攻击 (分散伤害)                                               │ ║
-║  └─────────────────────────────────────────────────────────────────────┘ ║
-║                                                                           ║
-║  【资源管理】                                                              ║
-║  ┌─────────────────────────────────────────────────────────────────────┐ ║
-║  │  怒气阈值: [30] 以下时只使用普通攻击积攒怒气                          │ ║
-║  │  保留技能: [盾墙] 非紧急情况不使用                                    │ ║
-║  └─────────────────────────────────────────────────────────────────────┘ ║
-║                                                                           ║
-╚═══════════════════════════════════════════════════════════════════════════╝
-```
-
-### 条件规则系统
-
-| 条件类型 | 可选值 | 示例 |
-|---------|-------|------|
-| **自身HP** | <, >, =, 百分比 | 自身HP < 30% |
-| **自身资源** | <, >, = | 怒气 > 80 |
-| **敌人HP** | <, >, = | 敌人HP < 20% |
-| **敌人数量** | <, >, = | 敌人数量 >= 3 |
-| **队友HP** | <, >, = | 任意队友HP < 40% |
-| **Buff状态** | 有/无 | 自身无[战斗怒吼] |
-| **回合数** | <, >, = | 回合数 = 1 (开场) |
-| **技能冷却** | 可用/冷却中 | [冲锋]可用 |
-
-### 策略模板
-
-| 模板 | 适用场景 | 特点 |
-|-----|---------|------|
-| **激进输出** | 低级区刷怪 | 优先高伤害技能 |
-| **稳健生存** | 高级区探索 | HP低时防御优先 |
-| **控制优先** | 多敌人战斗 | 优先使用控制技能 |
-| **Boss战** | 单目标 | 保留爆发，持续输出 |
-| **辅助优先** | 牧师/圣骑 | 优先治疗队友 |
-
-#### battle_strategies - 战斗策略表
-
-| 字段 | 类型 | 约束 | 说明 |
-|-----|------|-----|------|
-| id | INTEGER | PRIMARY KEY AUTOINCREMENT | 策略ID |
-| character_id | INTEGER | NOT NULL FK | 角色ID |
-| name | VARCHAR(32) | NOT NULL | 策略名称 |
-| is_active | INTEGER | DEFAULT 0 | 是否当前使用 |
-| skill_priority | TEXT | | 技能优先级 (JSON数组) |
-| conditional_rules | TEXT | | 条件规则 (JSON数组) |
-| target_priority | VARCHAR(32) | DEFAULT 'lowest_hp' | 目标选择策略 |
-| resource_threshold | INTEGER | DEFAULT 0 | 资源阈值 |
-| reserved_skills | TEXT | | 保留技能 (JSON数组) |
-| created_at | DATETIME | DEFAULT CURRENT_TIMESTAMP | 创建时间 |
-| updated_at | DATETIME | | 更新时间 |
-
-```sql
-CREATE TABLE IF NOT EXISTS battle_strategies (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    character_id INTEGER NOT NULL,
-    name VARCHAR(32) NOT NULL,
-    is_active INTEGER DEFAULT 0,
-    skill_priority TEXT,
-    conditional_rules TEXT,
-    target_priority VARCHAR(32) DEFAULT 'lowest_hp',
-    resource_threshold INTEGER DEFAULT 0,
-    reserved_skills TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME,
-    FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE
-);
-
-CREATE INDEX idx_battle_strategies_character ON battle_strategies(character_id);
-CREATE INDEX idx_battle_strategies_active ON battle_strategies(character_id, is_active);
-```
-
-**target_priority 可选值:**
-- `lowest_hp` - 攻击血量最低的敌人
-- `highest_hp` - 攻击血量最高的敌人
-- `highest_attack` - 攻击攻击力最高的敌人
-- `random` - 随机攻击
-- `nearest` - 攻击最近的敌人 (预留)
-
-**conditional_rules JSON格式:**
-```json
-[
-  {
-    "condition": {"type": "self_hp", "operator": "<", "value": 30},
-    "action": {"type": "priority_skill", "skill_id": "shield_wall"}
-  },
-  {
-    "condition": {"type": "enemy_hp", "operator": "<", "value": 20},
-    "action": {"type": "priority_skill", "skill_id": "execute"}
-  }
-]
-```
+> 📎 **详细设计已迁移至独立文档**: [作战策略系统设计](strategy_design.md)
+>
+> 策略系统包含：技能优先级、条件规则、目标选择、资源管理等功能。
+> 数据表结构请参阅上方 [13. battle_strategies](#13-battle_strategies---战斗策略表)。
 
 ---
 

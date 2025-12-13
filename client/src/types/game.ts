@@ -309,3 +309,93 @@ export const RESOURCE_COLORS: Record<string, string> = {
 export function getResourceColor(resourceType: string): string {
   return RESOURCE_COLORS[resourceType] || '#ffffff'
 }
+
+// ═══════════════════════════════════════════════════════════
+// 战斗策略
+// ═══════════════════════════════════════════════════════════
+
+export interface BattleStrategy {
+  id: number
+  characterId: number
+  name: string
+  isActive: boolean
+  skillPriority: string[]
+  conditionalRules: ConditionalRule[]
+  targetPriority: string
+  skillTargetOverrides: Record<string, string>
+  resourceThreshold: number
+  reservedSkills: ReservedSkill[]
+  autoTargetSettings: AutoTargetSettings
+  createdAt: string
+  updatedAt?: string
+}
+
+export interface ConditionalRule {
+  id: string
+  priority: number
+  enabled: boolean
+  condition: RuleCondition
+  action: RuleAction
+}
+
+export interface RuleCondition {
+  type: string
+  operator: string
+  value: number
+  skillId?: string
+  buffId?: string
+}
+
+export interface RuleAction {
+  type: string
+  skillId?: string
+  comment?: string
+}
+
+export interface ReservedSkill {
+  skillId: string
+  condition: RuleCondition
+}
+
+export interface AutoTargetSettings {
+  positionalAutoOptimize: boolean
+  executeAutoTarget: boolean
+  healAutoTarget: boolean
+}
+
+export interface StrategyCreateRequest {
+  characterId: number
+  name: string
+  fromTemplate?: string
+}
+
+export interface StrategyUpdateRequest {
+  name?: string
+  isActive?: boolean
+  skillPriority?: string[]
+  conditionalRules?: ConditionalRule[]
+  targetPriority?: string
+  skillTargetOverrides?: Record<string, string>
+  resourceThreshold?: number
+  reservedSkills?: ReservedSkill[]
+  autoTargetSettings?: AutoTargetSettings
+}
+
+export interface ConditionTypeInfo {
+  type: string
+  name: string
+  category: string
+  operators: string[]
+  valueType: string
+}
+
+export interface TargetPriorityInfo {
+  value: string
+  label: string
+}
+
+export interface StrategyTemplate {
+  id: string
+  name: string
+  description: string
+}

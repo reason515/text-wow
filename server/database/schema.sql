@@ -1040,13 +1040,15 @@ CREATE TABLE IF NOT EXISTS user_stamina (
 CREATE TABLE IF NOT EXISTS battle_strategies (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     character_id INTEGER NOT NULL,
-    name VARCHAR(32) NOT NULL,             -- 策略名称
-    is_active INTEGER DEFAULT 0,           -- 是否当前使用
-    skill_priority TEXT,                   -- 技能优先级 (JSON数组)
-    conditional_rules TEXT,                -- 条件规则 (JSON数组)
-    target_priority VARCHAR(32) DEFAULT 'lowest_hp', -- 目标选择策略
-    resource_threshold INTEGER DEFAULT 0,  -- 资源阈值
-    reserved_skills TEXT,                  -- 保留技能 (JSON数组)
+    name VARCHAR(32) NOT NULL,                          -- 策略名称
+    is_active INTEGER DEFAULT 0,                        -- 是否当前使用
+    skill_priority TEXT,                                -- 技能优先级 (JSON数组)
+    conditional_rules TEXT,                             -- 条件规则 (JSON数组)
+    target_priority VARCHAR(32) DEFAULT 'lowest_hp',    -- 默认目标选择策略
+    skill_target_overrides TEXT,                        -- 技能目标覆盖 (JSON对象)
+    resource_threshold INTEGER DEFAULT 0,               -- 资源阈值
+    reserved_skills TEXT,                               -- 保留技能 (JSON数组)
+    auto_target_settings TEXT,                          -- 智能目标设置 (JSON对象)
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME,
     FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE

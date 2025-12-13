@@ -5,6 +5,7 @@ import { useCharacterStore } from '../stores/character'
 import { useAuthStore } from '../stores/auth'
 import { getClassColor, getResourceColor } from '../types/game'
 import ChatPanel from './ChatPanel.vue'
+import StrategyEditor from './StrategyEditor.vue'
 
 const emit = defineEmits<{
   logout: []
@@ -27,6 +28,42 @@ const characterSkills = ref<any[]>([])
 const passiveSkills = ref<any[]>([])
 const loadingSkills = ref(false)
 const allocating = ref(false)
+
+// 策略编辑器
+const showStrategyEditor = ref(false)
+const strategyCharacterId = ref<number | null>(null)
+const strategyCharacterSkills = ref<any[]>([])
+
+// 打开策略编辑器
+async function openStrategyEditor() {
+  // 获取当前活跃角色
+  const activeChar = charStore.activeCharacter
+  if (!activeChar) {
+    console.warn('No active character')
+    return
+  }
+  strategyCharacterId.value = activeChar.id
+  // 获取角色技能用于策略配置
+  try {
+    const response = await fetch(`/api/characters/${activeChar.id}/skills`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    })
+    const data = await response.json()
+    if (data.success && data.data) {
+      strategyCharacterSkills.value = data.data.activeSkills || []
+    }
+  } catch (e) {
+    console.error('Failed to fetch skills for strategy:', e)
+  }
+  showStrategyEditor.value = true
+}
+
+// 关闭策略编辑器
+function closeStrategyEditor() {
+  showStrategyEditor.value = false
+}
 
 // 显示角色详情
 async function showDetail(char: any) {
@@ -1318,10 +1355,11 @@ function escapeRegex(str: string): string {
             >
               {{ game.isRunning ? '[停止挂机]' : '[开始挂机]' }}
             </button>
-            <button class="cmd-btn" @click="game.battleTick" :disabled="game.isRunning">
-              [→] 单步战斗
-            </button>
-            <button class="cmd-btn" disabled>
+            <button 
+              class="cmd-btn" 
+              @click="openStrategyEditor"
+              :disabled="!charStore.activeCharacter"
+            >
               [S] 策略
             </button>
             <button class="cmd-btn" disabled>
@@ -1336,6 +1374,14 @@ function escapeRegex(str: string): string {
 
       <!-- 底部聊天面板 -->
       <ChatPanel />
+
+      <!-- 策略编辑器 -->
+      <StrategyEditor 
+        v-if="showStrategyEditor && strategyCharacterId"
+        :character-id="strategyCharacterId"
+        :character-skills="strategyCharacterSkills"
+        @close="closeStrategyEditor"
+      />
     </template>
     
     <!-- 技能选择弹窗：被动/主动选择 -->

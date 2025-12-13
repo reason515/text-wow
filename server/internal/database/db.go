@@ -16,7 +16,7 @@ var DB *sql.DB
 // Init 初始化数据库连接
 func Init() error {
 	var err error
-	
+
 	// 打开数据库连接，启用WAL模式
 	DB, err = sql.Open("sqlite3", "./game.db?_journal_mode=WAL&_busy_timeout=5000")
 	if err != nil {
@@ -35,6 +35,11 @@ func Init() error {
 	// 创建表结构
 	if err := initSchema(); err != nil {
 		return fmt.Errorf("failed to init schema: %w", err)
+	}
+
+	// 运行数据库迁移
+	if err := runMigrations(); err != nil {
+		log.Printf("⚠️ Migration warning: %v", err)
 	}
 
 	// 导入种子数据（如果需要）
@@ -224,4 +229,115 @@ func Transaction(fn func(*sql.Tx) error) error {
 	}
 
 	return tx.Commit()
+}
+
+// runMigrations 运行数据库迁移
+func runMigrations() error {
+	// 迁移1: 更新 battle_strategies 表结构
+	if err := migrateBattleStrategies(); err != nil {
+		return fmt.Errorf("failed to migrate battle_strategies: %w", err)
+	}
+	return nil
+}
+
+// migrateBattleStrategies 迁移 battle_strategies 表
+func migrateBattleStrategies() error {
+	// 检查表是否存在
+	var tableName string
+	err := DB.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name='battle_strategies'").Scan(&tableName)
+	if err == sql.ErrNoRows {
+		// 表不存在，将由 schema.sql 创建
+		return nil
+	}
+
+	// 检查是否有 skill_priority 列
+	rows, err := DB.Query("PRAGMA table_info(battle_strategies)")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	hasSkillPriority := false
+	hasSkillTargetOverrides := false
+	hasAutoTargetSettings := false
+
+	for rows.Next() {
+		var cid int
+		var name, colType string
+		var notNull, pk int
+		var dfltValue sql.NullString
+		if err := rows.Scan(&cid, &name, &colType, &notNull, &dfltValue, &pk); err != nil {
+			return err
+		}
+		switch name {
+		case "skill_priority":
+			hasSkillPriority = true
+		case "skill_target_overrides":
+			hasSkillTargetOverrides = true
+		case "auto_target_settings":
+			hasAutoTargetSettings = true
+		}
+	}
+
+	// 如果缺少新列，需要重建表
+	if !hasSkillPriority || !hasSkillTargetOverrides || !hasAutoTargetSettings {
+		log.Println("🔄 Migrating battle_strategies table...")
+
+		// SQLite 不支持 DROP COLUMN，需要重建表
+		// 1. 重命名旧表
+		_, err := DB.Exec("ALTER TABLE battle_strategies RENAME TO battle_strategies_old")
+		if err != nil {
+			return fmt.Errorf("failed to rename old table: %w", err)
+		}
+
+		// 2. 创建新表
+		_, err = DB.Exec(`
+			CREATE TABLE battle_strategies (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				character_id INTEGER NOT NULL,
+				name VARCHAR(32) NOT NULL,
+				is_active INTEGER DEFAULT 0,
+				skill_priority TEXT,
+				conditional_rules TEXT,
+				target_priority VARCHAR(32) DEFAULT 'lowest_hp',
+				skill_target_overrides TEXT,
+				resource_threshold INTEGER DEFAULT 0,
+				reserved_skills TEXT,
+				auto_target_settings TEXT,
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				updated_at DATETIME,
+				FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE
+			)
+		`)
+		if err != nil {
+			// 回滚：重命名回来
+			DB.Exec("ALTER TABLE battle_strategies_old RENAME TO battle_strategies")
+			return fmt.Errorf("failed to create new table: %w", err)
+		}
+
+		// 3. 迁移数据（如果有）
+		_, err = DB.Exec(`
+			INSERT INTO battle_strategies (id, character_id, name, is_active, created_at)
+			SELECT id, character_id, name, is_active, created_at 
+			FROM battle_strategies_old
+		`)
+		if err != nil {
+			log.Printf("⚠️ Failed to migrate data: %v", err)
+			// 不是致命错误，继续
+		}
+
+		// 4. 删除旧表
+		_, err = DB.Exec("DROP TABLE battle_strategies_old")
+		if err != nil {
+			log.Printf("⚠️ Failed to drop old table: %v", err)
+		}
+
+		// 5. 创建索引
+		DB.Exec("CREATE INDEX IF NOT EXISTS idx_battle_strategies_character ON battle_strategies(character_id)")
+		DB.Exec("CREATE INDEX IF NOT EXISTS idx_battle_strategies_active ON battle_strategies(character_id, is_active)")
+
+		log.Println("✅ battle_strategies table migrated successfully")
+	}
+
+	return nil
 }

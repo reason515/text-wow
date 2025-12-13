@@ -33,6 +33,7 @@ func main() {
 	h := api.NewHandler()
 	chatHandler := api.NewChatHandler()
 	battleHandler := api.NewBattleHandler()
+	strategyHandler := api.NewStrategyHandlers()
 
 	// API 路由
 	apiGroup := r.Group("/api")
@@ -109,6 +110,16 @@ func main() {
 				battle.GET("/logs", battleHandler.GetBattleLogs)
 				battle.POST("/zone", battleHandler.ChangeZone)
 			}
+
+			// 策略
+			protected.GET("/characters/:characterId/strategies", strategyHandler.GetStrategies)
+			protected.POST("/characters/:characterId/strategies", strategyHandler.CreateStrategy)
+			protected.GET("/strategies/:strategyId", strategyHandler.GetStrategy)
+			protected.PUT("/strategies/:strategyId", strategyHandler.UpdateStrategy)
+			protected.DELETE("/strategies/:strategyId", strategyHandler.DeleteStrategy)
+			protected.POST("/strategies/:strategyId/activate", strategyHandler.SetActiveStrategy)
+			protected.GET("/strategy-templates", strategyHandler.GetStrategyTemplates)
+			protected.GET("/strategy-condition-types", strategyHandler.GetConditionTypes)
 		}
 	}
 
@@ -128,6 +139,10 @@ func main() {
 	log.Println("   GET  /api/battle/status    - 战斗状态 (需认证)")
 	log.Println("   GET  /api/battle/logs      - 战斗日志 (需认证)")
 	log.Println("   POST /api/battle/zone      - 切换区域 (需认证)")
+	log.Println("   GET  /api/characters/:id/strategies - 获取策略列表 (需认证)")
+	log.Println("   POST /api/characters/:id/strategies - 创建策略 (需认证)")
+	log.Println("   PUT  /api/strategies/:id   - 更新策略 (需认证)")
+	log.Println("   DELETE /api/strategies/:id - 删除策略 (需认证)")
 
 	if err := r.Run(":8080"); err != nil {
 		log.Fatalf("❌ Failed to start server: %v", err)

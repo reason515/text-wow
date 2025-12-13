@@ -321,6 +321,85 @@ type InitialSkillSelectionRequest struct {
 }
 
 // ═══════════════════════════════════════════════════════════
+// 战斗策略
+// ═══════════════════════════════════════════════════════════
+
+// BattleStrategy 战斗策略
+type BattleStrategy struct {
+	ID                   int                `json:"id"`
+	CharacterID          int                `json:"characterId"`
+	Name                 string             `json:"name"`
+	IsActive             bool               `json:"isActive"`
+	SkillPriority        []string           `json:"skillPriority"`        // 技能优先级列表
+	ConditionalRules     []ConditionalRule  `json:"conditionalRules"`     // 条件规则
+	TargetPriority       string             `json:"targetPriority"`       // 默认目标选择策略
+	SkillTargetOverrides map[string]string  `json:"skillTargetOverrides"` // 技能目标覆盖
+	ResourceThreshold    int                `json:"resourceThreshold"`    // 资源阈值
+	ReservedSkills       []ReservedSkill    `json:"reservedSkills"`       // 保留技能
+	AutoTargetSettings   AutoTargetSettings `json:"autoTargetSettings"`   // 智能目标设置
+	CreatedAt            time.Time          `json:"createdAt"`
+	UpdatedAt            *time.Time         `json:"updatedAt,omitempty"`
+}
+
+// ConditionalRule 条件规则
+type ConditionalRule struct {
+	ID        string        `json:"id"`
+	Priority  int           `json:"priority"`
+	Enabled   bool          `json:"enabled"`
+	Condition RuleCondition `json:"condition"`
+	Action    RuleAction    `json:"action"`
+}
+
+// RuleCondition 规则条件
+type RuleCondition struct {
+	Type     string  `json:"type"`              // 条件类型: self_hp_percent, alive_enemy_count, target_hp_percent, etc.
+	Operator string  `json:"operator"`          // 比较运算符: <, >, <=, >=, =, !=
+	Value    float64 `json:"value"`             // 条件值
+	SkillID  string  `json:"skillId,omitempty"` // 技能ID (用于 skill_ready 条件)
+	BuffID   string  `json:"buffId,omitempty"`  // Buff ID (用于 has_buff 条件)
+}
+
+// RuleAction 规则动作
+type RuleAction struct {
+	Type    string `json:"type"`              // 动作类型: use_skill, normal_attack
+	SkillID string `json:"skillId,omitempty"` // 使用的技能ID
+	Comment string `json:"comment,omitempty"` // 备注
+}
+
+// ReservedSkill 保留技能
+type ReservedSkill struct {
+	SkillID   string        `json:"skillId"`
+	Condition RuleCondition `json:"condition"`
+}
+
+// AutoTargetSettings 智能目标设置
+type AutoTargetSettings struct {
+	PositionalAutoOptimize bool `json:"positionalAutoOptimize"` // 位置技能自动优化
+	ExecuteAutoTarget      bool `json:"executeAutoTarget"`      // 斩杀技能自动选择低血量
+	HealAutoTarget         bool `json:"healAutoTarget"`         // 治疗技能自动选择低血量队友
+}
+
+// StrategyCreateRequest 创建策略请求
+type StrategyCreateRequest struct {
+	CharacterID  int    `json:"characterId" binding:"required"`
+	Name         string `json:"name" binding:"required,min=1,max=32"`
+	FromTemplate string `json:"fromTemplate,omitempty"` // 从模板创建
+}
+
+// StrategyUpdateRequest 更新策略请求
+type StrategyUpdateRequest struct {
+	Name                 *string             `json:"name,omitempty"`
+	IsActive             *bool               `json:"isActive,omitempty"`
+	SkillPriority        []string            `json:"skillPriority,omitempty"`
+	ConditionalRules     []ConditionalRule   `json:"conditionalRules,omitempty"`
+	TargetPriority       *string             `json:"targetPriority,omitempty"`
+	SkillTargetOverrides map[string]string   `json:"skillTargetOverrides,omitempty"`
+	ResourceThreshold    *int                `json:"resourceThreshold,omitempty"`
+	ReservedSkills       []ReservedSkill     `json:"reservedSkills,omitempty"`
+	AutoTargetSettings   *AutoTargetSettings `json:"autoTargetSettings,omitempty"`
+}
+
+// ═══════════════════════════════════════════════════════════
 // API 响应
 // ═══════════════════════════════════════════════════════════
 

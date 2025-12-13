@@ -20,6 +20,20 @@ export const useCharacterStore = defineStore('character', () => {
   const hordeRaces = computed(() => 
     races.value.filter(r => r.faction === 'horde')
   )
+  // 获取当前活跃角色（isActive=true 的角色，或小队第一个角色）
+  const activeCharacter = computed(() => {
+    // 优先从 team 中获取
+    if (team.value && team.value.characters && team.value.characters.length > 0) {
+      const active = team.value.characters.find(c => c.isActive)
+      return active || team.value.characters[0]
+    }
+    // 从 characters 中获取
+    if (characters.value.length > 0) {
+      const active = characters.value.find(c => c.isActive)
+      return active || characters.value[0]
+    }
+    return null
+  })
 
   // 获取种族列表
   async function fetchRaces(): Promise<boolean> {
@@ -135,6 +149,7 @@ export const useCharacterStore = defineStore('character', () => {
     hasCharacters,
     allianceRaces,
     hordeRaces,
+    activeCharacter,
     // 方法
     fetchRaces,
     fetchClasses,
