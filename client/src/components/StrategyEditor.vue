@@ -31,6 +31,22 @@ const conditionTypes = ref<ConditionTypeInfo[]>([])
 const targetPriorities = ref<TargetPriorityInfo[]>([])
 const templates = ref<StrategyTemplate[]>([])
 
+// 确保策略字段有默认值（防御性处理后端返回 null 的情况）
+function ensureStrategyDefaults(strategy: BattleStrategy): BattleStrategy {
+  return {
+    ...strategy,
+    skillPriority: strategy.skillPriority || [],
+    conditionalRules: strategy.conditionalRules || [],
+    skillTargetOverrides: strategy.skillTargetOverrides || {},
+    reservedSkills: strategy.reservedSkills || [],
+    autoTargetSettings: strategy.autoTargetSettings || {
+      positionalAutoOptimize: true,
+      executeAutoTarget: true,
+      healAutoTarget: true
+    }
+  }
+}
+
 // 新建策略弹窗
 const showNewDialog = ref(false)
 const newStrategyName = ref('')
@@ -43,7 +59,8 @@ async function loadStrategies() {
   try {
     const res = await get<BattleStrategy[]>(`/characters/${props.characterId}/strategies`)
     if (res.success && res.data) {
-      strategies.value = res.data
+      // 确保所有策略字段有默认值
+      strategies.value = res.data.map(ensureStrategyDefaults)
       // 选中激活的策略
       const active = strategies.value.find(s => s.isActive)
       if (active) {
@@ -100,8 +117,9 @@ async function createStrategy() {
       fromTemplate: newStrategyTemplate.value || undefined
     })
     if (res.success && res.data) {
-      strategies.value.push(res.data)
-      currentStrategy.value = res.data
+      const normalizedStrategy = ensureStrategyDefaults(res.data)
+      strategies.value.push(normalizedStrategy)
+      currentStrategy.value = normalizedStrategy
       showNewDialog.value = false
       newStrategyName.value = ''
       newStrategyTemplate.value = ''
@@ -1051,4 +1069,5 @@ select:focus, input:focus {
   background: #33ff33;
 }
 </style>
+
 

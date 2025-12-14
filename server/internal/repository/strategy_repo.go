@@ -366,9 +366,12 @@ func GetDefaultStrategy(characterID int, name string) *models.BattleStrategy {
 func GetStrategyTemplates() map[string]*models.BattleStrategy {
 	return map[string]*models.BattleStrategy{
 		"aggressive": {
-			Name:              "激进输出",
-			TargetPriority:    "lowest_hp",
-			ResourceThreshold: 10,
+			Name:                 "激进输出",
+			TargetPriority:       "lowest_hp",
+			ResourceThreshold:    10,
+			SkillPriority:        []string{},               // 初始化为空数组
+			SkillTargetOverrides: make(map[string]string),  // 初始化为空map
+			ReservedSkills:       []models.ReservedSkill{}, // 初始化为空数组
 			ConditionalRules: []models.ConditionalRule{
 				{
 					ID: "rule_1", Priority: 1, Enabled: true,
@@ -388,9 +391,12 @@ func GetStrategyTemplates() map[string]*models.BattleStrategy {
 			},
 		},
 		"defensive": {
-			Name:              "稳健生存",
-			TargetPriority:    "lowest_hp",
-			ResourceThreshold: 20,
+			Name:                 "稳健生存",
+			TargetPriority:       "lowest_hp",
+			ResourceThreshold:    20,
+			SkillPriority:        []string{},
+			SkillTargetOverrides: make(map[string]string),
+			ReservedSkills:       []models.ReservedSkill{},
 			ConditionalRules: []models.ConditionalRule{
 				{
 					ID: "rule_1", Priority: 1, Enabled: true,
@@ -425,9 +431,12 @@ func GetStrategyTemplates() map[string]*models.BattleStrategy {
 			},
 		},
 		"aoe": {
-			Name:              "AOE清怪",
-			TargetPriority:    "highest_hp",
-			ResourceThreshold: 15,
+			Name:                 "AOE清怪",
+			TargetPriority:       "highest_hp",
+			ResourceThreshold:    15,
+			SkillPriority:        []string{},
+			SkillTargetOverrides: make(map[string]string),
+			ReservedSkills:       []models.ReservedSkill{},
 			ConditionalRules: []models.ConditionalRule{
 				{
 					ID: "rule_1", Priority: 1, Enabled: true,
@@ -452,9 +461,12 @@ func GetStrategyTemplates() map[string]*models.BattleStrategy {
 			},
 		},
 		"tank": {
-			Name:              "坦克",
-			TargetPriority:    "highest_threat",
-			ResourceThreshold: 10,
+			Name:                 "坦克",
+			TargetPriority:       "highest_threat",
+			ResourceThreshold:    10,
+			SkillPriority:        []string{},
+			SkillTargetOverrides: make(map[string]string),
+			ReservedSkills:       []models.ReservedSkill{},
 			ConditionalRules: []models.ConditionalRule{
 				{
 					ID: "rule_1", Priority: 1, Enabled: true,
@@ -485,4 +497,3 @@ func GetStrategyTemplates() map[string]*models.BattleStrategy {
 		},
 	}
 }
-
