@@ -497,3 +497,4 @@ func GetStrategyTemplates() map[string]*models.BattleStrategy {
 		},
 	}
 }
+

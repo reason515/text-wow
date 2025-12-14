@@ -235,6 +235,231 @@ type BattleStatus struct {
 }
 
 // ═══════════════════════════════════════════════════════════
+// 战斗统计
+// ═══════════════════════════════════════════════════════════
+
+// BattleRecord 战斗记录 - 单场战斗的基本信息
+type BattleRecord struct {
+	ID              int       `json:"id"`
+	UserID          int       `json:"userId"`
+	ZoneID          string    `json:"zoneId"`
+	BattleType      string    `json:"battleType"` // pve/pvp/boss/abyss
+	MonsterID       string    `json:"monsterId,omitempty"`
+	OpponentUserID  *int      `json:"opponentUserId,omitempty"`
+	TotalRounds     int       `json:"totalRounds"`
+	DurationSeconds int       `json:"durationSeconds"`
+	Result          string    `json:"result"` // victory/defeat/draw/flee
+	TeamDamageDealt int       `json:"teamDamageDealt"`
+	TeamDamageTaken int       `json:"teamDamageTaken"`
+	TeamHealingDone int       `json:"teamHealingDone"`
+	ExpGained       int       `json:"expGained"`
+	GoldGained      int       `json:"goldGained"`
+	CreatedAt       time.Time `json:"createdAt"`
+
+	// 关联数据（不存储在本表）
+	CharacterStats []*BattleCharacterStats `json:"characterStats,omitempty"`
+	SkillBreakdown []*BattleSkillBreakdown `json:"skillBreakdown,omitempty"`
+}
+
+// BattleCharacterStats 单场战斗角色统计 - 记录每场战斗中每个角色的详细表现
+type BattleCharacterStats struct {
+	ID          int `json:"id"`
+	BattleID    int `json:"battleId"`
+	CharacterID int `json:"characterId"`
+	TeamSlot    int `json:"teamSlot"`
+
+	// 伤害统计
+	DamageDealt    int `json:"damageDealt"`    // 造成总伤害
+	PhysicalDamage int `json:"physicalDamage"` // 物理伤害
+	MagicDamage    int `json:"magicDamage"`    // 魔法伤害
+	FireDamage     int `json:"fireDamage"`     // 火焰伤害
+	FrostDamage    int `json:"frostDamage"`    // 冰霜伤害
+	ShadowDamage   int `json:"shadowDamage"`   // 暗影伤害
+	HolyDamage     int `json:"holyDamage"`     // 神圣伤害
+	NatureDamage   int `json:"natureDamage"`   // 自然伤害
+	DotDamage      int `json:"dotDamage"`      // DOT伤害
+
+	// 暴击统计
+	CritCount  int `json:"critCount"`  // 暴击次数
+	CritDamage int `json:"critDamage"` // 暴击总伤害
+	MaxCrit    int `json:"maxCrit"`    // 最高单次暴击
+
+	// 承伤统计
+	DamageTaken    int `json:"damageTaken"`    // 受到总伤害
+	PhysicalTaken  int `json:"physicalTaken"`  // 物理承伤
+	MagicTaken     int `json:"magicTaken"`     // 魔法承伤
+	DamageBlocked  int `json:"damageBlocked"`  // 格挡伤害
+	DamageAbsorbed int `json:"damageAbsorbed"` // 护盾吸收
+
+	// 闪避统计
+	DodgeCount int `json:"dodgeCount"` // 闪避次数
+	BlockCount int `json:"blockCount"` // 格挡次数
+	HitCount   int `json:"hitCount"`   // 被命中次数
+
+	// 治疗统计
+	HealingDone     int `json:"healingDone"`     // 造成治疗
+	HealingReceived int `json:"healingReceived"` // 受到治疗
+	Overhealing     int `json:"overhealing"`     // 过量治疗
+	SelfHealing     int `json:"selfHealing"`     // 自我治疗
+	HotHealing      int `json:"hotHealing"`      // HOT治疗
+
+	// 技能统计
+	SkillUses   int `json:"skillUses"`   // 技能使用次数
+	SkillHits   int `json:"skillHits"`   // 技能命中次数
+	SkillMisses int `json:"skillMisses"` // 技能未命中
+
+	// 控制统计
+	CcApplied  int `json:"ccApplied"`  // 施加控制次数
+	CcReceived int `json:"ccReceived"` // 受到控制次数
+	Dispels    int `json:"dispels"`    // 驱散次数
+	Interrupts int `json:"interrupts"` // 打断次数
+
+	// 其他统计
+	Kills             int `json:"kills"`             // 击杀数(最后一击)
+	Deaths            int `json:"deaths"`            // 死亡次数
+	Resurrects        int `json:"resurrects"`        // 复活次数
+	ResourceUsed      int `json:"resourceUsed"`      // 消耗能量
+	ResourceGenerated int `json:"resourceGenerated"` // 获得能量
+}
+
+// CharacterLifetimeStats 角色生涯统计 - 累计统计数据
+type CharacterLifetimeStats struct {
+	CharacterID int `json:"characterId"`
+
+	// 战斗场次
+	TotalBattles int `json:"totalBattles"` // 总战斗场数
+	Victories    int `json:"victories"`    // 胜利场数
+	Defeats      int `json:"defeats"`      // 失败场数
+	PveBattles   int `json:"pveBattles"`   // PVE战斗数
+	PvpBattles   int `json:"pvpBattles"`   // PVP战斗数
+	BossKills    int `json:"bossKills"`    // Boss击杀数
+
+	// 累计伤害
+	TotalDamageDealt    int `json:"totalDamageDealt"`    // 总造成伤害
+	TotalPhysicalDamage int `json:"totalPhysicalDamage"` // 物理总伤害
+	TotalMagicDamage    int `json:"totalMagicDamage"`    // 魔法总伤害
+	TotalCritDamage     int `json:"totalCritDamage"`     // 暴击总伤害
+	TotalCritCount      int `json:"totalCritCount"`      // 总暴击次数
+	HighestDamageSingle int `json:"highestDamageSingle"` // 单次最高伤害
+	HighestDamageBattle int `json:"highestDamageBattle"` // 单场最高伤害
+
+	// 累计承伤
+	TotalDamageTaken    int `json:"totalDamageTaken"`    // 总承受伤害
+	TotalDamageBlocked  int `json:"totalDamageBlocked"`  // 总格挡伤害
+	TotalDamageAbsorbed int `json:"totalDamageAbsorbed"` // 总吸收伤害
+	TotalDodgeCount     int `json:"totalDodgeCount"`     // 总闪避次数
+
+	// 累计治疗
+	TotalHealingDone     int `json:"totalHealingDone"`     // 总治疗量
+	TotalHealingReceived int `json:"totalHealingReceived"` // 总受到治疗
+	TotalOverhealing     int `json:"totalOverhealing"`     // 总过量治疗
+	HighestHealingSingle int `json:"highestHealingSingle"` // 单次最高治疗
+	HighestHealingBattle int `json:"highestHealingBattle"` // 单场最高治疗
+
+	// 击杀与死亡
+	TotalKills      int `json:"totalKills"`        // 总击杀数
+	TotalDeaths     int `json:"totalDeaths"`       // 总死亡数
+	KillStreakBest  int `json:"killStreakBest"`    // 最长连杀
+	CurrentKillStrk int `json:"currentKillStreak"` // 当前连杀
+
+	// 技能使用
+	TotalSkillUses int `json:"totalSkillUses"` // 技能总使用次数
+	TotalSkillHits int `json:"totalSkillHits"` // 技能总命中数
+
+	// 资源统计
+	TotalResourceUsed int `json:"totalResourceUsed"` // 总消耗能量
+	TotalRounds       int `json:"totalRounds"`       // 总战斗回合数
+	TotalBattleTime   int `json:"totalBattleTime"`   // 总战斗时间(秒)
+
+	// 最后更新
+	LastBattleAt *time.Time `json:"lastBattleAt,omitempty"`
+	UpdatedAt    time.Time  `json:"updatedAt"`
+}
+
+// BattleSkillBreakdown 战斗技能明细 - 每场战斗中各技能的使用和效果
+type BattleSkillBreakdown struct {
+	ID           int    `json:"id"`
+	BattleID     int    `json:"battleId"`
+	CharacterID  int    `json:"characterId"`
+	SkillID      string `json:"skillId"`
+	UseCount     int    `json:"useCount"`     // 使用次数
+	HitCount     int    `json:"hitCount"`     // 命中次数
+	CritCount    int    `json:"critCount"`    // 暴击次数
+	TotalDamage  int    `json:"totalDamage"`  // 造成总伤害
+	TotalHealing int    `json:"totalHealing"` // 造成总治疗
+	ResourceCost int    `json:"resourceCost"` // 总消耗能量
+
+	// 关联数据（不存储在本表）
+	SkillName string `json:"skillName,omitempty"`
+}
+
+// DailyStatistics 每日统计汇总 - 每日战斗数据快照
+type DailyStatistics struct {
+	ID               int       `json:"id"`
+	UserID           int       `json:"userId"`
+	StatDate         string    `json:"statDate"` // YYYY-MM-DD 格式
+	BattlesCount     int       `json:"battlesCount"`
+	Victories        int       `json:"victories"`
+	Defeats          int       `json:"defeats"`
+	TotalDamage      int       `json:"totalDamage"`
+	TotalHealing     int       `json:"totalHealing"`
+	TotalDamageTaken int       `json:"totalDamageTaken"`
+	ExpGained        int       `json:"expGained"`
+	GoldGained       int       `json:"goldGained"`
+	PlayTime         int       `json:"playTime"` // 游戏时长(秒)
+	Kills            int       `json:"kills"`
+	Deaths           int       `json:"deaths"`
+	CreatedAt        time.Time `json:"createdAt,omitempty"`
+}
+
+// ═══════════════════════════════════════════════════════════
+// 战斗统计 API 响应
+// ═══════════════════════════════════════════════════════════
+
+// BattleStatsOverview 战斗统计概览 - 用于前端面板展示
+type BattleStatsOverview struct {
+	// 会话统计
+	SessionStats *SessionStats `json:"sessionStats,omitempty"`
+
+	// 角色生涯统计
+	LifetimeStats []*CharacterLifetimeStats `json:"lifetimeStats,omitempty"`
+
+	// 今日统计
+	TodayStats *DailyStatistics `json:"todayStats,omitempty"`
+
+	// 最近战斗
+	RecentBattles []*BattleRecord `json:"recentBattles,omitempty"`
+}
+
+// SessionStats 会话统计 - 当前游戏会话的统计数据
+type SessionStats struct {
+	TotalBattles    int       `json:"totalBattles"`
+	TotalKills      int       `json:"totalKills"`
+	TotalExp        int       `json:"totalExp"`
+	TotalGold       int       `json:"totalGold"`
+	TotalDamage     int       `json:"totalDamage"`
+	TotalHealing    int       `json:"totalHealing"`
+	SessionStart    time.Time `json:"sessionStart"`
+	DurationSeconds int       `json:"durationSeconds"`
+}
+
+// CharacterBattleSummary 角色战斗摘要 - 用于角色详情页展示
+type CharacterBattleSummary struct {
+	CharacterID   int     `json:"characterId"`
+	CharacterName string  `json:"characterName"`
+	TotalBattles  int     `json:"totalBattles"`
+	Victories     int     `json:"victories"`
+	WinRate       float64 `json:"winRate"`
+	TotalDamage   int     `json:"totalDamage"`
+	TotalHealing  int     `json:"totalHealing"`
+	TotalKills    int     `json:"totalKills"`
+	TotalDeaths   int     `json:"totalDeaths"`
+	KDRatio       float64 `json:"kdRatio"` // 击杀/死亡比
+	AvgDPS        float64 `json:"avgDps"`  // 平均每回合伤害
+	AvgHPS        float64 `json:"avgHps"`  // 平均每回合治疗
+}
+
+// ═══════════════════════════════════════════════════════════
 // 技能
 // ═══════════════════════════════════════════════════════════
 

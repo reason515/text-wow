@@ -25,3 +25,6 @@ UPDATE characters SET
 
 
 
+
+
+

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"text-wow/internal/auth"
 	"text-wow/internal/game"
@@ -18,11 +19,12 @@ import (
 
 // Handler API处理器
 type Handler struct {
-	userRepo     *repository.UserRepository
-	charRepo     *repository.CharacterRepository
-	gameRepo     *repository.GameRepository
-	skillRepo    *repository.SkillRepository
-	skillService *service.SkillService
+	userRepo        *repository.UserRepository
+	charRepo        *repository.CharacterRepository
+	gameRepo        *repository.GameRepository
+	skillRepo       *repository.SkillRepository
+	skillService    *service.SkillService
+	battleStatsRepo *repository.BattleStatsRepository
 }
 
 // NewHandler 创建处理器
@@ -30,11 +32,12 @@ func NewHandler() *Handler {
 	skillRepo := repository.NewSkillRepository()
 	skillService := service.NewSkillService(skillRepo, repository.NewCharacterRepository())
 	return &Handler{
-		userRepo:     repository.NewUserRepository(),
-		charRepo:     repository.NewCharacterRepository(),
-		gameRepo:     repository.NewGameRepository(),
-		skillRepo:    skillRepo,
-		skillService: skillService,
+		userRepo:        repository.NewUserRepository(),
+		charRepo:        repository.NewCharacterRepository(),
+		gameRepo:        repository.NewGameRepository(),
+		skillRepo:       skillRepo,
+		skillService:    skillService,
+		battleStatsRepo: repository.NewBattleStatsRepository(),
 	}
 }
 
@@ -1009,5 +1012,262 @@ func (h *Handler) GetCharacterSkills(c *gin.Context) {
 	c.JSON(http.StatusOK, models.APIResponse{
 		Success: true,
 		Data:    skills,
+	})
+}
+
+// ═══════════════════════════════════════════════════════════
+// 战斗统计API
+// ═══════════════════════════════════════════════════════════
+
+// GetBattleStatsOverview 获取战斗统计概览
+func (h *Handler) GetBattleStatsOverview(c *gin.Context) {
+	userID, _ := c.Get("userID")
+
+	overview, err := h.battleStatsRepo.GetBattleStatsOverview(userID.(int))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Error:   "failed to get battle stats: " + err.Error(),
+		})
+		return
+	}
+
+	// 添加会话统计（从战斗管理器获取）
+	battleManager := game.GetBattleManager()
+	session := battleManager.GetSession(userID.(int))
+	if session != nil {
+		overview.SessionStats = &models.SessionStats{
+			TotalBattles:    session.BattleCount,
+			TotalKills:      session.SessionKills,
+			TotalExp:        session.SessionExp,
+			TotalGold:       session.SessionGold,
+			SessionStart:    session.StartedAt,
+			DurationSeconds: int(session.LastTick.Sub(session.StartedAt).Seconds()),
+		}
+	}
+
+	c.JSON(http.StatusOK, models.APIResponse{
+		Success: true,
+		Data:    overview,
+	})
+}
+
+// GetCharacterLifetimeStats 获取角色生涯统计
+func (h *Handler) GetCharacterLifetimeStats(c *gin.Context) {
+	charIDStr := c.Param("characterId")
+	charID, err := strconv.Atoi(charIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Success: false,
+			Error:   "invalid character id",
+		})
+		return
+	}
+
+	// 验证角色所有权
+	character, err := h.charRepo.GetByID(charID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, models.APIResponse{
+			Success: false,
+			Error:   "character not found",
+		})
+		return
+	}
+
+	userID, _ := c.Get("userID")
+	if character.UserID != userID {
+		c.JSON(http.StatusForbidden, models.APIResponse{
+			Success: false,
+			Error:   "forbidden",
+		})
+		return
+	}
+
+	stats, err := h.battleStatsRepo.GetOrCreateLifetimeStats(charID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Error:   "failed to get lifetime stats: " + err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.APIResponse{
+		Success: true,
+		Data:    stats,
+	})
+}
+
+// GetCharacterBattleSummary 获取角色战斗摘要
+func (h *Handler) GetCharacterBattleSummary(c *gin.Context) {
+	charIDStr := c.Param("characterId")
+	charID, err := strconv.Atoi(charIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Success: false,
+			Error:   "invalid character id",
+		})
+		return
+	}
+
+	// 验证角色所有权
+	character, err := h.charRepo.GetByID(charID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, models.APIResponse{
+			Success: false,
+			Error:   "character not found",
+		})
+		return
+	}
+
+	userID, _ := c.Get("userID")
+	if character.UserID != userID {
+		c.JSON(http.StatusForbidden, models.APIResponse{
+			Success: false,
+			Error:   "forbidden",
+		})
+		return
+	}
+
+	summary, err := h.battleStatsRepo.GetCharacterBattleSummary(charID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Error:   "failed to get battle summary: " + err.Error(),
+		})
+		return
+	}
+
+	// 填充角色名称
+	summary.CharacterName = character.Name
+
+	c.JSON(http.StatusOK, models.APIResponse{
+		Success: true,
+		Data:    summary,
+	})
+}
+
+// GetRecentBattles 获取最近战斗记录
+func (h *Handler) GetRecentBattles(c *gin.Context) {
+	userID, _ := c.Get("userID")
+
+	// 获取limit参数，默认10
+	limitStr := c.DefaultQuery("limit", "10")
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit < 1 || limit > 50 {
+		limit = 10
+	}
+
+	battles, err := h.battleStatsRepo.GetRecentBattleRecords(userID.(int), limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Error:   "failed to get recent battles: " + err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.APIResponse{
+		Success: true,
+		Data:    battles,
+	})
+}
+
+// GetBattleDetail 获取战斗详情
+func (h *Handler) GetBattleDetail(c *gin.Context) {
+	battleIDStr := c.Param("battleId")
+	battleID, err := strconv.Atoi(battleIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Success: false,
+			Error:   "invalid battle id",
+		})
+		return
+	}
+
+	userID, _ := c.Get("userID")
+
+	// 获取战斗记录
+	battle, err := h.battleStatsRepo.GetBattleRecordByID(battleID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, models.APIResponse{
+			Success: false,
+			Error:   "battle not found",
+		})
+		return
+	}
+
+	// 验证所有权
+	if battle.UserID != userID.(int) {
+		c.JSON(http.StatusForbidden, models.APIResponse{
+			Success: false,
+			Error:   "forbidden",
+		})
+		return
+	}
+
+	// 获取角色统计
+	charStats, err := h.battleStatsRepo.GetBattleCharacterStats(battleID)
+	if err == nil {
+		battle.CharacterStats = charStats
+	}
+
+	c.JSON(http.StatusOK, models.APIResponse{
+		Success: true,
+		Data:    battle,
+	})
+}
+
+// GetDailyStats 获取每日统计
+func (h *Handler) GetDailyStats(c *gin.Context) {
+	userID, _ := c.Get("userID")
+
+	// 获取日期参数，默认为今天
+	date := c.DefaultQuery("date", "")
+	if date == "" {
+		date = time.Now().Format("2006-01-02")
+	}
+
+	// 如果指定了日期范围，获取范围内的统计
+	startDate := c.DefaultQuery("start_date", "")
+	endDate := c.DefaultQuery("end_date", "")
+
+	if startDate != "" && endDate != "" {
+		stats, err := h.battleStatsRepo.GetDailyStatsRange(userID.(int), startDate, endDate)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, models.APIResponse{
+				Success: false,
+				Error:   "failed to get daily stats: " + err.Error(),
+			})
+			return
+		}
+		c.JSON(http.StatusOK, models.APIResponse{
+			Success: true,
+			Data:    stats,
+		})
+		return
+	}
+
+	// 单日统计
+	stats, err := h.battleStatsRepo.GetDailyStats(userID.(int), date)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			// 没有数据，返回空统计
+			c.JSON(http.StatusOK, models.APIResponse{
+				Success: true,
+				Data:    nil,
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Error:   "failed to get daily stats: " + err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.APIResponse{
+		Success: true,
+		Data:    stats,
 	})
 }

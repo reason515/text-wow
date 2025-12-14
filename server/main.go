@@ -120,6 +120,17 @@ func main() {
 			protected.POST("/strategies/:strategyId/activate", strategyHandler.SetActiveStrategy)
 			protected.GET("/strategy-templates", strategyHandler.GetStrategyTemplates)
 			protected.GET("/strategy-condition-types", strategyHandler.GetConditionTypes)
+
+			// 战斗统计
+			stats := protected.Group("/stats")
+			{
+				stats.GET("/overview", h.GetBattleStatsOverview)
+				stats.GET("/daily", h.GetDailyStats)
+				stats.GET("/battles", h.GetRecentBattles)
+				stats.GET("/battles/:battleId", h.GetBattleDetail)
+			}
+			protected.GET("/characters/:characterId/stats", h.GetCharacterLifetimeStats)
+			protected.GET("/characters/:characterId/stats/summary", h.GetCharacterBattleSummary)
 		}
 	}
 

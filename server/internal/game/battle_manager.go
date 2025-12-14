@@ -22,6 +22,7 @@ type BattleManager struct {
 	buffManager         *BuffManager
 	passiveSkillManager *PassiveSkillManager
 	strategyExecutor    *StrategyExecutor
+	battleStatsRepo     *repository.BattleStatsRepository // 战斗统计仓库
 }
 
 // BattleSession 用户战斗会话
@@ -48,6 +49,82 @@ type BattleSession struct {
 	CurrentBattleKills int        // 本场战斗击杀数
 	CurrentTurnIndex   int        // 回合控制：-1=玩家回合，>=0=敌人索引
 	JustEncountered    bool       // 刚遭遇敌人，需要等待1个tick再开始战斗
+
+	// 战斗统计收集
+	BattleStartTime    time.Time                              // 本场战斗开始时间
+	CurrentBattleRound int                                    // 本场战斗回合数
+	CharacterStats     map[int]*CharacterBattleStatsCollector // 角色战斗统计收集器
+	SkillBreakdown     map[int]map[string]*SkillUsageStats    // 角色->技能ID->技能使用统计
+}
+
+// CharacterBattleStatsCollector 角色战斗统计收集器（内存中收集，战斗结束时保存）
+type CharacterBattleStatsCollector struct {
+	CharacterID int
+	TeamSlot    int
+
+	// 伤害统计
+	DamageDealt    int
+	PhysicalDamage int
+	MagicDamage    int
+	FireDamage     int
+	FrostDamage    int
+	ShadowDamage   int
+	HolyDamage     int
+	NatureDamage   int
+	DotDamage      int
+
+	// 暴击统计
+	CritCount  int
+	CritDamage int
+	MaxCrit    int
+
+	// 承伤统计
+	DamageTaken    int
+	PhysicalTaken  int
+	MagicTaken     int
+	DamageBlocked  int
+	DamageAbsorbed int
+
+	// 闪避统计
+	DodgeCount int
+	BlockCount int
+	HitCount   int
+
+	// 治疗统计
+	HealingDone     int
+	HealingReceived int
+	Overhealing     int
+	SelfHealing     int
+	HotHealing      int
+
+	// 技能统计
+	SkillUses   int
+	SkillHits   int
+	SkillMisses int
+
+	// 控制统计
+	CcApplied  int
+	CcReceived int
+	Dispels    int
+	Interrupts int
+
+	// 其他统计
+	Kills             int
+	Deaths            int
+	Resurrects        int
+	ResourceUsed      int
+	ResourceGenerated int
+}
+
+// SkillUsageStats 技能使用统计
+type SkillUsageStats struct {
+	SkillID      string
+	UseCount     int
+	HitCount     int
+	CritCount    int
+	TotalDamage  int
+	TotalHealing int
+	ResourceCost int
 }
 
 // NewBattleManager 创建战斗管理器
@@ -60,6 +137,7 @@ func NewBattleManager() *BattleManager {
 		buffManager:         NewBuffManager(),
 		passiveSkillManager: NewPassiveSkillManager(),
 		strategyExecutor:    NewStrategyExecutor(),
+		battleStatsRepo:     repository.NewBattleStatsRepository(),
 	}
 }
 
@@ -348,6 +426,9 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 		session.CurrentBattleGold = 0
 		session.CurrentBattleKills = 0
 		session.CurrentTurnIndex = -1 // 玩家回合
+
+		// 初始化战斗统计收集器
+		m.initBattleStats(session, characters)
 
 		// 战斗开始时，确保战士的怒气为0，最大怒气为100
 		if char.ResourceType == "rage" {
@@ -958,10 +1039,27 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 					} else {
 						m.addLog(session, "combat", fmt.Sprintf("%s 使用 [%s] 对 %s 造成 %d 点伤害%s%s%s", char.Name, skillName, target.Name, playerDamage, formulaText, hpChangeText, resourceChangeText), "#ffaa00", withDamageType(playerDamageType))
 					}
+
+					// 记录造成伤害的统计
+					m.recordDamageDealt(session, char.ID, char.TeamSlot, playerDamage, playerDamageType, isCrit)
+
+					// 记录技能使用统计
+					skillID := ""
+					if skillState != nil {
+						skillID = skillState.SkillID
+					}
+					m.recordSkillUsage(session, char.ID, char.TeamSlot, skillID, playerDamage, 0, resourceCost, true, isCrit)
 				}
 			} else {
 				// 非攻击类技能（buff/debuff/control等）：只记录使用，不记录伤害
 				m.addLog(session, "combat", fmt.Sprintf("%s 使用 [%s]%s", char.Name, skillName, resourceChangeText), "#8888ff")
+
+				// 记录非伤害技能使用统计
+				skillID := ""
+				if skillState != nil {
+					skillID = skillState.SkillID
+				}
+				m.recordSkillUsage(session, char.ID, char.TeamSlot, skillID, 0, 0, resourceCost, true, false)
 			}
 			logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
 
@@ -990,6 +1088,9 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 				// 记录敌人死亡日志（敌人名字用红色，避免前端错误着色）
 				m.addLog(session, "kill", fmt.Sprintf("💀 <span style=\"color: #ff7777\">%s</span> 被击杀！获得 <span style=\"color: #3d85c6\">%d</span> 经验、<span style=\"color: #ffd700\">%d</span> 金币", target.Name, expGain, goldGain), "#ff6b6b")
 				logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
+
+				// 记录击杀统计
+				m.recordKill(session, char.ID, char.TeamSlot)
 
 				session.CurrentBattleExp += expGain
 				session.CurrentBattleGold += goldGain
@@ -1042,6 +1143,9 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 				// 闪避成功！
 				m.addLog(session, "dodge", fmt.Sprintf("%s 闪避了 %s 的攻击！", char.Name, enemy.Name), "#00ffff")
 				logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
+
+				// 记录闪避统计
+				m.recordDodge(session, char.ID, char.TeamSlot)
 
 				// 移动到下一个敌人或回到玩家回合
 				session.CurrentTurnIndex++
@@ -1180,6 +1284,9 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 			// 处理主动技能的反射效果（盾牌反射技能等）
 			m.handleActiveReflectEffects(char, enemy, enemyDamage, session, &logs)
 
+			// 记录受到伤害的统计
+			m.recordDamageTaken(session, char.ID, char.TeamSlot, enemyDamage, attackType, 0, 0)
+
 			// 战士受到伤害时获得怒气
 			resourceGain := 0
 			if char.ResourceType == "rage" && enemyDamage > 0 {
@@ -1197,6 +1304,9 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 				if char.Resource > char.MaxResource {
 					char.Resource = char.MaxResource
 				}
+
+				// 记录资源获得统计
+				m.recordResourceGenerated(session, char.ID, char.TeamSlot, rageGain)
 			}
 
 			// 构建战斗日志消息，包含资源变化（带颜色）
@@ -1258,6 +1368,20 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 				// 战斗失败总结
 				m.addBattleSummary(session, false, &logs)
 
+				// 记录角色死亡统计
+				m.recordDeath(session, char.ID, char.TeamSlot)
+
+				// 保存战斗统计到数据库（战斗失败）
+				monsterID := ""
+				if len(session.CurrentEnemies) > 0 && session.CurrentEnemies[0] != nil {
+					monsterID = session.CurrentEnemies[0].ID
+				}
+				zoneID := ""
+				if session.CurrentZone != nil {
+					zoneID = session.CurrentZone.ID
+				}
+				m.saveBattleStats(session, session.UserID, zoneID, monsterID, false, characters)
+
 				// 保存死亡数据（包括死亡标记、复活时间和怒气归0）
 				m.charRepo.UpdateAfterDeath(char.ID, char.HP, char.Resource, char.TotalDeaths, &reviveAt)
 
@@ -1274,6 +1398,9 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 
 				m.addLog(session, "system", fmt.Sprintf(">> 进入休息恢复状态 (预计 %d 秒)", int(restDuration.Seconds())+1), "#33ff33")
 				logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
+
+				// 清除战斗统计收集器
+				m.clearBattleStats(session)
 
 				// 重置本场战斗统计
 				session.CurrentBattleExp = 0
@@ -1329,6 +1456,17 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 		// 战斗胜利总结
 		m.addBattleSummary(session, true, &logs)
 
+		// 保存战斗统计到数据库
+		monsterID := ""
+		if len(session.CurrentEnemies) > 0 && session.CurrentEnemies[0] != nil {
+			monsterID = session.CurrentEnemies[0].ID
+		}
+		zoneID := ""
+		if session.CurrentZone != nil {
+			zoneID = session.CurrentZone.ID
+		}
+		m.saveBattleStats(session, session.UserID, zoneID, monsterID, true, characters)
+
 		// 战斗结束后，清除所有角色的buff和debuff，怒气归0
 		for _, c := range characters {
 			// 清除所有buff和debuff
@@ -1357,6 +1495,9 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 
 		m.addLog(session, "system", fmt.Sprintf(">> 开始休息恢复 (预计 %d 秒)", int(restDuration.Seconds())+1), "#33ff33")
 		logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
+
+		// 清除战斗统计收集器
+		m.clearBattleStats(session)
 
 		// 重置本场战斗统计
 		session.CurrentBattleExp = 0
@@ -2598,4 +2739,341 @@ func (m *BattleManager) handlePassiveReflectEffects(character *models.Character,
 			}
 		}
 	}
+}
+
+// ═══════════════════════════════════════════════════════════
+// 战斗统计收集方法
+// ═══════════════════════════════════════════════════════════
+
+// initBattleStats 初始化本场战斗的统计收集器
+func (m *BattleManager) initBattleStats(session *BattleSession, characters []*models.Character) {
+	session.BattleStartTime = time.Now()
+	session.CurrentBattleRound = 0
+	session.CharacterStats = make(map[int]*CharacterBattleStatsCollector)
+	session.SkillBreakdown = make(map[int]map[string]*SkillUsageStats)
+
+	for _, char := range characters {
+		session.CharacterStats[char.ID] = &CharacterBattleStatsCollector{
+			CharacterID: char.ID,
+			TeamSlot:    char.TeamSlot,
+		}
+		session.SkillBreakdown[char.ID] = make(map[string]*SkillUsageStats)
+	}
+}
+
+// getOrCreateCharacterStats 获取或创建角色统计收集器
+func (m *BattleManager) getOrCreateCharacterStats(session *BattleSession, characterID int, teamSlot int) *CharacterBattleStatsCollector {
+	if session.CharacterStats == nil {
+		session.CharacterStats = make(map[int]*CharacterBattleStatsCollector)
+	}
+	if stats, exists := session.CharacterStats[characterID]; exists {
+		return stats
+	}
+	stats := &CharacterBattleStatsCollector{
+		CharacterID: characterID,
+		TeamSlot:    teamSlot,
+	}
+	session.CharacterStats[characterID] = stats
+	return stats
+}
+
+// recordDamageDealt 记录角色造成的伤害
+func (m *BattleManager) recordDamageDealt(session *BattleSession, characterID int, teamSlot int, damage int, damageType string, isCrit bool) {
+	stats := m.getOrCreateCharacterStats(session, characterID, teamSlot)
+	stats.DamageDealt += damage
+
+	// 按伤害类型分类记录
+	switch damageType {
+	case "physical":
+		stats.PhysicalDamage += damage
+	case "magic":
+		stats.MagicDamage += damage
+	case "fire":
+		stats.FireDamage += damage
+	case "frost":
+		stats.FrostDamage += damage
+	case "shadow":
+		stats.ShadowDamage += damage
+	case "holy":
+		stats.HolyDamage += damage
+	case "nature":
+		stats.NatureDamage += damage
+	default:
+		stats.PhysicalDamage += damage // 默认为物理
+	}
+
+	// 暴击统计
+	if isCrit {
+		stats.CritCount++
+		stats.CritDamage += damage
+		if damage > stats.MaxCrit {
+			stats.MaxCrit = damage
+		}
+	}
+}
+
+// recordDamageTaken 记录角色受到的伤害
+func (m *BattleManager) recordDamageTaken(session *BattleSession, characterID int, teamSlot int, damage int, damageType string, blocked int, absorbed int) {
+	stats := m.getOrCreateCharacterStats(session, characterID, teamSlot)
+	stats.DamageTaken += damage
+	stats.DamageBlocked += blocked
+	stats.DamageAbsorbed += absorbed
+	stats.HitCount++
+
+	// 按伤害类型分类记录
+	switch damageType {
+	case "physical":
+		stats.PhysicalTaken += damage
+	case "magic", "fire", "frost", "shadow", "holy", "nature":
+		stats.MagicTaken += damage
+	default:
+		stats.PhysicalTaken += damage
+	}
+}
+
+// recordHealing 记录治疗
+func (m *BattleManager) recordHealing(session *BattleSession, healerID int, healerSlot int, targetID int, targetSlot int, healing int, overhealing int, isSelfHeal bool, isHot bool) {
+	// 记录治疗者的输出
+	healerStats := m.getOrCreateCharacterStats(session, healerID, healerSlot)
+	healerStats.HealingDone += healing
+	healerStats.Overhealing += overhealing
+	if isSelfHeal {
+		healerStats.SelfHealing += healing
+	}
+	if isHot {
+		healerStats.HotHealing += healing
+	}
+
+	// 记录目标的受到治疗（如果不是自我治疗）
+	if targetID != healerID {
+		targetStats := m.getOrCreateCharacterStats(session, targetID, targetSlot)
+		targetStats.HealingReceived += healing
+	}
+}
+
+// recordSkillUsage 记录技能使用
+func (m *BattleManager) recordSkillUsage(session *BattleSession, characterID int, teamSlot int, skillID string, damage int, healing int, resourceCost int, isHit bool, isCrit bool) {
+	stats := m.getOrCreateCharacterStats(session, characterID, teamSlot)
+	stats.SkillUses++
+	if isHit {
+		stats.SkillHits++
+	} else {
+		stats.SkillMisses++
+	}
+	stats.ResourceUsed += resourceCost
+
+	// 记录技能明细
+	if session.SkillBreakdown == nil {
+		session.SkillBreakdown = make(map[int]map[string]*SkillUsageStats)
+	}
+	if session.SkillBreakdown[characterID] == nil {
+		session.SkillBreakdown[characterID] = make(map[string]*SkillUsageStats)
+	}
+
+	skillStats, exists := session.SkillBreakdown[characterID][skillID]
+	if !exists {
+		skillStats = &SkillUsageStats{SkillID: skillID}
+		session.SkillBreakdown[characterID][skillID] = skillStats
+	}
+
+	skillStats.UseCount++
+	if isHit {
+		skillStats.HitCount++
+	}
+	if isCrit {
+		skillStats.CritCount++
+	}
+	skillStats.TotalDamage += damage
+	skillStats.TotalHealing += healing
+	skillStats.ResourceCost += resourceCost
+}
+
+// recordResourceGenerated 记录资源获得
+func (m *BattleManager) recordResourceGenerated(session *BattleSession, characterID int, teamSlot int, amount int) {
+	stats := m.getOrCreateCharacterStats(session, characterID, teamSlot)
+	stats.ResourceGenerated += amount
+}
+
+// recordDodge 记录闪避
+func (m *BattleManager) recordDodge(session *BattleSession, characterID int, teamSlot int) {
+	stats := m.getOrCreateCharacterStats(session, characterID, teamSlot)
+	stats.DodgeCount++
+}
+
+// recordKill 记录击杀
+func (m *BattleManager) recordKill(session *BattleSession, characterID int, teamSlot int) {
+	stats := m.getOrCreateCharacterStats(session, characterID, teamSlot)
+	stats.Kills++
+}
+
+// recordDeath 记录死亡
+func (m *BattleManager) recordDeath(session *BattleSession, characterID int, teamSlot int) {
+	stats := m.getOrCreateCharacterStats(session, characterID, teamSlot)
+	stats.Deaths++
+}
+
+// recordCcApplied 记录施加控制
+func (m *BattleManager) recordCcApplied(session *BattleSession, characterID int, teamSlot int) {
+	stats := m.getOrCreateCharacterStats(session, characterID, teamSlot)
+	stats.CcApplied++
+}
+
+// recordCcReceived 记录受到控制
+func (m *BattleManager) recordCcReceived(session *BattleSession, characterID int, teamSlot int) {
+	stats := m.getOrCreateCharacterStats(session, characterID, teamSlot)
+	stats.CcReceived++
+}
+
+// incrementBattleRound 增加战斗回合数
+func (m *BattleManager) incrementBattleRound(session *BattleSession) {
+	session.CurrentBattleRound++
+}
+
+// saveBattleStats 保存战斗统计到数据库
+func (m *BattleManager) saveBattleStats(session *BattleSession, userID int, zoneID string, monsterID string, isVictory bool, characters []*models.Character) {
+	if m.battleStatsRepo == nil {
+		return
+	}
+
+	// 如果没有统计数据，跳过保存
+	if session.CharacterStats == nil || len(session.CharacterStats) == 0 {
+		return
+	}
+
+	// 计算战斗时长
+	duration := int(time.Since(session.BattleStartTime).Seconds())
+
+	// 计算团队总伤害和治疗
+	var teamDamageDealt, teamDamageTaken, teamHealingDone int
+	for _, stats := range session.CharacterStats {
+		teamDamageDealt += stats.DamageDealt
+		teamDamageTaken += stats.DamageTaken
+		teamHealingDone += stats.HealingDone
+	}
+
+	// 创建战斗记录
+	result := "victory"
+	if !isVictory {
+		result = "defeat"
+	}
+
+	battleRecord := &models.BattleRecord{
+		UserID:          userID,
+		ZoneID:          zoneID,
+		BattleType:      "pve",
+		MonsterID:       monsterID,
+		TotalRounds:     session.CurrentBattleRound,
+		DurationSeconds: duration,
+		Result:          result,
+		TeamDamageDealt: teamDamageDealt,
+		TeamDamageTaken: teamDamageTaken,
+		TeamHealingDone: teamHealingDone,
+		ExpGained:       session.CurrentBattleExp,
+		GoldGained:      session.CurrentBattleGold,
+	}
+
+	// 保存战斗记录
+	battleID, err := m.battleStatsRepo.CreateBattleRecord(battleRecord)
+	if err != nil {
+		fmt.Printf("[ERROR] Failed to save battle record: %v\n", err)
+		return
+	}
+
+	// 保存每个角色的统计数据
+	today := time.Now().Format("2006-01-02")
+	for characterID, collector := range session.CharacterStats {
+		// 创建角色战斗统计
+		charStats := &models.BattleCharacterStats{
+			BattleID:          int(battleID),
+			CharacterID:       characterID,
+			TeamSlot:          collector.TeamSlot,
+			DamageDealt:       collector.DamageDealt,
+			PhysicalDamage:    collector.PhysicalDamage,
+			MagicDamage:       collector.MagicDamage,
+			FireDamage:        collector.FireDamage,
+			FrostDamage:       collector.FrostDamage,
+			ShadowDamage:      collector.ShadowDamage,
+			HolyDamage:        collector.HolyDamage,
+			NatureDamage:      collector.NatureDamage,
+			DotDamage:         collector.DotDamage,
+			CritCount:         collector.CritCount,
+			CritDamage:        collector.CritDamage,
+			MaxCrit:           collector.MaxCrit,
+			DamageTaken:       collector.DamageTaken,
+			PhysicalTaken:     collector.PhysicalTaken,
+			MagicTaken:        collector.MagicTaken,
+			DamageBlocked:     collector.DamageBlocked,
+			DamageAbsorbed:    collector.DamageAbsorbed,
+			DodgeCount:        collector.DodgeCount,
+			BlockCount:        collector.BlockCount,
+			HitCount:          collector.HitCount,
+			HealingDone:       collector.HealingDone,
+			HealingReceived:   collector.HealingReceived,
+			Overhealing:       collector.Overhealing,
+			SelfHealing:       collector.SelfHealing,
+			HotHealing:        collector.HotHealing,
+			SkillUses:         collector.SkillUses,
+			SkillHits:         collector.SkillHits,
+			SkillMisses:       collector.SkillMisses,
+			CcApplied:         collector.CcApplied,
+			CcReceived:        collector.CcReceived,
+			Dispels:           collector.Dispels,
+			Interrupts:        collector.Interrupts,
+			Kills:             collector.Kills,
+			Deaths:            collector.Deaths,
+			Resurrects:        collector.Resurrects,
+			ResourceUsed:      collector.ResourceUsed,
+			ResourceGenerated: collector.ResourceGenerated,
+		}
+
+		_, err := m.battleStatsRepo.CreateBattleCharacterStats(charStats)
+		if err != nil {
+			fmt.Printf("[ERROR] Failed to save character battle stats: %v\n", err)
+		}
+
+		// 更新角色生涯统计
+		err = m.battleStatsRepo.UpdateLifetimeStats(characterID, charStats, isVictory, "pve", session.CurrentBattleRound)
+		if err != nil {
+			fmt.Printf("[ERROR] Failed to update lifetime stats: %v\n", err)
+		}
+
+		// 保存技能明细
+		if skillBreakdown, exists := session.SkillBreakdown[characterID]; exists {
+			for skillID, skillStats := range skillBreakdown {
+				breakdown := &models.BattleSkillBreakdown{
+					BattleID:     int(battleID),
+					CharacterID:  characterID,
+					SkillID:      skillID,
+					UseCount:     skillStats.UseCount,
+					HitCount:     skillStats.HitCount,
+					CritCount:    skillStats.CritCount,
+					TotalDamage:  skillStats.TotalDamage,
+					TotalHealing: skillStats.TotalHealing,
+					ResourceCost: skillStats.ResourceCost,
+				}
+				_, err := m.battleStatsRepo.CreateBattleSkillBreakdown(breakdown)
+				if err != nil {
+					fmt.Printf("[ERROR] Failed to save skill breakdown: %v\n", err)
+				}
+			}
+		}
+	}
+
+	// 更新每日统计
+	err = m.battleStatsRepo.UpdateDailyStats(
+		userID, today, isVictory,
+		teamDamageDealt, teamHealingDone, teamDamageTaken,
+		session.CurrentBattleExp, session.CurrentBattleGold,
+		session.CurrentBattleKills, 0, // deaths 需要从角色统计中计算
+	)
+	if err != nil {
+		fmt.Printf("[ERROR] Failed to update daily stats: %v\n", err)
+	}
+}
+
+// clearBattleStats 清除本场战斗的统计数据
+func (m *BattleManager) clearBattleStats(session *BattleSession) {
+	session.CharacterStats = nil
+	session.SkillBreakdown = nil
+	session.CurrentBattleRound = 0
 }

@@ -47,6 +47,32 @@ function ensureStrategyDefaults(strategy: BattleStrategy): BattleStrategy {
   }
 }
 
+const addSkillSelectEl = ref<HTMLSelectElement | null>(null)
+
+function addSkillToPriority() {
+  const strategy = currentStrategy.value
+  const select = addSkillSelectEl.value
+  if (!strategy || !select) {
+    return
+  }
+
+  const skillId = select.value
+  if (!skillId) {
+    return
+  }
+
+  if (!Array.isArray(strategy.skillPriority)) {
+    return
+  }
+
+  if (strategy.skillPriority.includes(skillId)) {
+    return
+  }
+
+  strategy.skillPriority.push(skillId)
+  select.value = ''
+}
+
 // 新建策略弹窗
 const showNewDialog = ref(false)
 const newStrategyName = ref('')
@@ -446,7 +472,7 @@ onMounted(() => {
         </div>
 
         <div class="add-skill">
-          <select id="add-skill-select" class="skill-select">
+          <select ref="addSkillSelectEl" class="skill-select">
             <option value="">添加技能到优先级列表</option>
             <option 
               v-for="skill in characterSkills" 
@@ -457,13 +483,7 @@ onMounted(() => {
               {{ skill.skill?.name || skill.skillId }}
             </option>
           </select>
-          <button @click="() => {
-            const select = document.getElementById('add-skill-select') as HTMLSelectElement
-            if (select.value && !currentStrategy!.skillPriority.includes(select.value)) {
-              currentStrategy!.skillPriority.push(select.value)
-              select.value = ''
-            }
-          }">添加</button>
+          <button @click="addSkillToPriority">添加</button>
         </div>
       </div>
 
@@ -1069,5 +1089,6 @@ select:focus, input:focus {
   background: #33ff33;
 }
 </style>
+
 
 
