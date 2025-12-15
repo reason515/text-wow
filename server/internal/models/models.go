@@ -460,6 +460,66 @@ type CharacterBattleSummary struct {
 }
 
 // ═══════════════════════════════════════════════════════════
+// DPS分析相关
+// ═══════════════════════════════════════════════════════════
+
+// SkillDPSAnalysis 技能DPS分析 - 单个技能的详细DPS数据
+type SkillDPSAnalysis struct {
+	SkillID           string  `json:"skillId"`
+	SkillName         string  `json:"skillName"`
+	TotalDamage       int     `json:"totalDamage"`       // 总伤害
+	UseCount          int     `json:"useCount"`          // 使用次数
+	HitCount          int     `json:"hitCount"`          // 命中次数
+	CritCount         int     `json:"critCount"`         // 暴击次数
+	AvgDamage         float64 `json:"avgDamage"`         // 平均伤害
+	MaxDamage         int     `json:"maxDamage"`         // 最高伤害
+	DPS               float64 `json:"dps"`               // 每秒伤害
+	DamagePercent     float64 `json:"damagePercent"`     // 伤害占比(%)
+	ResourceCost      int     `json:"resourceCost"`      // 总消耗能量
+	DamagePerResource float64 `json:"damagePerResource"` // 每点能量伤害
+	HitRate           float64 `json:"hitRate"`           // 命中率(%)
+	CritRate          float64 `json:"critRate"`          // 暴击率(%)
+}
+
+// CharacterDPSAnalysis 角色DPS分析 - 单个角色的完整DPS数据
+type CharacterDPSAnalysis struct {
+	CharacterID       int                 `json:"characterId"`
+	CharacterName     string              `json:"characterName"`
+	TotalDamage       int                 `json:"totalDamage"`       // 总伤害
+	TotalHealing      int                 `json:"totalHealing"`      // 总治疗
+	Duration          int                 `json:"duration"`          // 战斗时长(秒)
+	TotalDPS          float64             `json:"totalDps"`          // 总DPS
+	TotalHPS          float64             `json:"totalHps"`          // 总HPS
+	SkillBreakdown    []*SkillDPSAnalysis `json:"skillBreakdown"`    // 技能明细
+	DamageComposition *DamageComposition  `json:"damageComposition"` // 伤害构成
+}
+
+// DamageComposition 伤害构成 - 按类型分类的伤害统计
+type DamageComposition struct {
+	Physical    int                `json:"physical"`    // 物理伤害
+	Magic       int                `json:"magic"`       // 魔法伤害
+	Fire        int                `json:"fire"`        // 火焰伤害
+	Frost       int                `json:"frost"`       // 冰霜伤害
+	Shadow      int                `json:"shadow"`      // 暗影伤害
+	Holy        int                `json:"holy"`        // 神圣伤害
+	Nature      int                `json:"nature"`      // 自然伤害
+	Dot         int                `json:"dot"`         // DOT伤害
+	Total       int                `json:"total"`       // 总伤害
+	Percentages map[string]float64 `json:"percentages"` // 各类型占比(%)
+}
+
+// BattleDPSAnalysis 战斗DPS分析 - 单场战斗的完整DPS数据
+type BattleDPSAnalysis struct {
+	BattleID              int                     `json:"battleId"`
+	Duration              int                     `json:"duration"`              // 战斗时长(秒)
+	TotalRounds           int                     `json:"totalRounds"`           // 总回合数
+	TeamDPS               float64                 `json:"teamDps"`               // 队伍总DPS
+	TeamHPS               float64                 `json:"teamHps"`               // 队伍总HPS
+	Characters            []*CharacterDPSAnalysis `json:"characters"`            // 各角色DPS分析
+	TeamDamageComposition *DamageComposition      `json:"teamDamageComposition"` // 队伍伤害构成
+}
+
+// ═══════════════════════════════════════════════════════════
 // 技能
 // ═══════════════════════════════════════════════════════════
 

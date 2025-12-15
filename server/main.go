@@ -128,6 +128,7 @@ func main() {
 				stats.GET("/daily", h.GetDailyStats)
 				stats.GET("/battles", h.GetRecentBattles)
 				stats.GET("/battles/:battleId", h.GetBattleDetail)
+				stats.GET("/battles/:battleId/dps", h.GetBattleDPSAnalysis)
 			}
 			protected.GET("/characters/:characterId/stats", h.GetCharacterLifetimeStats)
 			protected.GET("/characters/:characterId/stats/summary", h.GetCharacterBattleSummary)

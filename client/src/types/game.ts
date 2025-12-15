@@ -399,3 +399,229 @@ export interface StrategyTemplate {
   name: string
   description: string
 }
+
+// ═══════════════════════════════════════════════════════════
+// 战斗统计
+// ═══════════════════════════════════════════════════════════
+
+export interface BattleRecord {
+  id: number
+  userId: number
+  zoneId: string
+  battleType: string
+  monsterId?: string
+  opponentUserId?: number
+  totalRounds: number
+  durationSeconds: number
+  result: string
+  teamDamageDealt: number
+  teamDamageTaken: number
+  teamHealingDone: number
+  expGained: number
+  goldGained: number
+  createdAt: string
+  characterStats?: BattleCharacterStats[]
+  skillBreakdown?: BattleSkillBreakdown[]
+}
+
+export interface BattleCharacterStats {
+  id: number
+  battleId: number
+  characterId: number
+  teamSlot: number
+  damageDealt: number
+  physicalDamage: number
+  magicDamage: number
+  fireDamage: number
+  frostDamage: number
+  shadowDamage: number
+  holyDamage: number
+  natureDamage: number
+  dotDamage: number
+  critCount: number
+  critDamage: number
+  maxCrit: number
+  damageTaken: number
+  physicalDamageTaken: number
+  magicDamageTaken: number
+  damageBlocked: number
+  damageAbsorbed: number
+  dodgeCount: number
+  blockCount: number
+  hitCount: number
+  healingDone: number
+  healingReceived: number
+  overhealing: number
+  selfHealing: number
+  hotHealing: number
+  skillUses: number
+  skillHits: number
+  skillMisses: number
+  ccApplied: number
+  ccReceived: number
+  dispels: number
+  interrupts: number
+  kills: number
+  deaths: number
+  resurrects: number
+  resourceUsed: number
+  resourceGenerated: number
+}
+
+export interface CharacterLifetimeStats {
+  characterId: number
+  totalBattles: number
+  victories: number
+  defeats: number
+  pveBattles: number
+  pvpBattles: number
+  bossKills: number
+  totalDamageDealt: number
+  totalPhysicalDamage: number
+  totalMagicDamage: number
+  totalCritDamage: number
+  totalCritCount: number
+  highestDamageSingle: number
+  highestDamageBattle: number
+  totalDamageTaken: number
+  totalDamageBlocked: number
+  totalDamageAbsorbed: number
+  totalDodgeCount: number
+  totalHealingDone: number
+  totalHealingReceived: number
+  totalOverhealing: number
+  highestHealingSingle: number
+  highestHealingBattle: number
+  totalKills: number
+  totalDeaths: number
+  killStreakBest: number
+  currentKillStreak: number
+  totalSkillUses: number
+  totalSkillHits: number
+  totalResourceUsed: number
+  totalRounds: number
+  totalBattleTime: number
+  lastBattleAt?: string
+  updatedAt: string
+}
+
+export interface BattleSkillBreakdown {
+  id: number
+  battleId: number
+  characterId: number
+  skillId: string
+  useCount: number
+  hitCount: number
+  critCount: number
+  totalDamage: number
+  totalHealing: number
+  resourceCost: number
+  skillName?: string
+}
+
+export interface DailyStatistics {
+  id: number
+  userId: number
+  statDate: string
+  battlesCount: number
+  victories: number
+  defeats: number
+  totalDamage: number
+  totalHealing: number
+  totalDamageTaken: number
+  expGained: number
+  goldGained: number
+  playTime: number
+  kills: number
+  deaths: number
+  createdAt?: string
+}
+
+export interface SessionStats {
+  totalBattles: number
+  totalKills: number
+  totalExp: number
+  totalGold: number
+  totalDamage: number
+  totalHealing: number
+  sessionStart: string
+  durationSeconds: number
+}
+
+export interface BattleStatsOverview {
+  sessionStats?: SessionStats
+  lifetimeStats?: CharacterLifetimeStats[]
+  todayStats?: DailyStatistics
+  recentBattles?: BattleRecord[]
+}
+
+export interface CharacterBattleSummary {
+  characterId: number
+  characterName: string
+  totalBattles: number
+  victories: number
+  winRate: number
+  totalDamage: number
+  totalHealing: number
+  totalKills: number
+  totalDeaths: number
+  kdRatio: number
+  avgDps: number
+  avgHps: number
+}
+
+// ═══════════════════════════════════════════════════════════
+// DPS分析
+// ═══════════════════════════════════════════════════════════
+
+export interface SkillDPSAnalysis {
+  skillId: string
+  skillName: string
+  totalDamage: number
+  useCount: number
+  hitCount: number
+  critCount: number
+  avgDamage: number
+  maxDamage: number
+  dps: number
+  damagePercent: number
+  resourceCost: number
+  damagePerResource: number
+  hitRate: number
+  critRate: number
+}
+
+export interface DamageComposition {
+  physical: number
+  magic: number
+  fire: number
+  frost: number
+  shadow: number
+  holy: number
+  nature: number
+  dot: number
+  total: number
+  percentages: Record<string, number>
+}
+
+export interface CharacterDPSAnalysis {
+  characterId: number
+  characterName: string
+  totalDamage: number
+  totalHealing: number
+  duration: number
+  totalDps: number
+  totalHps: number
+  skillBreakdown: SkillDPSAnalysis[]
+  damageComposition: DamageComposition
+}
+
+export interface BattleDPSAnalysis {
+  battleId: number
+  duration: number
+  totalRounds: number
+  teamDps: number
+  teamHps: number
+  characters: CharacterDPSAnalysis[]
+  teamDamageComposition: DamageComposition
+}

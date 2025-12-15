@@ -34,3 +34,5 @@ UPDATE monsters SET dodge_rate = 0.05 WHERE dodge_rate IS NULL;
 
 
 
+
+

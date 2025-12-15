@@ -6,6 +6,7 @@ import { useAuthStore } from '../stores/auth'
 import { getClassColor, getResourceColor } from '../types/game'
 import ChatPanel from './ChatPanel.vue'
 import StrategyEditor from './StrategyEditor.vue'
+import BattleStatsPanel from './BattleStatsPanel.vue'
 
 const emit = defineEmits<{
   logout: []
@@ -33,6 +34,9 @@ const allocating = ref(false)
 const showStrategyEditor = ref(false)
 const strategyCharacterId = ref<number | null>(null)
 const strategyCharacterSkills = ref<any[]>([])
+
+// 战斗统计面板
+const showStatsPanel = ref(false)
 
 // 打开策略编辑器
 async function openStrategyEditor() {
@@ -63,6 +67,16 @@ async function openStrategyEditor() {
 // 关闭策略编辑器
 function closeStrategyEditor() {
   showStrategyEditor.value = false
+}
+
+// 打开战斗统计面板
+function openStatsPanel() {
+  showStatsPanel.value = true
+}
+
+// 关闭战斗统计面板
+function closeStatsPanel() {
+  showStatsPanel.value = false
 }
 
 // 显示角色详情
@@ -1362,6 +1376,12 @@ function escapeRegex(str: string): string {
             >
               [S] 策略
             </button>
+            <button 
+              class="cmd-btn" 
+              @click="openStatsPanel"
+            >
+              [T] 统计
+            </button>
             <button class="cmd-btn" disabled>
               [E] 装备
             </button>
@@ -1381,6 +1401,12 @@ function escapeRegex(str: string): string {
         :character-id="strategyCharacterId"
         :character-skills="strategyCharacterSkills"
         @close="closeStrategyEditor"
+      />
+
+      <!-- 战斗统计面板 -->
+      <BattleStatsPanel 
+        v-if="showStatsPanel"
+        @close="closeStatsPanel"
       />
     </template>
     

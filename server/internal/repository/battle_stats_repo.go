@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"fmt"
 	"time"
 
 	"text-wow/internal/database"
@@ -448,7 +449,12 @@ func (r *BattleStatsRepository) GetBattleSkillBreakdown(battleID int, characterI
 		SELECT bsb.id, bsb.battle_id, bsb.character_id, bsb.skill_id,
 		       bsb.use_count, bsb.hit_count, bsb.crit_count,
 		       bsb.total_damage, bsb.total_healing, bsb.resource_cost,
-		       COALESCE(s.name, bsb.skill_id) as skill_name
+		       COALESCE(s.name, 
+		         CASE 
+		           WHEN bsb.skill_id = '' OR bsb.skill_id IS NULL THEN '普通攻击'
+		           ELSE bsb.skill_id 
+		         END
+		       ) as skill_name
 		FROM battle_skill_breakdown bsb
 		LEFT JOIN skills s ON bsb.skill_id = s.id
 		WHERE bsb.battle_id = ? AND bsb.character_id = ?
@@ -471,6 +477,12 @@ func (r *BattleStatsRepository) GetBattleSkillBreakdown(battleID int, characterI
 		if err != nil {
 			return nil, err
 		}
+
+		// 如果skillName仍然为空或等于skillID（说明技能表中没有该技能），且skillID为空，设置为"普通攻击"
+		if b.SkillName == "" || (b.SkillName == b.SkillID && (b.SkillID == "" || b.SkillID == "normal_attack")) {
+			b.SkillName = "普通攻击"
+		}
+
 		breakdowns = append(breakdowns, b)
 	}
 
@@ -660,4 +672,174 @@ func (r *BattleStatsRepository) GetBattleStatsOverview(userID int) (*models.Batt
 	overview.RecentBattles = recentBattles
 
 	return overview, nil
+}
+
+// ═══════════════════════════════════════════════════════════
+// DPS分析
+// ═══════════════════════════════════════════════════════════
+
+// GetBattleDPSAnalysis 获取战斗DPS分析
+func (r *BattleStatsRepository) GetBattleDPSAnalysis(battleID int) (*models.BattleDPSAnalysis, error) {
+	// 获取战斗记录
+	battle, err := r.GetBattleRecordByID(battleID)
+	if err != nil {
+		return nil, err
+	}
+
+	// 获取角色统计
+	charStats, err := r.GetBattleCharacterStats(battleID)
+	if err != nil {
+		return nil, err
+	}
+
+	analysis := &models.BattleDPSAnalysis{
+		BattleID:    battleID,
+		Duration:    battle.DurationSeconds,
+		TotalRounds: battle.TotalRounds,
+		Characters:  make([]*models.CharacterDPSAnalysis, 0),
+	}
+
+	// 计算队伍总DPS和HPS
+	if battle.DurationSeconds > 0 {
+		analysis.TeamDPS = float64(battle.TeamDamageDealt) / float64(battle.DurationSeconds)
+		analysis.TeamHPS = float64(battle.TeamHealingDone) / float64(battle.DurationSeconds)
+	}
+
+	// 队伍伤害构成
+	teamComposition := &models.DamageComposition{
+		Percentages: make(map[string]float64),
+	}
+
+	// 处理每个角色的DPS分析
+	for _, charStat := range charStats {
+		// 查询角色名称
+		var characterName string
+		err := database.DB.QueryRow(`SELECT name FROM characters WHERE id = ?`, charStat.CharacterID).Scan(&characterName)
+		if err != nil {
+			// 如果查询失败，使用默认名称
+			characterName = fmt.Sprintf("角色 #%d", charStat.CharacterID)
+		}
+
+		charAnalysis := &models.CharacterDPSAnalysis{
+			CharacterID:    charStat.CharacterID,
+			CharacterName:  characterName,
+			TotalDamage:    charStat.DamageDealt,
+			TotalHealing:   charStat.HealingDone,
+			Duration:       battle.DurationSeconds,
+			SkillBreakdown: make([]*models.SkillDPSAnalysis, 0),
+		}
+
+		// 计算角色DPS和HPS
+		if battle.DurationSeconds > 0 {
+			charAnalysis.TotalDPS = float64(charStat.DamageDealt) / float64(battle.DurationSeconds)
+			charAnalysis.TotalHPS = float64(charStat.HealingDone) / float64(battle.DurationSeconds)
+		}
+
+		// 获取技能明细
+		skillBreakdowns, err := r.GetBattleSkillBreakdown(battleID, charStat.CharacterID)
+		if err == nil {
+			for _, skill := range skillBreakdowns {
+				skillAnalysis := &models.SkillDPSAnalysis{
+					SkillID:      skill.SkillID,
+					SkillName:    skill.SkillName,
+					TotalDamage:  skill.TotalDamage,
+					UseCount:     skill.UseCount,
+					HitCount:     skill.HitCount,
+					CritCount:    skill.CritCount,
+					ResourceCost: skill.ResourceCost,
+				}
+
+				// 计算平均伤害
+				if skill.HitCount > 0 {
+					skillAnalysis.AvgDamage = float64(skill.TotalDamage) / float64(skill.HitCount)
+				}
+
+				// 计算DPS
+				if battle.DurationSeconds > 0 {
+					skillAnalysis.DPS = float64(skill.TotalDamage) / float64(battle.DurationSeconds)
+				}
+
+				// 计算伤害占比
+				if charStat.DamageDealt > 0 {
+					skillAnalysis.DamagePercent = float64(skill.TotalDamage) / float64(charStat.DamageDealt) * 100
+				}
+
+				// 计算每点能量伤害
+				if skill.ResourceCost > 0 {
+					skillAnalysis.DamagePerResource = float64(skill.TotalDamage) / float64(skill.ResourceCost)
+				}
+
+				// 计算命中率
+				if skill.UseCount > 0 {
+					skillAnalysis.HitRate = float64(skill.HitCount) / float64(skill.UseCount) * 100
+				}
+
+				// 计算暴击率
+				if skill.HitCount > 0 {
+					skillAnalysis.CritRate = float64(skill.CritCount) / float64(skill.HitCount) * 100
+				}
+
+				charAnalysis.SkillBreakdown = append(charAnalysis.SkillBreakdown, skillAnalysis)
+			}
+		}
+
+		// 角色伤害构成
+		charComposition := &models.DamageComposition{
+			Physical:    charStat.PhysicalDamage,
+			Magic:       charStat.MagicDamage,
+			Fire:        charStat.FireDamage,
+			Frost:       charStat.FrostDamage,
+			Shadow:      charStat.ShadowDamage,
+			Holy:        charStat.HolyDamage,
+			Nature:      charStat.NatureDamage,
+			Dot:         charStat.DotDamage,
+			Total:       charStat.DamageDealt,
+			Percentages: make(map[string]float64),
+		}
+
+		// 计算各类型占比（确保Percentages已初始化）
+		charComposition.Percentages = make(map[string]float64)
+		if charComposition.Total > 0 {
+			charComposition.Percentages["physical"] = float64(charComposition.Physical) / float64(charComposition.Total) * 100
+			charComposition.Percentages["magic"] = float64(charComposition.Magic) / float64(charComposition.Total) * 100
+			charComposition.Percentages["fire"] = float64(charComposition.Fire) / float64(charComposition.Total) * 100
+			charComposition.Percentages["frost"] = float64(charComposition.Frost) / float64(charComposition.Total) * 100
+			charComposition.Percentages["shadow"] = float64(charComposition.Shadow) / float64(charComposition.Total) * 100
+			charComposition.Percentages["holy"] = float64(charComposition.Holy) / float64(charComposition.Total) * 100
+			charComposition.Percentages["nature"] = float64(charComposition.Nature) / float64(charComposition.Total) * 100
+			charComposition.Percentages["dot"] = float64(charComposition.Dot) / float64(charComposition.Total) * 100
+		}
+
+		charAnalysis.DamageComposition = charComposition
+
+		// 累加队伍伤害构成
+		teamComposition.Physical += charStat.PhysicalDamage
+		teamComposition.Magic += charStat.MagicDamage
+		teamComposition.Fire += charStat.FireDamage
+		teamComposition.Frost += charStat.FrostDamage
+		teamComposition.Shadow += charStat.ShadowDamage
+		teamComposition.Holy += charStat.HolyDamage
+		teamComposition.Nature += charStat.NatureDamage
+		teamComposition.Dot += charStat.DotDamage
+		teamComposition.Total += charStat.DamageDealt
+
+		analysis.Characters = append(analysis.Characters, charAnalysis)
+	}
+
+	// 计算队伍伤害构成占比
+	teamComposition.Percentages = make(map[string]float64)
+	if teamComposition.Total > 0 {
+		teamComposition.Percentages["physical"] = float64(teamComposition.Physical) / float64(teamComposition.Total) * 100
+		teamComposition.Percentages["magic"] = float64(teamComposition.Magic) / float64(teamComposition.Total) * 100
+		teamComposition.Percentages["fire"] = float64(teamComposition.Fire) / float64(teamComposition.Total) * 100
+		teamComposition.Percentages["frost"] = float64(teamComposition.Frost) / float64(teamComposition.Total) * 100
+		teamComposition.Percentages["shadow"] = float64(teamComposition.Shadow) / float64(teamComposition.Total) * 100
+		teamComposition.Percentages["holy"] = float64(teamComposition.Holy) / float64(teamComposition.Total) * 100
+		teamComposition.Percentages["nature"] = float64(teamComposition.Nature) / float64(teamComposition.Total) * 100
+		teamComposition.Percentages["dot"] = float64(teamComposition.Dot) / float64(teamComposition.Total) * 100
+	}
+
+	analysis.TeamDamageComposition = teamComposition
+
+	return analysis, nil
 }

@@ -1271,3 +1271,51 @@ func (h *Handler) GetDailyStats(c *gin.Context) {
 		Data:    stats,
 	})
 }
+
+// GetBattleDPSAnalysis 获取战斗DPS分析
+func (h *Handler) GetBattleDPSAnalysis(c *gin.Context) {
+	battleIDStr := c.Param("battleId")
+	battleID, err := strconv.Atoi(battleIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Success: false,
+			Error:   "invalid battle id",
+		})
+		return
+	}
+
+	userID, _ := c.Get("userID")
+
+	// 获取战斗记录验证所有权
+	battle, err := h.battleStatsRepo.GetBattleRecordByID(battleID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, models.APIResponse{
+			Success: false,
+			Error:   "battle not found",
+		})
+		return
+	}
+
+	if battle.UserID != userID.(int) {
+		c.JSON(http.StatusForbidden, models.APIResponse{
+			Success: false,
+			Error:   "forbidden",
+		})
+		return
+	}
+
+	// 获取DPS分析
+	analysis, err := h.battleStatsRepo.GetBattleDPSAnalysis(battleID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Error:   "failed to get DPS analysis: " + err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.APIResponse{
+		Success: true,
+		Data:    analysis,
+	})
+}
