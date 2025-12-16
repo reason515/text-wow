@@ -843,3 +843,348 @@ func (r *BattleStatsRepository) GetBattleDPSAnalysis(battleID int) (*models.Batt
 
 	return analysis, nil
 }
+
+// GetCumulativeDPSAnalysis 获取累计DPS分析（按时间范围）
+func (r *BattleStatsRepository) GetCumulativeDPSAnalysis(userID int, startTime time.Time) (*models.BattleDPSAnalysis, error) {
+	// 获取时间范围内的所有战斗记录
+	rows, err := database.DB.Query(`
+		SELECT id, user_id, zone_id, battle_type, monster_id, opponent_user_id,
+		       total_rounds, duration_seconds, result,
+		       team_damage_dealt, team_damage_taken, team_healing_done,
+		       exp_gained, gold_gained, created_at
+		FROM battle_records 
+		WHERE user_id = ? AND created_at >= ?
+		ORDER BY created_at ASC`, userID, startTime,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var battles []*models.BattleRecord
+	var totalDuration int
+	var totalRounds int
+	var totalDamage int
+	var totalHealing int
+
+	for rows.Next() {
+		battle := &models.BattleRecord{}
+		var monsterID sql.NullString
+		var opponentUserID sql.NullInt64
+
+		err := rows.Scan(
+			&battle.ID, &battle.UserID, &battle.ZoneID, &battle.BattleType, &monsterID, &opponentUserID,
+			&battle.TotalRounds, &battle.DurationSeconds, &battle.Result,
+			&battle.TeamDamageDealt, &battle.TeamDamageTaken, &battle.TeamHealingDone,
+			&battle.ExpGained, &battle.GoldGained, &battle.CreatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		if monsterID.Valid {
+			battle.MonsterID = monsterID.String
+		}
+		if opponentUserID.Valid {
+			id := int(opponentUserID.Int64)
+			battle.OpponentUserID = &id
+		}
+
+		battles = append(battles, battle)
+		totalDuration += battle.DurationSeconds
+		totalRounds += battle.TotalRounds
+		totalDamage += battle.TeamDamageDealt
+		totalHealing += battle.TeamHealingDone
+	}
+
+	battleCount := len(battles)
+
+	if battleCount == 0 {
+		// 没有战斗记录，返回空分析
+		return &models.BattleDPSAnalysis{
+			BattleID:    0,
+			Duration:    0,
+			TotalRounds: 0,
+			TeamDPS:     0,
+			TeamHPS:     0,
+			Characters:  make([]*models.CharacterDPSAnalysis, 0),
+			TeamDamageComposition: &models.DamageComposition{
+				Percentages: make(map[string]float64),
+			},
+		}, nil
+	}
+
+	// 获取所有战斗的角色统计（按角色ID聚合）
+	charStatsMap := make(map[int]*models.BattleCharacterStats)
+	characterIDs := make(map[int]bool)
+
+	for _, battle := range battles {
+		charStats, err := r.GetBattleCharacterStats(battle.ID)
+		if err != nil {
+			continue
+		}
+
+		for _, charStat := range charStats {
+			characterIDs[charStat.CharacterID] = true
+			if existing, exists := charStatsMap[charStat.CharacterID]; exists {
+				// 累加统计数据
+				existing.DamageDealt += charStat.DamageDealt
+				existing.PhysicalDamage += charStat.PhysicalDamage
+				existing.MagicDamage += charStat.MagicDamage
+				existing.FireDamage += charStat.FireDamage
+				existing.FrostDamage += charStat.FrostDamage
+				existing.ShadowDamage += charStat.ShadowDamage
+				existing.HolyDamage += charStat.HolyDamage
+				existing.NatureDamage += charStat.NatureDamage
+				existing.DotDamage += charStat.DotDamage
+				existing.CritCount += charStat.CritCount
+				existing.CritDamage += charStat.CritDamage
+				if charStat.MaxCrit > existing.MaxCrit {
+					existing.MaxCrit = charStat.MaxCrit
+				}
+				existing.DamageTaken += charStat.DamageTaken
+				existing.PhysicalTaken += charStat.PhysicalTaken
+				existing.MagicTaken += charStat.MagicTaken
+				existing.DamageBlocked += charStat.DamageBlocked
+				existing.DamageAbsorbed += charStat.DamageAbsorbed
+				existing.DodgeCount += charStat.DodgeCount
+				existing.BlockCount += charStat.BlockCount
+				existing.HitCount += charStat.HitCount
+				existing.HealingDone += charStat.HealingDone
+				existing.HealingReceived += charStat.HealingReceived
+				existing.Overhealing += charStat.Overhealing
+				existing.SelfHealing += charStat.SelfHealing
+				existing.HotHealing += charStat.HotHealing
+				existing.SkillUses += charStat.SkillUses
+				existing.SkillHits += charStat.SkillHits
+				existing.SkillMisses += charStat.SkillMisses
+				existing.CcApplied += charStat.CcApplied
+				existing.CcReceived += charStat.CcReceived
+				existing.Dispels += charStat.Dispels
+				existing.Interrupts += charStat.Interrupts
+				existing.Kills += charStat.Kills
+				existing.Deaths += charStat.Deaths
+				existing.Resurrects += charStat.Resurrects
+				existing.ResourceUsed += charStat.ResourceUsed
+				existing.ResourceGenerated += charStat.ResourceGenerated
+			} else {
+				// 创建新的统计记录
+				newStat := &models.BattleCharacterStats{
+					CharacterID:       charStat.CharacterID,
+					TeamSlot:          charStat.TeamSlot,
+					DamageDealt:       charStat.DamageDealt,
+					PhysicalDamage:    charStat.PhysicalDamage,
+					MagicDamage:       charStat.MagicDamage,
+					FireDamage:        charStat.FireDamage,
+					FrostDamage:       charStat.FrostDamage,
+					ShadowDamage:      charStat.ShadowDamage,
+					HolyDamage:        charStat.HolyDamage,
+					NatureDamage:      charStat.NatureDamage,
+					DotDamage:         charStat.DotDamage,
+					CritCount:         charStat.CritCount,
+					CritDamage:        charStat.CritDamage,
+					MaxCrit:           charStat.MaxCrit,
+					DamageTaken:       charStat.DamageTaken,
+					PhysicalTaken:     charStat.PhysicalTaken,
+					MagicTaken:        charStat.MagicTaken,
+					DamageBlocked:     charStat.DamageBlocked,
+					DamageAbsorbed:    charStat.DamageAbsorbed,
+					DodgeCount:        charStat.DodgeCount,
+					BlockCount:        charStat.BlockCount,
+					HitCount:          charStat.HitCount,
+					HealingDone:       charStat.HealingDone,
+					HealingReceived:   charStat.HealingReceived,
+					Overhealing:       charStat.Overhealing,
+					SelfHealing:       charStat.SelfHealing,
+					HotHealing:        charStat.HotHealing,
+					SkillUses:         charStat.SkillUses,
+					SkillHits:         charStat.SkillHits,
+					SkillMisses:       charStat.SkillMisses,
+					CcApplied:         charStat.CcApplied,
+					CcReceived:        charStat.CcReceived,
+					Dispels:           charStat.Dispels,
+					Interrupts:        charStat.Interrupts,
+					Kills:             charStat.Kills,
+					Deaths:            charStat.Deaths,
+					Resurrects:        charStat.Resurrects,
+					ResourceUsed:      charStat.ResourceUsed,
+					ResourceGenerated: charStat.ResourceGenerated,
+				}
+				charStatsMap[charStat.CharacterID] = newStat
+			}
+		}
+	}
+
+	// 构建累计DPS分析
+	analysis := &models.BattleDPSAnalysis{
+		BattleID:    0, // 累计分析没有特定的battleID
+		Duration:    totalDuration,
+		TotalRounds: totalRounds,
+		BattleCount: battleCount, // 累计战斗场次
+		Characters:  make([]*models.CharacterDPSAnalysis, 0),
+	}
+
+	// 计算队伍总DPS和HPS
+	if totalDuration > 0 {
+		analysis.TeamDPS = float64(totalDamage) / float64(totalDuration)
+		analysis.TeamHPS = float64(totalHealing) / float64(totalDuration)
+	}
+
+	// 队伍伤害构成
+	teamComposition := &models.DamageComposition{
+		Percentages: make(map[string]float64),
+	}
+
+	// 处理每个角色的累计DPS分析
+	for charID := range characterIDs {
+		charStat := charStatsMap[charID]
+
+		// 查询角色名称
+		var characterName string
+		err := database.DB.QueryRow(`SELECT name FROM characters WHERE id = ?`, charID).Scan(&characterName)
+		if err != nil {
+			characterName = fmt.Sprintf("角色 #%d", charID)
+		}
+
+		charAnalysis := &models.CharacterDPSAnalysis{
+			CharacterID:    charID,
+			CharacterName:  characterName,
+			TotalDamage:    charStat.DamageDealt,
+			TotalHealing:   charStat.HealingDone,
+			Duration:       totalDuration,
+			SkillBreakdown: make([]*models.SkillDPSAnalysis, 0),
+		}
+
+		// 计算角色DPS和HPS
+		if totalDuration > 0 {
+			charAnalysis.TotalDPS = float64(charStat.DamageDealt) / float64(totalDuration)
+			charAnalysis.TotalHPS = float64(charStat.HealingDone) / float64(totalDuration)
+		}
+
+		// 获取累计技能明细（聚合所有战斗的技能数据）
+		skillBreakdownMap := make(map[string]*models.SkillDPSAnalysis)
+
+		for _, battle := range battles {
+			skillBreakdowns, err := r.GetBattleSkillBreakdown(battle.ID, charID)
+			if err != nil {
+				continue
+			}
+
+			for _, skill := range skillBreakdowns {
+				if existing, exists := skillBreakdownMap[skill.SkillID]; exists {
+					// 累加技能统计
+					existing.TotalDamage += skill.TotalDamage
+					existing.UseCount += skill.UseCount
+					existing.HitCount += skill.HitCount
+					existing.CritCount += skill.CritCount
+					existing.ResourceCost += skill.ResourceCost
+				} else {
+					// 创建新的技能统计
+					skillAnalysis := &models.SkillDPSAnalysis{
+						SkillID:      skill.SkillID,
+						SkillName:    skill.SkillName,
+						TotalDamage:  skill.TotalDamage,
+						UseCount:     skill.UseCount,
+						HitCount:     skill.HitCount,
+						CritCount:    skill.CritCount,
+						ResourceCost: skill.ResourceCost,
+					}
+					skillBreakdownMap[skill.SkillID] = skillAnalysis
+				}
+			}
+		}
+
+		// 计算技能DPS和其他指标
+		for _, skillAnalysis := range skillBreakdownMap {
+			// 计算平均伤害
+			if skillAnalysis.HitCount > 0 {
+				skillAnalysis.AvgDamage = float64(skillAnalysis.TotalDamage) / float64(skillAnalysis.HitCount)
+			}
+
+			// 计算DPS
+			if totalDuration > 0 {
+				skillAnalysis.DPS = float64(skillAnalysis.TotalDamage) / float64(totalDuration)
+			}
+
+			// 计算伤害占比
+			if charStat.DamageDealt > 0 {
+				skillAnalysis.DamagePercent = float64(skillAnalysis.TotalDamage) / float64(charStat.DamageDealt) * 100
+			}
+
+			// 计算每点能量伤害
+			if skillAnalysis.ResourceCost > 0 {
+				skillAnalysis.DamagePerResource = float64(skillAnalysis.TotalDamage) / float64(skillAnalysis.ResourceCost)
+			}
+
+			// 计算命中率
+			if skillAnalysis.UseCount > 0 {
+				skillAnalysis.HitRate = float64(skillAnalysis.HitCount) / float64(skillAnalysis.UseCount) * 100
+			}
+
+			// 计算暴击率
+			if skillAnalysis.HitCount > 0 {
+				skillAnalysis.CritRate = float64(skillAnalysis.CritCount) / float64(skillAnalysis.HitCount) * 100
+			}
+
+			charAnalysis.SkillBreakdown = append(charAnalysis.SkillBreakdown, skillAnalysis)
+		}
+
+		// 角色伤害构成
+		charComposition := &models.DamageComposition{
+			Physical:    charStat.PhysicalDamage,
+			Magic:       charStat.MagicDamage,
+			Fire:        charStat.FireDamage,
+			Frost:       charStat.FrostDamage,
+			Shadow:      charStat.ShadowDamage,
+			Holy:        charStat.HolyDamage,
+			Nature:      charStat.NatureDamage,
+			Dot:         charStat.DotDamage,
+			Total:       charStat.DamageDealt,
+			Percentages: make(map[string]float64),
+		}
+
+		// 计算各类型占比
+		if charComposition.Total > 0 {
+			charComposition.Percentages["physical"] = float64(charComposition.Physical) / float64(charComposition.Total) * 100
+			charComposition.Percentages["magic"] = float64(charComposition.Magic) / float64(charComposition.Total) * 100
+			charComposition.Percentages["fire"] = float64(charComposition.Fire) / float64(charComposition.Total) * 100
+			charComposition.Percentages["frost"] = float64(charComposition.Frost) / float64(charComposition.Total) * 100
+			charComposition.Percentages["shadow"] = float64(charComposition.Shadow) / float64(charComposition.Total) * 100
+			charComposition.Percentages["holy"] = float64(charComposition.Holy) / float64(charComposition.Total) * 100
+			charComposition.Percentages["nature"] = float64(charComposition.Nature) / float64(charComposition.Total) * 100
+			charComposition.Percentages["dot"] = float64(charComposition.Dot) / float64(charComposition.Total) * 100
+		}
+
+		charAnalysis.DamageComposition = charComposition
+
+		// 累加队伍伤害构成
+		teamComposition.Physical += charStat.PhysicalDamage
+		teamComposition.Magic += charStat.MagicDamage
+		teamComposition.Fire += charStat.FireDamage
+		teamComposition.Frost += charStat.FrostDamage
+		teamComposition.Shadow += charStat.ShadowDamage
+		teamComposition.Holy += charStat.HolyDamage
+		teamComposition.Nature += charStat.NatureDamage
+		teamComposition.Dot += charStat.DotDamage
+		teamComposition.Total += charStat.DamageDealt
+
+		analysis.Characters = append(analysis.Characters, charAnalysis)
+	}
+
+	// 计算队伍伤害构成占比
+	teamComposition.Percentages = make(map[string]float64)
+	if teamComposition.Total > 0 {
+		teamComposition.Percentages["physical"] = float64(teamComposition.Physical) / float64(teamComposition.Total) * 100
+		teamComposition.Percentages["magic"] = float64(teamComposition.Magic) / float64(teamComposition.Total) * 100
+		teamComposition.Percentages["fire"] = float64(teamComposition.Fire) / float64(teamComposition.Total) * 100
+		teamComposition.Percentages["frost"] = float64(teamComposition.Frost) / float64(teamComposition.Total) * 100
+		teamComposition.Percentages["shadow"] = float64(teamComposition.Shadow) / float64(teamComposition.Total) * 100
+		teamComposition.Percentages["holy"] = float64(teamComposition.Holy) / float64(teamComposition.Total) * 100
+		teamComposition.Percentages["nature"] = float64(teamComposition.Nature) / float64(teamComposition.Total) * 100
+		teamComposition.Percentages["dot"] = float64(teamComposition.Dot) / float64(teamComposition.Total) * 100
+	}
+
+	analysis.TeamDamageComposition = teamComposition
+
+	return analysis, nil
+}

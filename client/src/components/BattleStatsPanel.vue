@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { get } from '../api/client'
+import { get, post } from '../api/client'
 import type { 
   BattleStatsOverview, 
   CharacterLifetimeStats, 
@@ -21,10 +21,15 @@ const emit = defineEmits<{
 const loading = ref(false)
 const error = ref<string | null>(null)
 const overview = ref<BattleStatsOverview | null>(null)
-const activeTab = ref<'overview' | 'lifetime' | 'daily' | 'recent' | 'dps'>('overview')
+const activeTab = ref<'overview' | 'lifetime' | 'daily' | 'recent' | 'dps' | 'cumulative'>('overview')
 const selectedBattleId = ref<number | null>(null)
 const dpsAnalysis = ref<BattleDPSAnalysis | null>(null)
 const loadingDps = ref(false)
+const cumulativeDpsAnalysis = ref<BattleDPSAnalysis | null>(null)
+const loadingCumulative = ref(false)
+const statsSessionActive = ref(false)
+const statsSessionStartTime = ref<string | null>(null)
+const loadingSessionStatus = ref(false)
 
 // 加载统计数据
 async function loadStats() {
@@ -185,6 +190,14 @@ function getSkillDisplayName(skill: any): string {
   return skill.skillId
 }
 
+// 获取累计战斗场次
+function getCumulativeBattleCount(): number {
+  if (cumulativeDpsAnalysis.value && cumulativeDpsAnalysis.value.battleCount) {
+    return cumulativeDpsAnalysis.value.battleCount
+  }
+  return 0
+}
+
 // 检查是否有任何伤害类型数据
 function hasAnyDamageType(composition: any): boolean {
   if (!composition || !composition.percentages) {
@@ -198,8 +211,91 @@ function hasAnyDamageType(composition: any): boolean {
   return false
 }
 
+// 加载统计会话状态
+async function loadSessionStatus() {
+  loadingSessionStatus.value = true
+  try {
+    const response = await get<{ isActive: boolean; startTime?: string }>('/stats/session/status')
+    if (response.success && response.data) {
+      statsSessionActive.value = response.data.isActive
+      statsSessionStartTime.value = response.data.startTime || null
+    }
+  } catch (e) {
+    console.error('Failed to load session status:', e)
+  } finally {
+    loadingSessionStatus.value = false
+  }
+}
+
+// 开始统计会话
+async function startStatsSession() {
+  try {
+    const response = await post('/stats/session/start')
+    if (response.success) {
+      statsSessionActive.value = true
+      statsSessionStartTime.value = new Date().toISOString()
+      await loadCumulativeDPS()
+      activeTab.value = 'cumulative'
+    } else {
+      error.value = response.error || '开始统计失败'
+    }
+  } catch (e) {
+    console.error('Failed to start stats session:', e)
+    error.value = '开始统计时发生错误'
+  }
+}
+
+// 重置统计会话
+async function resetStatsSession() {
+  if (!confirm('确定要重置统计吗？这将清除当前的累计统计数据。')) {
+    return
+  }
+  
+  try {
+    const response = await post('/stats/session/reset')
+    if (response.success) {
+      statsSessionActive.value = false
+      statsSessionStartTime.value = null
+      cumulativeDpsAnalysis.value = null
+      if (activeTab.value === 'cumulative') {
+        activeTab.value = 'overview'
+      }
+    } else {
+      error.value = response.error || '重置统计失败'
+    }
+  } catch (e) {
+    console.error('Failed to reset stats session:', e)
+    error.value = '重置统计时发生错误'
+  }
+}
+
+// 加载累计DPS分析
+async function loadCumulativeDPS() {
+  if (!statsSessionActive.value) {
+    return
+  }
+  
+  loadingCumulative.value = true
+  error.value = null
+  
+  try {
+    const response = await get<BattleDPSAnalysis>('/stats/cumulative/dps')
+    if (response.success && response.data) {
+      cumulativeDpsAnalysis.value = response.data
+    } else {
+      error.value = response.error || '加载累计DPS分析失败'
+    }
+  } catch (e) {
+    console.error('Failed to load cumulative DPS:', e)
+    error.value = '加载累计DPS分析时发生错误'
+  } finally {
+    loadingCumulative.value = false
+  }
+}
+
 onMounted(() => {
   loadStats()
+  loadSessionStatus()
 })
 </script>
 
@@ -248,6 +344,40 @@ onMounted(() => {
         >
           DPS分析
         </button>
+        <button 
+          class="stats-tab" 
+          :class="{ active: activeTab === 'cumulative' }"
+          @click="activeTab = 'cumulative'; loadCumulativeDPS()"
+          :disabled="!statsSessionActive"
+        >
+          累计统计
+        </button>
+      </div>
+
+      <!-- 统计会话控制 -->
+      <div class="stats-session-controls">
+        <div class="stats-session-status">
+          <span v-if="statsSessionActive" class="session-active">
+            ● 统计中 ({{ statsSessionStartTime ? formatDate(statsSessionStartTime) : '已开始' }})
+          </span>
+          <span v-else class="session-inactive">○ 未开始统计</span>
+        </div>
+        <div class="stats-session-actions">
+          <button 
+            v-if="!statsSessionActive"
+            class="session-btn session-btn-start"
+            @click="startStatsSession"
+          >
+            开始统计
+          </button>
+          <button 
+            v-else
+            class="session-btn session-btn-reset"
+            @click="resetStatsSession"
+          >
+            重置统计
+          </button>
+        </div>
       </div>
 
       <!-- 内容区域 -->
@@ -770,6 +900,165 @@ onMounted(() => {
             </div>
           </div>
         </div>
+
+        <!-- 累计统计 -->
+        <div v-else-if="activeTab === 'cumulative'" class="stats-cumulative">
+          <div v-if="loadingCumulative" class="stats-loading">加载累计统计中...</div>
+          <div v-else-if="!statsSessionActive" class="stats-empty">
+            <div class="dps-empty-message">
+              <p>请先开始统计会话</p>
+              <p class="dps-empty-hint">点击上方的"开始统计"按钮开始累计统计</p>
+            </div>
+          </div>
+          <div v-else-if="!cumulativeDpsAnalysis || (cumulativeDpsAnalysis.characters && cumulativeDpsAnalysis.characters.length === 0)" class="stats-empty">
+            <div class="dps-empty-message">
+              <p>暂无累计统计数据</p>
+              <p class="dps-empty-hint">开始战斗后，统计数据将在这里显示</p>
+            </div>
+          </div>
+          <div v-else class="dps-analysis">
+            <!-- 累计总览 -->
+            <div class="stats-section">
+              <h3 class="stats-section-title">
+                累计统计
+                <span v-if="statsSessionStartTime" class="session-time-badge">
+                  自 {{ formatDate(statsSessionStartTime) }}
+                </span>
+              </h3>
+              <div class="dps-overview">
+                <div class="dps-overview-item">
+                  <span class="dps-overview-label">战斗场次</span>
+                  <span class="dps-overview-value">{{ getCumulativeBattleCount() }}</span>
+                </div>
+                <div class="dps-overview-item">
+                  <span class="dps-overview-label">累计时长</span>
+                  <span class="dps-overview-value">{{ formatTime(cumulativeDpsAnalysis.duration) }}</span>
+                </div>
+                <div class="dps-overview-item">
+                  <span class="dps-overview-label">总回合数</span>
+                  <span class="dps-overview-value">{{ cumulativeDpsAnalysis.totalRounds }}</span>
+                </div>
+                <div class="dps-overview-item">
+                  <span class="dps-overview-label">队伍DPS</span>
+                  <span class="dps-overview-value stats-highlight">{{ formatDPS(cumulativeDpsAnalysis.teamDps) }}</span>
+                </div>
+                <div class="dps-overview-item">
+                  <span class="dps-overview-label">队伍HPS</span>
+                  <span class="dps-overview-value">{{ formatDPS(cumulativeDpsAnalysis.teamHps) }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 伤害构成 -->
+            <div v-if="cumulativeDpsAnalysis.teamDamageComposition && hasAnyDamageType(cumulativeDpsAnalysis.teamDamageComposition)" class="stats-section">
+              <h3 class="stats-section-title">累计伤害构成</h3>
+              <div class="damage-composition">
+                <template v-for="(value, key) in cumulativeDpsAnalysis.teamDamageComposition.percentages" :key="key">
+                  <div 
+                    v-if="value > 0"
+                    class="damage-type-item"
+                  >
+                    <div class="damage-type-header">
+                      <span class="damage-type-name">{{ getDamageTypeName(key) }}</span>
+                      <span class="damage-type-percent">{{ value.toFixed(1) }}%</span>
+                    </div>
+                    <div class="damage-type-bar">
+                      <div 
+                        class="damage-type-fill" 
+                        :style="{ width: value + '%', backgroundColor: getDamageTypeColor(key) }"
+                      ></div>
+                    </div>
+                    <span class="damage-type-value">{{ formatNumber(getDamageTypeValue(key, cumulativeDpsAnalysis.teamDamageComposition)) }}</span>
+                  </div>
+                </template>
+              </div>
+            </div>
+
+            <!-- 角色累计DPS分析 -->
+            <div 
+              v-for="character in cumulativeDpsAnalysis.characters" 
+              :key="character.characterId"
+              class="stats-section character-dps-section"
+            >
+              <h3 class="stats-section-title">
+                {{ character.characterName || `角色 #${character.characterId}` }}
+                <span class="character-dps-badge">{{ formatDPS(character.totalDps) }} DPS</span>
+              </h3>
+
+              <!-- 角色总览 -->
+              <div class="character-dps-overview">
+                <div class="dps-overview-item">
+                  <span class="dps-overview-label">总伤害</span>
+                  <span class="dps-overview-value">{{ formatNumber(character.totalDamage) }}</span>
+                </div>
+                <div class="dps-overview-item">
+                  <span class="dps-overview-label">总治疗</span>
+                  <span class="dps-overview-value">{{ formatNumber(character.totalHealing) }}</span>
+                </div>
+                <div class="dps-overview-item">
+                  <span class="dps-overview-label">DPS</span>
+                  <span class="dps-overview-value stats-highlight">{{ formatDPS(character.totalDps) }}</span>
+                </div>
+                <div class="dps-overview-item">
+                  <span class="dps-overview-label">HPS</span>
+                  <span class="dps-overview-value">{{ formatDPS(character.totalHps) }}</span>
+                </div>
+              </div>
+
+              <!-- 技能DPS明细 -->
+              <div class="skill-dps-list">
+                <h4 class="stats-subtitle">累计技能DPS明细</h4>
+                <div class="skill-dps-table">
+                  <div class="skill-dps-header">
+                    <div class="skill-dps-col-name">技能</div>
+                    <div class="skill-dps-col-dps">DPS</div>
+                    <div class="skill-dps-col-damage">总伤害</div>
+                    <div class="skill-dps-col-percent">占比</div>
+                    <div class="skill-dps-col-uses">使用</div>
+                    <div class="skill-dps-col-avg">平均</div>
+                  </div>
+                  <div 
+                    v-for="skill in character.skillBreakdown" 
+                    :key="skill.skillId"
+                    class="skill-dps-row"
+                  >
+                    <div class="skill-dps-col-name">{{ getSkillDisplayName(skill) }}</div>
+                    <div class="skill-dps-col-dps stats-highlight">{{ formatDPS(skill.dps) }}</div>
+                    <div class="skill-dps-col-damage">{{ formatNumber(skill.totalDamage) }}</div>
+                    <div class="skill-dps-col-percent">{{ skill.damagePercent.toFixed(1) }}%</div>
+                    <div class="skill-dps-col-uses">{{ skill.useCount }}</div>
+                    <div class="skill-dps-col-avg">{{ formatNumber(skill.avgDamage) }}</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 角色伤害构成 -->
+              <div v-if="character.damageComposition && hasAnyDamageType(character.damageComposition)" class="character-damage-composition">
+                <h4 class="stats-subtitle">累计伤害类型构成</h4>
+                <div class="damage-composition">
+                  <template v-for="(value, key) in character.damageComposition.percentages" :key="key">
+                    <div 
+                      v-if="value > 0"
+                      class="damage-type-item"
+                    >
+                      <div class="damage-type-header">
+                        <span class="damage-type-name">{{ getDamageTypeName(key) }}</span>
+                        <span class="damage-type-percent">{{ value.toFixed(1) }}%</span>
+                      </div>
+                      <div class="damage-type-bar">
+                        <div 
+                          class="damage-type-fill" 
+                          :style="{ width: value + '%', backgroundColor: getDamageTypeColor(key) }"
+                        ></div>
+                      </div>
+                      <span class="damage-type-value">{{ formatNumber(getDamageTypeValue(key, character.damageComposition)) }}</span>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -1285,6 +1574,80 @@ onMounted(() => {
   margin-top: 16px;
 }
 
+/* 统计会话控制 */
+.stats-session-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--text-dim);
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.stats-session-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.session-active {
+  color: var(--terminal-green);
+}
+
+.session-inactive {
+  color: var(--text-secondary);
+}
+
+.stats-session-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.session-btn {
+  padding: 6px 12px;
+  border: 1px solid;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.session-btn-start {
+  border-color: var(--terminal-green);
+  color: var(--terminal-green);
+}
+
+.session-btn-start:hover {
+  background: rgba(0, 255, 0, 0.1);
+}
+
+.session-btn-reset {
+  border-color: var(--terminal-red);
+  color: var(--terminal-red);
+}
+
+.session-btn-reset:hover {
+  background: rgba(255, 0, 0, 0.1);
+}
+
+.session-time-badge {
+  margin-left: 12px;
+  padding: 2px 8px;
+  background: rgba(0, 255, 255, 0.1);
+  border: 1px solid var(--terminal-cyan);
+  border-radius: 4px;
+  color: var(--terminal-cyan);
+  font-size: 11px;
+  font-weight: normal;
+}
+
+.stats-tab:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* 滚动条样式 */
 .stats-content::-webkit-scrollbar {
   width: 8px;
@@ -1303,3 +1666,6 @@ onMounted(() => {
   background: var(--terminal-green);
 }
 </style>
+
+
+

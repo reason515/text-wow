@@ -1319,3 +1319,90 @@ func (h *Handler) GetBattleDPSAnalysis(c *gin.Context) {
 		Data:    analysis,
 	})
 }
+
+// StartStatsSession 开始统计会话
+func (h *Handler) StartStatsSession(c *gin.Context) {
+	userID, _ := c.Get("userID")
+
+	battleManager := game.GetBattleManager()
+	battleManager.StartStatsSession(userID.(int))
+
+	c.JSON(http.StatusOK, models.APIResponse{
+		Success: true,
+		Data: gin.H{
+			"message": "统计会话已开始",
+		},
+	})
+}
+
+// ResetStatsSession 重置统计会话
+func (h *Handler) ResetStatsSession(c *gin.Context) {
+	userID, _ := c.Get("userID")
+
+	battleManager := game.GetBattleManager()
+	battleManager.ResetStatsSession(userID.(int))
+
+	c.JSON(http.StatusOK, models.APIResponse{
+		Success: true,
+		Data: gin.H{
+			"message": "统计会话已重置",
+		},
+	})
+}
+
+// GetStatsSessionStatus 获取统计会话状态
+func (h *Handler) GetStatsSessionStatus(c *gin.Context) {
+	userID, _ := c.Get("userID")
+
+	battleManager := game.GetBattleManager()
+	session := battleManager.GetStatsSession(userID.(int))
+
+	if session == nil {
+		c.JSON(http.StatusOK, models.APIResponse{
+			Success: true,
+			Data: gin.H{
+				"isActive": false,
+			},
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.APIResponse{
+		Success: true,
+		Data: gin.H{
+			"isActive":  session.IsActive,
+			"startTime": session.StartTime,
+		},
+	})
+}
+
+// GetCumulativeDPSAnalysis 获取累计DPS分析
+func (h *Handler) GetCumulativeDPSAnalysis(c *gin.Context) {
+	userID, _ := c.Get("userID")
+
+	battleManager := game.GetBattleManager()
+	session := battleManager.GetStatsSession(userID.(int))
+
+	if session == nil || !session.IsActive {
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Success: false,
+			Error:   "统计会话未开始，请先开始统计",
+		})
+		return
+	}
+
+	// 获取累计DPS分析
+	analysis, err := h.battleStatsRepo.GetCumulativeDPSAnalysis(userID.(int), session.StartTime)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Error:   "failed to get cumulative DPS analysis: " + err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.APIResponse{
+		Success: true,
+		Data:    analysis,
+	})
+}

@@ -23,6 +23,17 @@ type BattleManager struct {
 	passiveSkillManager *PassiveSkillManager
 	strategyExecutor    *StrategyExecutor
 	battleStatsRepo     *repository.BattleStatsRepository // 战斗统计仓库
+
+	// 用户自定义统计会话管理
+	statsSessions   map[int]*StatsSession // key: userID, 用户自定义的统计会话
+	statsSessionsMu sync.RWMutex          // 统计会话的锁
+}
+
+// StatsSession 用户自定义统计会话
+type StatsSession struct {
+	UserID    int
+	StartTime time.Time
+	IsActive  bool
 }
 
 // BattleSession 用户战斗会话
@@ -138,6 +149,7 @@ func NewBattleManager() *BattleManager {
 		passiveSkillManager: NewPassiveSkillManager(),
 		strategyExecutor:    NewStrategyExecutor(),
 		battleStatsRepo:     repository.NewBattleStatsRepository(),
+		statsSessions:       make(map[int]*StatsSession),
 	}
 }
 
@@ -3076,4 +3088,36 @@ func (m *BattleManager) clearBattleStats(session *BattleSession) {
 	session.CharacterStats = nil
 	session.SkillBreakdown = nil
 	session.CurrentBattleRound = 0
+}
+
+// ═══════════════════════════════════════════════════════════
+// 用户自定义统计会话管理
+// ═══════════════════════════════════════════════════════════
+
+// StartStatsSession 开始统计会话
+func (m *BattleManager) StartStatsSession(userID int) {
+	m.statsSessionsMu.Lock()
+	defer m.statsSessionsMu.Unlock()
+
+	m.statsSessions[userID] = &StatsSession{
+		UserID:    userID,
+		StartTime: time.Now(),
+		IsActive:  true,
+	}
+}
+
+// ResetStatsSession 重置统计会话
+func (m *BattleManager) ResetStatsSession(userID int) {
+	m.statsSessionsMu.Lock()
+	defer m.statsSessionsMu.Unlock()
+
+	delete(m.statsSessions, userID)
+}
+
+// GetStatsSession 获取统计会话
+func (m *BattleManager) GetStatsSession(userID int) *StatsSession {
+	m.statsSessionsMu.RLock()
+	defer m.statsSessionsMu.RUnlock()
+
+	return m.statsSessions[userID]
 }

@@ -30,3 +30,7 @@ UPDATE characters SET
 
 
 
+
+
+
+

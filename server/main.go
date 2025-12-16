@@ -129,6 +129,10 @@ func main() {
 				stats.GET("/battles", h.GetRecentBattles)
 				stats.GET("/battles/:battleId", h.GetBattleDetail)
 				stats.GET("/battles/:battleId/dps", h.GetBattleDPSAnalysis)
+				stats.POST("/session/start", h.StartStatsSession)
+				stats.POST("/session/reset", h.ResetStatsSession)
+				stats.GET("/session/status", h.GetStatsSessionStatus)
+				stats.GET("/cumulative/dps", h.GetCumulativeDPSAnalysis)
 			}
 			protected.GET("/characters/:characterId/stats", h.GetCharacterLifetimeStats)
 			protected.GET("/characters/:characterId/stats/summary", h.GetCharacterBattleSummary)

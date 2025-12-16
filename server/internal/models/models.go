@@ -513,6 +513,7 @@ type BattleDPSAnalysis struct {
 	BattleID              int                     `json:"battleId"`
 	Duration              int                     `json:"duration"`              // 战斗时长(秒)
 	TotalRounds           int                     `json:"totalRounds"`           // 总回合数
+	BattleCount           int                     `json:"battleCount,omitempty"` // 战斗场次（累计统计时使用）
 	TeamDPS               float64                 `json:"teamDps"`               // 队伍总DPS
 	TeamHPS               float64                 `json:"teamHps"`               // 队伍总HPS
 	Characters            []*CharacterDPSAnalysis `json:"characters"`            // 各角色DPS分析

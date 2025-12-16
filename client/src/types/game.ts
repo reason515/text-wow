@@ -620,6 +620,7 @@ export interface BattleDPSAnalysis {
   battleId: number
   duration: number
   totalRounds: number
+  battleCount?: number
   teamDps: number
   teamHps: number
   characters: CharacterDPSAnalysis[]
