@@ -783,6 +783,64 @@ func (r *BattleStatsRepository) GetBattleDPSAnalysis(battleID int) (*models.Batt
 			}
 		}
 
+		// 确保普通攻击被包含在技能明细中
+		// 计算所有技能的总伤害
+		totalSkillDamage := 0
+		for _, skill := range charAnalysis.SkillBreakdown {
+			totalSkillDamage += skill.TotalDamage
+		}
+
+		// 如果技能明细的总伤害小于角色总伤害，差值就是普通攻击的伤害
+		if totalSkillDamage < charStat.DamageDealt {
+			normalAttackDamage := charStat.DamageDealt - totalSkillDamage
+			
+			// 检查是否已经有普通攻击的记录（skillID为空字符串）
+			normalAttackExists := false
+			for _, skill := range charAnalysis.SkillBreakdown {
+				if skill.SkillID == "" || skill.SkillName == "普通攻击" {
+					// 如果已存在但伤害不匹配，更新伤害
+					if skill.TotalDamage < normalAttackDamage {
+						skill.TotalDamage = normalAttackDamage
+						// 重新计算相关指标
+						if skill.HitCount > 0 {
+							skill.AvgDamage = float64(skill.TotalDamage) / float64(skill.HitCount)
+						}
+						if battle.DurationSeconds > 0 {
+							skill.DPS = float64(skill.TotalDamage) / float64(battle.DurationSeconds)
+						}
+						if charStat.DamageDealt > 0 {
+							skill.DamagePercent = float64(skill.TotalDamage) / float64(charStat.DamageDealt) * 100
+						}
+					}
+					normalAttackExists = true
+					break
+				}
+			}
+			
+			if !normalAttackExists {
+				// 创建普通攻击的统计条目
+				normalAttackAnalysis := &models.SkillDPSAnalysis{
+					SkillID:      "",
+					SkillName:    "普通攻击",
+					TotalDamage:  normalAttackDamage,
+					UseCount:     0, // 无法从单场数据中准确获取，保持为0
+					HitCount:     0, // 无法从单场数据中准确获取，保持为0
+					CritCount:    0, // 无法从单场数据中准确获取，保持为0
+					ResourceCost: 0,
+				}
+				
+				// 计算DPS和伤害占比
+				if battle.DurationSeconds > 0 {
+					normalAttackAnalysis.DPS = float64(normalAttackDamage) / float64(battle.DurationSeconds)
+				}
+				if charStat.DamageDealt > 0 {
+					normalAttackAnalysis.DamagePercent = float64(normalAttackDamage) / float64(charStat.DamageDealt) * 100
+				}
+				
+				charAnalysis.SkillBreakdown = append(charAnalysis.SkillBreakdown, normalAttackAnalysis)
+			}
+		}
+
 		// 角色伤害构成
 		charComposition := &models.DamageComposition{
 			Physical:    charStat.PhysicalDamage,
@@ -1129,6 +1187,59 @@ func (r *BattleStatsRepository) GetCumulativeDPSAnalysis(userID int, startTime t
 			charAnalysis.SkillBreakdown = append(charAnalysis.SkillBreakdown, skillAnalysis)
 		}
 
+		// 确保普通攻击被包含在技能明细中
+		// 计算所有技能的总伤害
+		totalSkillDamage := 0
+		for _, skill := range skillBreakdownMap {
+			totalSkillDamage += skill.TotalDamage
+		}
+
+		// 如果技能明细的总伤害小于角色总伤害，差值就是普通攻击的伤害
+		if totalSkillDamage < charStat.DamageDealt {
+			normalAttackDamage := charStat.DamageDealt - totalSkillDamage
+			
+			// 检查是否已经有普通攻击的记录（skillID为空字符串）
+			normalAttackKey := ""
+			if existing, exists := skillBreakdownMap[normalAttackKey]; exists {
+				// 如果已存在但伤害不匹配，更新伤害
+				if existing.TotalDamage < normalAttackDamage {
+					existing.TotalDamage = normalAttackDamage
+					// 重新计算相关指标
+					if existing.HitCount > 0 {
+						existing.AvgDamage = float64(existing.TotalDamage) / float64(existing.HitCount)
+					}
+					if totalDuration > 0 {
+						existing.DPS = float64(existing.TotalDamage) / float64(totalDuration)
+					}
+					if charStat.DamageDealt > 0 {
+						existing.DamagePercent = float64(existing.TotalDamage) / float64(charStat.DamageDealt) * 100
+					}
+				}
+			} else {
+				// 创建普通攻击的统计条目
+				normalAttackAnalysis := &models.SkillDPSAnalysis{
+					SkillID:      normalAttackKey,
+					SkillName:    "普通攻击",
+					TotalDamage:  normalAttackDamage,
+					UseCount:     0, // 无法从累计数据中准确获取，保持为0
+					HitCount:     0, // 无法从累计数据中准确获取，保持为0
+					CritCount:    0, // 无法从累计数据中准确获取，保持为0
+					ResourceCost: 0,
+				}
+				
+				// 计算DPS和伤害占比
+				if totalDuration > 0 {
+					normalAttackAnalysis.DPS = float64(normalAttackDamage) / float64(totalDuration)
+				}
+				if charStat.DamageDealt > 0 {
+					normalAttackAnalysis.DamagePercent = float64(normalAttackDamage) / float64(charStat.DamageDealt) * 100
+				}
+				
+				skillBreakdownMap[normalAttackKey] = normalAttackAnalysis
+				charAnalysis.SkillBreakdown = append(charAnalysis.SkillBreakdown, normalAttackAnalysis)
+			}
+		}
+
 		// 角色伤害构成
 		charComposition := &models.DamageComposition{
 			Physical:    charStat.PhysicalDamage,
@@ -1188,3 +1299,8 @@ func (r *BattleStatsRepository) GetCumulativeDPSAnalysis(userID int, startTime t
 
 	return analysis, nil
 }
+
+
+
+
+

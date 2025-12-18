@@ -490,6 +490,7 @@ export const useGameStore = defineStore('game', () => {
   function addLocalLog(type: BattleLog['type'], message: string, color: string = '#00FF00') {
     const log: BattleLog = {
       time: new Date().toLocaleTimeString('zh-CN', { hour12: false }),
+      logType: type || 'info',
       type,
       message,
       color

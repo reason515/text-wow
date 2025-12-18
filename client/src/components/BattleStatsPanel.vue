@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import { get, post } from '../api/client'
 import type { 
   BattleStatsOverview, 
@@ -21,15 +21,15 @@ const emit = defineEmits<{
 const loading = ref(false)
 const error = ref<string | null>(null)
 const overview = ref<BattleStatsOverview | null>(null)
-const activeTab = ref<'overview' | 'lifetime' | 'daily' | 'recent' | 'dps' | 'cumulative'>('overview')
-const selectedBattleId = ref<number | null>(null)
-const dpsAnalysis = ref<BattleDPSAnalysis | null>(null)
-const loadingDps = ref(false)
+const activeTab = ref<'overview' | 'lifetime' | 'daily' | 'recent' | 'cumulative'>('overview')
 const cumulativeDpsAnalysis = ref<BattleDPSAnalysis | null>(null)
 const loadingCumulative = ref(false)
 const statsSessionActive = ref(false)
 const statsSessionStartTime = ref<string | null>(null)
 const loadingSessionStatus = ref(false)
+const battleDpsAnalysis = ref<BattleDPSAnalysis | null>(null)
+const loadingBattleDps = ref(false)
+const selectedBattleId = ref<number | null>(null)
 
 // 加载统计数据
 async function loadStats() {
@@ -99,28 +99,6 @@ function getWinRate(victories: number, total: number): number {
 function getKDRatio(kills: number, deaths: number): number {
   if (deaths === 0) return kills > 0 ? kills : 0
   return kills / deaths
-}
-
-// 加载DPS分析
-async function loadDPSAnalysis(battleId: number) {
-  loadingDps.value = true
-  error.value = null
-  selectedBattleId.value = battleId
-  
-  try {
-    const response = await get<BattleDPSAnalysis>(`/stats/battles/${battleId}/dps`)
-    if (response.success && response.data) {
-      dpsAnalysis.value = response.data
-      activeTab.value = 'dps'
-    } else {
-      error.value = response.error || '加载DPS分析失败'
-    }
-  } catch (e) {
-    console.error('Failed to load DPS analysis:', e)
-    error.value = '加载DPS分析时发生错误'
-  } finally {
-    loadingDps.value = false
-  }
 }
 
 // 格式化DPS
@@ -203,7 +181,7 @@ function hasAnyDamageType(composition: any): boolean {
   if (!composition || !composition.percentages) {
     return false
   }
-  for (const value of Object.values(composition.percentages)) {
+  for (const value of Object.values(composition.percentages) as number[]) {
     if (value > 0) {
       return true
     }
@@ -257,9 +235,7 @@ async function resetStatsSession() {
       statsSessionActive.value = false
       statsSessionStartTime.value = null
       cumulativeDpsAnalysis.value = null
-      if (activeTab.value === 'cumulative') {
-        activeTab.value = 'overview'
-      }
+      // 保持在 DPS统计 页，显示“未开始统计”的状态
     } else {
       error.value = response.error || '重置统计失败'
     }
@@ -291,6 +267,35 @@ async function loadCumulativeDPS() {
   } finally {
     loadingCumulative.value = false
   }
+}
+
+// 加载单场战斗DPS分析
+async function loadBattleDPS(battleId: number) {
+  loadingBattleDps.value = true
+  error.value = null
+  selectedBattleId.value = battleId
+  
+  try {
+    const response = await get<BattleDPSAnalysis>(`/stats/battles/${battleId}/dps`)
+    if (response.success && response.data) {
+      battleDpsAnalysis.value = response.data
+      // 切换到累计统计标签页以显示DPS分析
+      activeTab.value = 'cumulative'
+    } else {
+      error.value = response.error || '加载战斗DPS分析失败'
+    }
+  } catch (e) {
+    console.error('Failed to load battle DPS:', e)
+    error.value = '加载战斗DPS分析时发生错误'
+  } finally {
+    loadingBattleDps.value = false
+  }
+}
+
+// 关闭单场战斗DPS分析
+function closeBattleDPS() {
+  battleDpsAnalysis.value = null
+  selectedBattleId.value = null
 }
 
 onMounted(() => {
@@ -339,45 +344,11 @@ onMounted(() => {
         </button>
         <button 
           class="stats-tab" 
-          :class="{ active: activeTab === 'dps' }"
-          @click="activeTab = 'dps'"
-        >
-          DPS分析
-        </button>
-        <button 
-          class="stats-tab" 
           :class="{ active: activeTab === 'cumulative' }"
           @click="activeTab = 'cumulative'; loadCumulativeDPS()"
-          :disabled="!statsSessionActive"
         >
-          累计统计
+          DPS统计
         </button>
-      </div>
-
-      <!-- 统计会话控制 -->
-      <div class="stats-session-controls">
-        <div class="stats-session-status">
-          <span v-if="statsSessionActive" class="session-active">
-            ● 统计中 ({{ statsSessionStartTime ? formatDate(statsSessionStartTime) : '已开始' }})
-          </span>
-          <span v-else class="session-inactive">○ 未开始统计</span>
-        </div>
-        <div class="stats-session-actions">
-          <button 
-            v-if="!statsSessionActive"
-            class="session-btn session-btn-start"
-            @click="startStatsSession"
-          >
-            开始统计
-          </button>
-          <button 
-            v-else
-            class="session-btn session-btn-reset"
-            @click="resetStatsSession"
-          >
-            重置统计
-          </button>
-        </div>
       </div>
 
       <!-- 内容区域 -->
@@ -743,217 +714,110 @@ onMounted(() => {
                 </div>
               </div>
               <div class="battle-actions">
-                <button class="battle-action-btn" @click="loadDPSAnalysis(battle.id)">
-                  查看DPS分析
+                <button 
+                  class="battle-action-btn"
+                  @click="loadBattleDPS(battle.id)"
+                  :disabled="loadingBattleDps"
+                >
+                  {{ loadingBattleDps && selectedBattleId === battle.id ? '加载中...' : '查看DPS分析' }}
                 </button>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- DPS分析 -->
-        <div v-else-if="activeTab === 'dps'" class="stats-dps">
-          <div v-if="loadingDps" class="stats-loading">加载DPS分析中...</div>
-          <div v-else-if="!dpsAnalysis" class="stats-empty">
-            <div class="dps-empty-message">
-              <p>请先选择一场战斗查看DPS分析</p>
-              <p class="dps-empty-hint">在"最近战斗"标签页中，点击战斗记录的"查看DPS分析"按钮</p>
-            </div>
-          </div>
-          <div v-else class="dps-analysis">
-            <!-- 队伍总览 -->
-            <div class="stats-section">
-              <h3 class="stats-section-title">队伍总览</h3>
-              <div class="dps-overview">
-                <div class="dps-overview-item">
-                  <span class="dps-overview-label">战斗时长</span>
-                  <span class="dps-overview-value">{{ formatTime(dpsAnalysis.duration) }}</span>
-                </div>
-                <div class="dps-overview-item">
-                  <span class="dps-overview-label">总回合数</span>
-                  <span class="dps-overview-value">{{ dpsAnalysis.totalRounds }}</span>
-                </div>
-                <div class="dps-overview-item">
-                  <span class="dps-overview-label">队伍DPS</span>
-                  <span class="dps-overview-value stats-highlight">{{ formatDPS(dpsAnalysis.teamDps) }}</span>
-                </div>
-                <div class="dps-overview-item">
-                  <span class="dps-overview-label">队伍HPS</span>
-                  <span class="dps-overview-value">{{ formatDPS(dpsAnalysis.teamHps) }}</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- 伤害构成 -->
-            <div v-if="dpsAnalysis.teamDamageComposition && dpsAnalysis.teamDamageComposition.percentages" class="stats-section">
-              <h3 class="stats-section-title">伤害构成</h3>
-              <div class="damage-composition">
-                <template v-for="(value, key) in dpsAnalysis.teamDamageComposition.percentages" :key="key">
-                  <div 
-                    v-if="value > 0"
-                    class="damage-type-item"
-                  >
-                    <div class="damage-type-header">
-                      <span class="damage-type-name">{{ getDamageTypeName(key) }}</span>
-                      <span class="damage-type-percent">{{ value.toFixed(1) }}%</span>
-                    </div>
-                    <div class="damage-type-bar">
-                      <div 
-                        class="damage-type-fill" 
-                        :style="{ width: value + '%', backgroundColor: getDamageTypeColor(key) }"
-                      ></div>
-                    </div>
-                    <span class="damage-type-value">{{ formatNumber(getDamageTypeValue(key, dpsAnalysis.teamDamageComposition)) }}</span>
-                  </div>
-                </template>
-                <div v-if="!hasAnyDamageType(dpsAnalysis.teamDamageComposition)" class="stats-empty">
-                  暂无伤害类型数据
-                </div>
-              </div>
-            </div>
-
-            <!-- 角色DPS分析 -->
-            <div 
-              v-for="character in dpsAnalysis.characters" 
-              :key="character.characterId"
-              class="stats-section character-dps-section"
-            >
-              <h3 class="stats-section-title">
-                {{ character.characterName || `角色 #${character.characterId}` }}
-                <span class="character-dps-badge">{{ formatDPS(character.totalDps) }} DPS</span>
-              </h3>
-
-              <!-- 角色总览 -->
-              <div class="character-dps-overview">
-                <div class="dps-overview-item">
-                  <span class="dps-overview-label">总伤害</span>
-                  <span class="dps-overview-value">{{ formatNumber(character.totalDamage) }}</span>
-                </div>
-                <div class="dps-overview-item">
-                  <span class="dps-overview-label">总治疗</span>
-                  <span class="dps-overview-value">{{ formatNumber(character.totalHealing) }}</span>
-                </div>
-                <div class="dps-overview-item">
-                  <span class="dps-overview-label">DPS</span>
-                  <span class="dps-overview-value stats-highlight">{{ formatDPS(character.totalDps) }}</span>
-                </div>
-                <div class="dps-overview-item">
-                  <span class="dps-overview-label">HPS</span>
-                  <span class="dps-overview-value">{{ formatDPS(character.totalHps) }}</span>
-                </div>
-              </div>
-
-              <!-- 技能DPS明细 -->
-              <div class="skill-dps-list">
-                <h4 class="stats-subtitle">技能DPS明细</h4>
-                <div class="skill-dps-table">
-                  <div class="skill-dps-header">
-                    <div class="skill-dps-col-name">技能</div>
-                    <div class="skill-dps-col-dps">DPS</div>
-                    <div class="skill-dps-col-damage">总伤害</div>
-                    <div class="skill-dps-col-percent">占比</div>
-                    <div class="skill-dps-col-uses">使用</div>
-                    <div class="skill-dps-col-avg">平均</div>
-                  </div>
-                  <div 
-                    v-for="skill in character.skillBreakdown" 
-                    :key="skill.skillId"
-                    class="skill-dps-row"
-                  >
-                    <div class="skill-dps-col-name">{{ getSkillDisplayName(skill) }}</div>
-                    <div class="skill-dps-col-dps stats-highlight">{{ formatDPS(skill.dps) }}</div>
-                    <div class="skill-dps-col-damage">{{ formatNumber(skill.totalDamage) }}</div>
-                    <div class="skill-dps-col-percent">{{ skill.damagePercent.toFixed(1) }}%</div>
-                    <div class="skill-dps-col-uses">{{ skill.useCount }}</div>
-                    <div class="skill-dps-col-avg">{{ formatNumber(skill.avgDamage) }}</div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- 角色伤害构成 -->
-              <div v-if="character.damageComposition && character.damageComposition.percentages" class="character-damage-composition">
-                <h4 class="stats-subtitle">伤害类型构成</h4>
-                <div class="damage-composition">
-                  <template v-for="(value, key) in character.damageComposition.percentages" :key="key">
-                    <div 
-                      v-if="value > 0"
-                      class="damage-type-item"
-                    >
-                      <div class="damage-type-header">
-                        <span class="damage-type-name">{{ getDamageTypeName(key) }}</span>
-                        <span class="damage-type-percent">{{ value.toFixed(1) }}%</span>
-                      </div>
-                      <div class="damage-type-bar">
-                        <div 
-                          class="damage-type-fill" 
-                          :style="{ width: value + '%', backgroundColor: getDamageTypeColor(key) }"
-                        ></div>
-                      </div>
-                      <span class="damage-type-value">{{ formatNumber(getDamageTypeValue(key, character.damageComposition)) }}</span>
-                    </div>
-                  </template>
-                  <div v-if="!hasAnyDamageType(character.damageComposition)" class="stats-empty">
-                    暂无伤害类型数据
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 累计统计 -->
+        <!-- 累计统计 / 单场战斗DPS分析 -->
         <div v-else-if="activeTab === 'cumulative'" class="stats-cumulative">
-          <div v-if="loadingCumulative" class="stats-loading">加载累计统计中...</div>
-          <div v-else-if="!statsSessionActive" class="stats-empty">
+          <!-- 单场战斗DPS分析 -->
+          <div v-if="battleDpsAnalysis" class="battle-dps-header">
+            <h3 class="battle-dps-title">单场战斗DPS分析</h3>
+            <button class="battle-dps-close" @click="closeBattleDPS">×</button>
+          </div>
+          
+          <!-- DPS统计页内的会话控制（仅累计统计时显示） -->
+          <div v-if="!battleDpsAnalysis" class="stats-session-controls">
+            <div class="stats-session-status">
+              <span v-if="statsSessionActive" class="session-active">
+                ● 统计中 ({{ statsSessionStartTime ? formatDate(statsSessionStartTime) : '已开始' }})
+              </span>
+              <span v-else class="session-inactive">○ 未开始统计</span>
+            </div>
+            <div class="stats-session-actions">
+              <button 
+                v-if="!statsSessionActive"
+                class="session-btn session-btn-start"
+                @click="startStatsSession"
+              >
+                开始统计
+              </button>
+              <button 
+                v-else
+                class="session-btn session-btn-reset"
+                @click="resetStatsSession"
+              >
+                重置统计
+              </button>
+            </div>
+          </div>
+
+          <div v-if="loadingCumulative || loadingBattleDps" class="stats-loading">
+            {{ battleDpsAnalysis ? '加载战斗DPS分析中...' : '加载累计统计中...' }}
+          </div>
+          <div v-else-if="battleDpsAnalysis && (!battleDpsAnalysis.characters || battleDpsAnalysis.characters.length === 0)" class="stats-empty">
+            <div class="dps-empty-message">
+              <p>该战斗暂无DPS数据</p>
+            </div>
+          </div>
+          <div v-else-if="!battleDpsAnalysis && !statsSessionActive" class="stats-empty">
             <div class="dps-empty-message">
               <p>请先开始统计会话</p>
               <p class="dps-empty-hint">点击上方的"开始统计"按钮开始累计统计</p>
             </div>
           </div>
-          <div v-else-if="!cumulativeDpsAnalysis || (cumulativeDpsAnalysis.characters && cumulativeDpsAnalysis.characters.length === 0)" class="stats-empty">
+          <div v-else-if="!battleDpsAnalysis && (!cumulativeDpsAnalysis || (cumulativeDpsAnalysis.characters && cumulativeDpsAnalysis.characters.length === 0))" class="stats-empty">
             <div class="dps-empty-message">
               <p>暂无累计统计数据</p>
               <p class="dps-empty-hint">开始战斗后，统计数据将在这里显示</p>
             </div>
           </div>
           <div v-else class="dps-analysis">
-            <!-- 累计总览 -->
+            <!-- DPS总览 -->
             <div class="stats-section">
               <h3 class="stats-section-title">
-                累计统计
-                <span v-if="statsSessionStartTime" class="session-time-badge">
+                {{ battleDpsAnalysis ? '单场战斗DPS统计' : '累计DPS统计' }}
+                <span v-if="!battleDpsAnalysis && statsSessionStartTime" class="session-time-badge">
                   自 {{ formatDate(statsSessionStartTime) }}
                 </span>
               </h3>
               <div class="dps-overview">
-                <div class="dps-overview-item">
+                <div v-if="!battleDpsAnalysis" class="dps-overview-item">
                   <span class="dps-overview-label">战斗场次</span>
                   <span class="dps-overview-value">{{ getCumulativeBattleCount() }}</span>
                 </div>
                 <div class="dps-overview-item">
-                  <span class="dps-overview-label">累计时长</span>
-                  <span class="dps-overview-value">{{ formatTime(cumulativeDpsAnalysis.duration) }}</span>
+                  <span class="dps-overview-label">{{ battleDpsAnalysis ? '战斗时长' : '累计时长' }}</span>
+                  <span class="dps-overview-value">{{ formatTime((battleDpsAnalysis || cumulativeDpsAnalysis).duration) }}</span>
                 </div>
                 <div class="dps-overview-item">
                   <span class="dps-overview-label">总回合数</span>
-                  <span class="dps-overview-value">{{ cumulativeDpsAnalysis.totalRounds }}</span>
+                  <span class="dps-overview-value">{{ (battleDpsAnalysis || cumulativeDpsAnalysis).totalRounds }}</span>
                 </div>
                 <div class="dps-overview-item">
                   <span class="dps-overview-label">队伍DPS</span>
-                  <span class="dps-overview-value stats-highlight">{{ formatDPS(cumulativeDpsAnalysis.teamDps) }}</span>
+                  <span class="dps-overview-value stats-highlight">{{ formatDPS((battleDpsAnalysis || cumulativeDpsAnalysis).teamDps) }}</span>
                 </div>
                 <div class="dps-overview-item">
                   <span class="dps-overview-label">队伍HPS</span>
-                  <span class="dps-overview-value">{{ formatDPS(cumulativeDpsAnalysis.teamHps) }}</span>
+                  <span class="dps-overview-value">{{ formatDPS((battleDpsAnalysis || cumulativeDpsAnalysis).teamHps) }}</span>
                 </div>
               </div>
             </div>
 
             <!-- 伤害构成 -->
-            <div v-if="cumulativeDpsAnalysis.teamDamageComposition && hasAnyDamageType(cumulativeDpsAnalysis.teamDamageComposition)" class="stats-section">
-              <h3 class="stats-section-title">累计伤害构成</h3>
+            <div v-if="(battleDpsAnalysis || cumulativeDpsAnalysis)?.teamDamageComposition && hasAnyDamageType((battleDpsAnalysis || cumulativeDpsAnalysis).teamDamageComposition)" class="stats-section">
+              <h3 class="stats-section-title">{{ battleDpsAnalysis ? '战斗伤害构成' : '累计伤害构成' }}</h3>
               <div class="damage-composition">
-                <template v-for="(value, key) in cumulativeDpsAnalysis.teamDamageComposition.percentages" :key="key">
+                <template v-for="(value, key) in (battleDpsAnalysis || cumulativeDpsAnalysis).teamDamageComposition.percentages" :key="key">
                   <div 
                     v-if="value > 0"
                     class="damage-type-item"
@@ -968,15 +832,15 @@ onMounted(() => {
                         :style="{ width: value + '%', backgroundColor: getDamageTypeColor(key) }"
                       ></div>
                     </div>
-                    <span class="damage-type-value">{{ formatNumber(getDamageTypeValue(key, cumulativeDpsAnalysis.teamDamageComposition)) }}</span>
+                    <span class="damage-type-value">{{ formatNumber(getDamageTypeValue(key, (battleDpsAnalysis || cumulativeDpsAnalysis).teamDamageComposition)) }}</span>
                   </div>
                 </template>
               </div>
             </div>
 
-            <!-- 角色累计DPS分析 -->
+            <!-- 角色DPS分析 -->
             <div 
-              v-for="character in cumulativeDpsAnalysis.characters" 
+              v-for="character in (battleDpsAnalysis || cumulativeDpsAnalysis).characters" 
               :key="character.characterId"
               class="stats-section character-dps-section"
             >
@@ -1007,7 +871,7 @@ onMounted(() => {
 
               <!-- 技能DPS明细 -->
               <div class="skill-dps-list">
-                <h4 class="stats-subtitle">累计技能DPS明细</h4>
+                <h4 class="stats-subtitle">{{ battleDpsAnalysis ? '技能DPS明细' : '累计技能DPS明细' }}</h4>
                 <div class="skill-dps-table">
                   <div class="skill-dps-header">
                     <div class="skill-dps-col-name">技能</div>
@@ -1034,7 +898,7 @@ onMounted(() => {
 
               <!-- 角色伤害构成 -->
               <div v-if="character.damageComposition && hasAnyDamageType(character.damageComposition)" class="character-damage-composition">
-                <h4 class="stats-subtitle">累计伤害类型构成</h4>
+                <h4 class="stats-subtitle">{{ battleDpsAnalysis ? '伤害类型构成' : '累计伤害类型构成' }}</h4>
                 <div class="damage-composition">
                   <template v-for="(value, key) in character.damageComposition.percentages" :key="key">
                     <div 
@@ -1366,6 +1230,14 @@ onMounted(() => {
   border-top: 1px solid var(--text-dim);
 }
 
+.battle-actions {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--text-dim);
+  display: flex;
+  justify-content: flex-end;
+}
+
 .battle-action-btn {
   width: 100%;
   padding: 8px;
@@ -1632,6 +1504,44 @@ onMounted(() => {
   background: rgba(255, 0, 0, 0.1);
 }
 
+.battle-dps-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--text-dim);
+  background: rgba(0, 0, 0, 0.3);
+  margin-bottom: 16px;
+}
+
+.battle-dps-title {
+  margin: 0;
+  font-size: 16px;
+  color: var(--text-primary);
+}
+
+.battle-dps-close {
+  background: transparent;
+  border: 1px solid var(--text-dim);
+  color: var(--text-secondary);
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.battle-dps-close:hover {
+  background: rgba(255, 0, 0, 0.1);
+  border-color: var(--terminal-red);
+  color: var(--terminal-red);
+}
+
 .session-time-badge {
   margin-left: 12px;
   padding: 2px 8px;
@@ -1666,6 +1576,11 @@ onMounted(() => {
   background: var(--terminal-green);
 }
 </style>
+
+
+
+
+
 
 
 

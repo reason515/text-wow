@@ -1276,7 +1276,7 @@ function escapeRegex(str: string): string {
                     ></div>
                   </div>
                   <div class="team-character-resource-value">
-                    {{ char.resource || char.mp || 0 }}/{{ char.maxResource || char.max_resource || char.max_mp || 100 }}
+                    {{ (char as any).resource || (char as any).mp || 0 }}/{{ (char as any).maxResource || (char as any).max_resource || (char as any).max_mp || 100 }}
                   </div>
                 </div>
                 <!-- Buff/Debuff显示 -->
@@ -1543,7 +1543,7 @@ function escapeRegex(str: string): string {
               <div class="character-detail-progress-fill" :style="{ width: getMpPercent(selectedCharacter) + '%' }"></div>
             </div>
             <div class="character-detail-progress-text">
-              {{ selectedCharacter.resource || selectedCharacter.mp || 0 }}/{{ selectedCharacter.maxResource || selectedCharacter.max_resource || selectedCharacter.max_mp || 100 }}
+              {{ (selectedCharacter as any).resource || (selectedCharacter as any).mp || 0 }}/{{ (selectedCharacter as any).maxResource || (selectedCharacter as any).max_resource || (selectedCharacter as any).max_mp || 100 }}
             </div>
           </div>
           

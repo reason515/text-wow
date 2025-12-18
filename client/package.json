@@ -13,17 +13,17 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "vue": "^3.4.0",
-    "pinia": "^2.1.7"
+    "pinia": "^2.1.7",
+    "vue": "^3.4.0"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.0.0",
+    "@vitest/coverage-v8": "^1.2.0",
     "@vue/test-utils": "^2.4.3",
     "happy-dom": "^13.3.1",
-    "typescript": "^5.3.0",
+    "typescript": "^5.9.3",
     "vite": "^5.0.0",
     "vitest": "^1.2.0",
-    "vue-tsc": "^1.8.0",
-    "@vitest/coverage-v8": "^1.2.0"
+    "vue-tsc": "^3.1.8"
   }
 }

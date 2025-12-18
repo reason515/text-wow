@@ -37,3 +37,8 @@ SET attack_type = COALESCE(attack_type, 'physical'),
 
 
 
+
+
+
+
+

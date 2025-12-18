@@ -1272,54 +1272,6 @@ func (h *Handler) GetDailyStats(c *gin.Context) {
 	})
 }
 
-// GetBattleDPSAnalysis 获取战斗DPS分析
-func (h *Handler) GetBattleDPSAnalysis(c *gin.Context) {
-	battleIDStr := c.Param("battleId")
-	battleID, err := strconv.Atoi(battleIDStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, models.APIResponse{
-			Success: false,
-			Error:   "invalid battle id",
-		})
-		return
-	}
-
-	userID, _ := c.Get("userID")
-
-	// 获取战斗记录验证所有权
-	battle, err := h.battleStatsRepo.GetBattleRecordByID(battleID)
-	if err != nil {
-		c.JSON(http.StatusNotFound, models.APIResponse{
-			Success: false,
-			Error:   "battle not found",
-		})
-		return
-	}
-
-	if battle.UserID != userID.(int) {
-		c.JSON(http.StatusForbidden, models.APIResponse{
-			Success: false,
-			Error:   "forbidden",
-		})
-		return
-	}
-
-	// 获取DPS分析
-	analysis, err := h.battleStatsRepo.GetBattleDPSAnalysis(battleID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.APIResponse{
-			Success: false,
-			Error:   "failed to get DPS analysis: " + err.Error(),
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, models.APIResponse{
-		Success: true,
-		Data:    analysis,
-	})
-}
-
 // StartStatsSession 开始统计会话
 func (h *Handler) StartStatsSession(c *gin.Context) {
 	userID, _ := c.Get("userID")
@@ -1397,6 +1349,54 @@ func (h *Handler) GetCumulativeDPSAnalysis(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, models.APIResponse{
 			Success: false,
 			Error:   "failed to get cumulative DPS analysis: " + err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.APIResponse{
+		Success: true,
+		Data:    analysis,
+	})
+}
+
+// GetBattleDPSAnalysis 获取单场战斗DPS分析
+func (h *Handler) GetBattleDPSAnalysis(c *gin.Context) {
+	userID, _ := c.Get("userID")
+	battleIDStr := c.Param("battleId")
+	battleID, err := strconv.Atoi(battleIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Success: false,
+			Error:   "invalid battle id",
+		})
+		return
+	}
+
+	// 验证战斗记录的所有权
+	battle, err := h.battleStatsRepo.GetBattleRecordByID(battleID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, models.APIResponse{
+			Success: false,
+			Error:   "battle not found",
+		})
+		return
+	}
+
+	// 验证战斗是否属于当前用户
+	if battle.UserID != userID.(int) {
+		c.JSON(http.StatusForbidden, models.APIResponse{
+			Success: false,
+			Error:   "forbidden",
+		})
+		return
+	}
+
+	// 获取单场战斗DPS分析
+	analysis, err := h.battleStatsRepo.GetBattleDPSAnalysis(battleID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Error:   "failed to get battle DPS analysis: " + err.Error(),
 		})
 		return
 	}
