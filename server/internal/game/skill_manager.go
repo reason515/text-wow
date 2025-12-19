@@ -44,6 +44,11 @@ func (sm *SkillManager) LoadCharacterSkills(characterID int) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
+	// 如果技能已经加载，不重新加载（保持冷却时间等状态）
+	if _, exists := sm.characterSkills[characterID]; exists {
+		return nil
+	}
+
 	characterSkills, err := sm.skillRepo.GetCharacterSkills(characterID)
 	if err != nil {
 		return err

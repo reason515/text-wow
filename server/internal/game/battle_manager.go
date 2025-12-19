@@ -996,34 +996,6 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 				formulaText = m.formatDamageFormula(damageDetails)
 			}
 
-			// 处理技能特殊效果日志（闪避时不触发伤害相关效果）
-			if skillEffects != nil && !isDodged {
-				if stun, ok := skillEffects["stun"].(bool); ok && stun {
-					m.addLog(session, "combat", fmt.Sprintf("%s 被眩晕了！", target.Name), "#ff00ff")
-					logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
-				}
-				// 处理基于伤害的恢复（嗜血等）
-				if healPercent, ok := skillEffects["healPercent"].(float64); ok && usedSkill {
-					healAmount := int(float64(playerDamage) * healPercent / 100.0)
-					char.HP += healAmount
-					if char.HP > char.MaxHP {
-						char.HP = char.MaxHP
-					}
-					m.addLog(session, "heal", fmt.Sprintf("%s 恢复了 %d 点生命值", char.Name, healAmount), "#00ff00")
-					logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
-				}
-				// 处理破釜沉舟的立即恢复（基于最大HP）
-				if healMaxHpPercent, ok := skillEffects["healMaxHpPercent"].(float64); ok && usedSkill {
-					healAmount := int(float64(char.MaxHP) * healMaxHpPercent / 100.0)
-					char.HP += healAmount
-					if char.HP > char.MaxHP {
-						char.HP = char.MaxHP
-					}
-					m.addLog(session, "heal", fmt.Sprintf("%s 的破釜沉舟恢复了 %d 点生命值", char.Name, healAmount), "#00ff00")
-					logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
-				}
-			}
-
 			// 记录技能使用日志
 			if shouldDealDamage {
 				if isDodged {
@@ -1074,6 +1046,34 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 				m.recordSkillUsage(session, char.ID, char.TeamSlot, skillID, 0, 0, resourceCost, true, false)
 			}
 			logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
+
+			// 处理技能特殊效果日志（在技能使用日志之后，闪避时不触发伤害相关效果）
+			if skillEffects != nil && !isDodged {
+				if stun, ok := skillEffects["stun"].(bool); ok && stun {
+					m.addLog(session, "combat", fmt.Sprintf("%s 被眩晕了！", target.Name), "#ff00ff")
+					logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
+				}
+				// 处理基于伤害的恢复（嗜血等）
+				if healPercent, ok := skillEffects["healPercent"].(float64); ok && usedSkill {
+					healAmount := int(float64(playerDamage) * healPercent / 100.0)
+					char.HP += healAmount
+					if char.HP > char.MaxHP {
+						char.HP = char.MaxHP
+					}
+					m.addLog(session, "heal", fmt.Sprintf("%s 恢复了 %d 点生命值", char.Name, healAmount), "#00ff00")
+					logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
+				}
+				// 处理破釜沉舟的立即恢复（基于最大HP）
+				if healMaxHpPercent, ok := skillEffects["healMaxHpPercent"].(float64); ok && usedSkill {
+					healAmount := int(float64(char.MaxHP) * healMaxHpPercent / 100.0)
+					char.HP += healAmount
+					if char.HP > char.MaxHP {
+						char.HP = char.MaxHP
+					}
+					m.addLog(session, "heal", fmt.Sprintf("%s 的破釜沉舟恢复了 %d 点生命值", char.Name, healAmount), "#00ff00")
+					logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
+				}
+			}
 
 			// 减少技能冷却时间
 			m.skillManager.TickCooldowns(char.ID)
@@ -1148,6 +1148,53 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 		// 敌人回合：当前索引的敌人攻击玩家
 		if session.CurrentTurnIndex < len(aliveEnemies) {
 			enemy := aliveEnemies[session.CurrentTurnIndex]
+
+			// 检查敌人是否处于眩晕状态
+			enemyDebuffs := m.buffManager.GetEnemyDebuffs(enemy.ID)
+			isStunned := false
+			for _, debuff := range enemyDebuffs {
+				if debuff.Type == "stun" {
+					isStunned = true
+					break
+				}
+			}
+
+			if isStunned {
+				// 敌人被眩晕，无法行动
+				m.addLog(session, "combat", fmt.Sprintf("%s 处于眩晕状态，无法行动！", enemy.Name), "#ff00ff")
+				logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
+
+				// 减少敌人debuff持续时间
+				expiredDebuffs := m.buffManager.TickEnemyDebuffs(enemy.ID)
+				for _, expiredID := range expiredDebuffs {
+					// 检查是否是眩晕debuff
+					if expiredID == "charge_stun" {
+						m.addLog(session, "buff", fmt.Sprintf("%s 的眩晕效果消失了", enemy.Name), "#888888")
+						logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
+					}
+				}
+
+				// 移动到下一个敌人或回到玩家回合
+				session.CurrentTurnIndex++
+				if session.CurrentTurnIndex >= len(aliveEnemies) {
+					session.CurrentTurnIndex = -1 // 回到玩家回合
+				}
+
+				// 返回结果（眩晕，无行动）
+				return &BattleTickResult{
+					Character:    char,
+					Enemy:        session.CurrentEnemy,
+					Enemies:      session.CurrentEnemies,
+					Logs:         logs,
+					IsRunning:    session.IsRunning,
+					IsResting:    session.IsResting,
+					RestUntil:    session.RestUntil,
+					SessionKills: session.SessionKills,
+					SessionGold:  session.SessionGold,
+					SessionExp:   session.SessionExp,
+					BattleCount:  session.BattleCount,
+				}, nil
+			}
 
 			// 【闪避判定】玩家尝试闪避敌人攻击
 			playerDodgeRate := m.calculateCharacterDodgeRate(char)
@@ -1345,6 +1392,15 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 			}
 			logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
 
+			// 减少敌人debuff持续时间
+			expiredDebuffs := m.buffManager.TickEnemyDebuffs(enemy.ID)
+			for _, expiredID := range expiredDebuffs {
+				if expiredID == "charge_stun" {
+					m.addLog(session, "buff", fmt.Sprintf("%s 的眩晕效果消失了", enemy.Name), "#888888")
+					logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
+				}
+			}
+
 			// 检查玩家是否死亡
 			if char.HP <= 0 {
 				char.TotalDeaths++
@@ -1369,9 +1425,13 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 				char.IsDead = true
 				char.ReviveAt = &reviveAt
 
-				// 角色死亡时，立即清除所有buff和debuff
+				// 角色死亡时，立即清除所有buff和debuff，技能冷却重置
 				if m.buffManager != nil {
 					m.buffManager.ClearBuffs(char.ID)
+				}
+				// 清除技能状态（包括冷却时间）
+				if m.skillManager != nil {
+					m.skillManager.ClearCharacterSkills(char.ID)
 				}
 
 				m.addLog(session, "death", fmt.Sprintf("%s 被击败了... 需要 %d 秒复活", char.Name, int(reviveDuration.Seconds())), "#ff0000")
@@ -1479,11 +1539,15 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 		}
 		m.saveBattleStats(session, session.UserID, zoneID, monsterID, true, characters)
 
-		// 战斗结束后，清除所有角色的buff和debuff，怒气归0
+		// 战斗结束后，清除所有角色的buff和debuff，怒气归0，技能冷却重置
 		for _, c := range characters {
 			// 清除所有buff和debuff
 			if m.buffManager != nil {
 				m.buffManager.ClearBuffs(c.ID)
+			}
+			// 清除技能状态（包括冷却时间）
+			if m.skillManager != nil {
+				m.skillManager.ClearCharacterSkills(c.ID)
 			}
 			// 战士的怒气归0
 			if c.ResourceType == "rage" {
@@ -2682,6 +2746,20 @@ func (m *BattleManager) updateShieldValue(characterID int, newShieldValue float6
 func (m *BattleManager) applySkillDebuffs(skillState *CharacterSkillState, character *models.Character, target *models.Monster, allEnemies []*models.Monster, skillEffects map[string]interface{}) {
 	skill := skillState.Skill
 	effect := skillState.Effect
+
+	// 处理眩晕效果（冲锋等技能）
+	if stun, ok := skillEffects["stun"].(bool); ok && stun {
+		stunDuration := 1 // 默认1回合
+		if duration, ok := skillEffects["stunDuration"].(int); ok {
+			stunDuration = duration
+		} else if duration, ok := skillEffects["stunDuration"].(float64); ok {
+			stunDuration = int(duration)
+		}
+		// 应用到目标敌人
+		if target != nil && target.HP > 0 {
+			m.buffManager.ApplyEnemyDebuff(target.ID, "charge_stun", "冲锋眩晕", "stun", stunDuration, 0, "", "")
+		}
+	}
 
 	switch skill.ID {
 	case "warrior_demoralizing_shout":

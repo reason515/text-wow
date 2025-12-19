@@ -57,15 +57,36 @@ func (e *StrategyExecutor) ExecuteStrategy(strategy *models.BattleStrategy, ctx 
 	}
 
 	// 1. 检查资源阈值 - 如果资源低于阈值，优先普通攻击积攒资源
+	// 但是，如果技能优先级列表中有不消耗资源或获得资源的技能（如冲锋），应该允许使用
 	if ctx.Character.Resource < strategy.ResourceThreshold {
-		// 除非有紧急条件规则触发
-		urgentDecision := e.checkUrgentRules(strategy, ctx)
-		if urgentDecision != nil {
-			return urgentDecision
+		// 检查是否有不消耗资源的技能可用（如冲锋，ResourceCost <= 0）
+		hasFreeSkill := false
+		for _, skillID := range strategy.SkillPriority {
+			if ctx.SkillManager != nil {
+				available := ctx.SkillManager.GetAvailableSkills(ctx.Character.ID, ctx.Character.Resource, ctx.BuffManager)
+				for _, skill := range available {
+					if (skill.SkillID == skillID || skill.SkillID == "warrior_"+skillID) && skill.Skill.ResourceCost <= 0 {
+						hasFreeSkill = true
+						break
+					}
+				}
+				if hasFreeSkill {
+					break
+				}
+			}
 		}
-		return &SkillDecision{
-			IsNormalAttack: true,
-			Reason:         "资源低于阈值，使用普通攻击积攒资源",
+		
+		// 如果有免费技能可用，继续执行策略选择，不强制普通攻击
+		if !hasFreeSkill {
+			// 除非有紧急条件规则触发
+			urgentDecision := e.checkUrgentRules(strategy, ctx)
+			if urgentDecision != nil {
+				return urgentDecision
+			}
+			return &SkillDecision{
+				IsNormalAttack: true,
+				Reason:         "资源低于阈值，使用普通攻击积攒资源",
+			}
 		}
 	}
 
