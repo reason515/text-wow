@@ -402,8 +402,8 @@ func (h *Handler) CreateCharacter(c *gin.Context) {
 	}
 
 	// 计算物理和魔法攻击/防御
-	// 物理攻击 = 力量×1.0 + 敏捷×0.2
-	char.PhysicalAttack = int(float64(char.Strength)*1.0 + float64(char.Agility)*0.2)
+	// 物理攻击 = 力量×0.6 + 敏捷×0.2
+	char.PhysicalAttack = int(float64(char.Strength)*0.6 + float64(char.Agility)*0.2)
 	// 魔法攻击 = 智力×1.0 + 精神×0.2
 	char.MagicAttack = int(float64(char.Intellect)*1.0 + float64(char.Spirit)*0.2)
 	// 物理防御 = 力量×0.2 + 耐力×0.3
@@ -634,7 +634,7 @@ func (h *Handler) AllocateAttributePoints(c *gin.Context) {
 		char.Resource = char.MaxResource
 	}
 
-	char.PhysicalAttack = int(float64(char.Strength)*1.0 + float64(char.Agility)*0.2)
+	char.PhysicalAttack = int(float64(char.Strength)*0.6 + float64(char.Agility)*0.2)
 	char.MagicAttack = int(float64(char.Intellect)*1.0 + float64(char.Spirit)*0.2)
 	char.PhysicalDefense = int(float64(char.Strength)*0.2 + float64(char.Stamina)*0.3)
 	char.MagicDefense = int(float64(char.Intellect)*0.2 + float64(char.Spirit)*0.3)

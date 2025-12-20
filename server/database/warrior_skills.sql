@@ -68,7 +68,7 @@ INSERT OR REPLACE INTO skills (id, name, description, class_id, type, target_typ
 -- A8. 破釜沉舟 (Last Stand)
 ('warrior_last_stand', '破釜沉舟', '紧急恢复技能，关键时刻保命。1级：立即恢复最大HP的30%，持续3回合，每级+5%恢复量，+0.5回合持续时间', 'warrior', 'buff', 'self', NULL, 0, NULL, 0, 0, 10, 1, 'eff_last_stand', 1.0, 0.0, 'normal', '["survival", "emergency"]'),
 -- A9. 冲锋 (Charge)
-('warrior_charge', '冲锋', '战士的招牌技能！快速冲向敌人并造成伤害，获得怒气，有概率眩晕目标。1级：80%伤害，+15怒气，30%眩晕，冷却3回合，每级+10%伤害，+3怒气，+5%眩晕概率，-0.5回合冷却', 'warrior', 'attack', 'enemy', 'physical', 0, 'strength', 0.8, 0, 3, 1, 'eff_charge_stun', 0.3, 1.2, 'normal', '["signature", "mobility", "rage_generation", "control"]'),
+('warrior_charge', '冲锋', '战士的招牌技能！快速冲向敌人并造成伤害，获得怒气，有概率眩晕目标。1级：80%伤害，+15怒气，30%眩晕，冷却5回合，每级+10%伤害，+3怒气，+5%眩晕概率，-0.5回合冷却', 'warrior', 'attack', 'enemy', 'physical', 0, 'strength', 0.8, 0, 5, 1, 'eff_charge_stun', 0.3, 1.2, 'normal', '["signature", "mobility", "rage_generation", "control"]'),
 
 -- 所有主动技能池 (剩余13个)
 -- A10. 旋风斩 (Whirlwind)

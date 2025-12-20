@@ -306,7 +306,7 @@ const displayedStats = computed(() => {
   const intl = char.intellect || 0
   const spr = char.spirit || 0
 
-  const basePhysicalAttack = char.physicalAttack ?? (str * 1 + agi * 0.2)
+  const basePhysicalAttack = char.physicalAttack ?? (str * 0.6 + agi * 0.2)
   const baseMagicAttack = char.magicAttack ?? (intl * 1 + spr * 0.2)
   const basePhysicalDefense = char.physicalDefense ?? (str * 0.2 + (char.stamina || 0) * 0.3)
   const baseMagicDefense = char.magicDefense ?? (intl * 0.2 + spr * 0.3)
@@ -435,12 +435,12 @@ function getCombatStatTooltip(statKey: string): string {
 
   switch (statKey) {
     case 'physicalAttack': {
-      const base = (str * 1 + agi * 0.2).toFixed(1)
+      const base = (str * 0.6 + agi * 0.2).toFixed(1)
       const bonus = stats.physicalAttackBonusPct
       return [
-        `物理攻击 = 力量×1.0 + 敏捷×0.2${bonus ? `，再乘(1 + 被动${bonus.toFixed(1)}%)` : ''}`,
+        `物理攻击 = 力量×0.6 + 敏捷×0.2${bonus ? `，再乘(1 + 被动${bonus.toFixed(1)}%)` : ''}`,
         `力量: ${str}, 敏捷: ${agi}`,
-        `基础计算: ${str}×1.0 + ${agi}×0.2 = ${base}`,
+        `基础计算: ${str}×0.6 + ${agi}×0.2 = ${base}`,
         bonus ? `被动加成: +${bonus.toFixed(1)}%` : '',
         `最终: ${stats.physicalAttack}`
       ].filter(Boolean).join('\n')
@@ -539,12 +539,12 @@ function getPrimaryStatTooltip(statKey: PrimaryStatKey): string {
 
   switch (statKey) {
     case 'strength': {
-      const physAtk = (str * 1).toFixed(1)
+      const physAtk = (str * 0.6).toFixed(1)
       const physDef = (str * 0.2).toFixed(1)
       const critDmg = ((char.physCritDamage ?? (1.5 + str * 0.003)) * 100).toFixed(1)
       return [
         '力量',
-        `- 每点提供 1.0 物理攻击 (当前贡献: +${physAtk})`,
+        `- 每点提供 0.6 物理攻击 (当前贡献: +${physAtk})`,
         `- 每点提供 0.2 物理防御 (当前贡献: +${physDef})`,
         `- 物理暴击伤害 = 150% + 力量×0.3% (当前: ${critDmg}%)`
       ].join('\n')
