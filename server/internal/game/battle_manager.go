@@ -505,9 +505,11 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 			var strategyDecision *SkillDecision
 
 			// 优先使用策略执行器
+			hasStrategy := false
 			if m.strategyExecutor != nil {
 				strategy := m.strategyExecutor.GetActiveStrategy(char.ID)
 				if strategy != nil {
+					hasStrategy = true
 					// 构建战斗上下文
 					battleCtx := &BattleContext{
 						Character:    char,
@@ -541,8 +543,12 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 						targetHPPercent = float64(target.HP) / float64(target.MaxHP)
 					}
 				}
+			} else if hasStrategy {
+				// 有策略但返回 nil，表示没有可用技能或应该使用普通攻击
+				// 不使用 SelectBestSkill，因为它不检查条件规则限制
+				skillState = nil
 			} else if m.skillManager != nil {
-				// 没有策略或策略无决策，使用默认逻辑
+				// 没有策略，使用默认逻辑
 				skillState = m.skillManager.SelectBestSkill(char.ID, char.Resource, targetHPPercent, hasMultipleEnemies, m.buffManager)
 			}
 			_ = targetIndex // 避免未使用警告
@@ -767,13 +773,24 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 							}
 
 							// 对相邻目标造成伤害（最多2个）
+							// 收集相邻目标的日志信息，稍后记录（在主目标日志之后）
+							adjacentLogs := make([]models.BattleLog, 0)
+							adjacentTotalDamage := 0 // 累计波及伤害总和，用于统计
 							adjacentCount := 0
+							processedEnemies := make(map[*models.Monster]bool) // 记录已处理的敌人，避免重复
 							for _, enemy := range aliveEnemies {
-								if enemy != target && enemy.HP > 0 && adjacentCount < 2 {
+								// 确保不是主目标，且未处理过，且还有空位
+								if enemy != target && enemy.HP > 0 && adjacentCount < 2 && !processedEnemies[enemy] {
+									processedEnemies[enemy] = true // 标记为已处理
 									// 相邻目标单独判定闪避
 									if m.checkDodge(enemy.DodgeRate, ignoresDodge) {
-										m.addLog(session, "dodge", fmt.Sprintf("%s 闪避了 %s 的攻击！", enemy.Name, char.Name), "#00ffff")
-										logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
+										// 先创建日志但不立即添加到session，稍后统一添加
+										adjacentLog := models.BattleLog{
+											LogType: "dodge",
+											Message: fmt.Sprintf("%s 闪避了 %s 的攻击！", enemy.Name, char.Name),
+											Color:   "#00ffff",
+										}
+										adjacentLogs = append(adjacentLogs, adjacentLog)
 										adjacentCount++
 										continue
 									}
@@ -795,12 +812,25 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 											enemy.HP = 0
 										}
 										adjacentCount++
+										adjacentTotalDamage += adjacentDamage // 累计伤害用于统计
 										adjacentHPChange := m.formatHPChange(enemy.Name, adjacentOldHP, enemy.HP, enemy.MaxHP)
-										m.addLog(session, "combat", fmt.Sprintf("%s 的顺劈斩波及到 %s，造成 %d 点伤害%s", char.Name, enemy.Name, adjacentDamage, adjacentHPChange), "#ffaa00", withDamageType("physical"))
-										logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
+										// 先创建日志但不立即添加到session，稍后统一添加
+										adjacentLog := models.BattleLog{
+											LogType:    "combat",
+											Message:    fmt.Sprintf("%s 的顺劈斩波及到 %s，造成 %d 点伤害%s", char.Name, enemy.Name, adjacentDamage, adjacentHPChange),
+											Color:      "#ffaa00",
+											DamageType: "physical",
+										}
+										adjacentLogs = append(adjacentLogs, adjacentLog)
 									}
 								}
 							}
+							// 将相邻目标日志信息和总伤害存储到skillState中，稍后记录
+							if skillState.Effect == nil {
+								skillState.Effect = make(map[string]interface{})
+							}
+							skillState.Effect["_adjacentLogs"] = adjacentLogs
+							skillState.Effect["_adjacentTotalDamage"] = adjacentTotalDamage
 						} else {
 							// 单体技能 - 如果未闪避则造成伤害
 							if !isDodged {
@@ -1024,15 +1054,58 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 						m.addLog(session, "combat", fmt.Sprintf("%s 使用 [%s] 对 %s 造成 %d 点伤害%s%s%s", char.Name, skillName, target.Name, playerDamage, formulaText, hpChangeText, resourceChangeText), "#ffaa00", withDamageType(playerDamageType))
 					}
 
+					// 如果是顺劈斩，在主目标日志后记录相邻目标的日志
+					if skillState != nil && skillState.SkillID == "warrior_cleave" {
+						// 先添加主目标日志到logs
+						logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
+						
+						// 然后添加相邻目标的日志
+						if adjacentLogsRaw, ok := skillState.Effect["_adjacentLogs"]; ok {
+							if adjacentLogs, ok := adjacentLogsRaw.([]models.BattleLog); ok {
+								for _, adjacentLog := range adjacentLogs {
+									// 将日志添加到session并记录到logs
+									if adjacentLog.LogType == "dodge" {
+										// 闪避日志不需要伤害类型
+										m.addLog(session, adjacentLog.LogType, adjacentLog.Message, adjacentLog.Color)
+									} else {
+										// 伤害日志需要伤害类型（使用日志中存储的DamageType，如果没有则使用physical）
+										damageType := adjacentLog.DamageType
+										if damageType == "" {
+											damageType = "physical"
+										}
+										m.addLog(session, adjacentLog.LogType, adjacentLog.Message, adjacentLog.Color, withDamageType(damageType))
+									}
+									logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
+								}
+								// 清理临时数据
+								delete(skillState.Effect, "_adjacentLogs")
+							}
+						}
+					}
+
 					// 记录造成伤害的统计
 					m.recordDamageDealt(session, char.ID, char.TeamSlot, playerDamage, playerDamageType, isCrit)
 
-					// 记录技能使用统计
+					// 如果是顺劈斩，记录波及伤害到统计
+					totalSkillDamage := playerDamage // 技能总伤害（用于技能使用统计）
+					if skillState != nil && skillState.SkillID == "warrior_cleave" {
+						if adjacentTotalDamageRaw, ok := skillState.Effect["_adjacentTotalDamage"]; ok {
+							if adjacentTotalDamage, ok := adjacentTotalDamageRaw.(int); ok && adjacentTotalDamage > 0 {
+								// 波及伤害也计入统计（物理伤害，是否暴击取决于主目标是否暴击）
+								m.recordDamageDealt(session, char.ID, char.TeamSlot, adjacentTotalDamage, "physical", isCrit)
+								totalSkillDamage += adjacentTotalDamage // 累计到技能总伤害
+								// 清理临时数据
+								delete(skillState.Effect, "_adjacentTotalDamage")
+							}
+						}
+					}
+
+					// 记录技能使用统计（包含主目标和波及伤害的总和）
 					skillID := ""
 					if skillState != nil {
 						skillID = skillState.SkillID
 					}
-					m.recordSkillUsage(session, char.ID, char.TeamSlot, skillID, playerDamage, 0, resourceCost, true, isCrit)
+					m.recordSkillUsage(session, char.ID, char.TeamSlot, skillID, totalSkillDamage, 0, resourceCost, true, isCrit)
 				}
 			} else {
 				// 非攻击类技能（buff/debuff/control等）：只记录使用，不记录伤害
@@ -1045,7 +1118,12 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 				}
 				m.recordSkillUsage(session, char.ID, char.TeamSlot, skillID, 0, 0, resourceCost, true, false)
 			}
-			logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
+			// 对于顺劈斩，主目标和相邻目标的日志都已经在上面添加了，这里跳过避免重复
+			// 对于其他技能，添加技能使用日志
+			if skillState == nil || skillState.SkillID != "warrior_cleave" {
+				logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
+			}
+			// 顺劈斩的日志已经在上面处理完毕，不需要再添加
 
 			// 处理技能特殊效果日志（在技能使用日志之后，闪避时不触发伤害相关效果）
 			if skillEffects != nil && !isDodged {
@@ -3199,3 +3277,4 @@ func (m *BattleManager) GetStatsSession(userID int) *StatsSession {
 
 	return m.statsSessions[userID]
 }
+

@@ -125,6 +125,10 @@ func (e *StrategyExecutor) ExecuteStrategy(strategy *models.BattleStrategy, ctx 
 			if e.isReservedSkill(strategy, skillID, ctx) {
 				continue
 			}
+			// 检查技能是否被条件规则限制（如果技能在条件规则中，但条件不满足，则跳过）
+			if e.isSkillRestrictedByCondition(strategy, skillID, ctx) {
+				continue
+			}
 			return &SkillDecision{
 				SkillID:     skillID,
 				TargetIndex: e.selectTarget(strategy, ctx, skillID),
@@ -320,6 +324,40 @@ func (e *StrategyExecutor) isReservedSkill(strategy *models.BattleStrategy, skil
 			// 如果保留条件未满足，则该技能被保留
 			if !e.evaluateCondition(&reserved.Condition, ctx) {
 				return true
+			}
+		}
+	}
+	return false
+}
+
+// normalizeSkillID 标准化技能ID（统一为带warrior_前缀的格式）
+func (e *StrategyExecutor) normalizeSkillID(skillID string) string {
+	if len(skillID) >= 8 && skillID[:8] == "warrior_" {
+		return skillID
+	}
+	return "warrior_" + skillID
+}
+
+// isSkillRestrictedByCondition 检查技能是否被条件规则限制
+// 如果技能在条件规则中，但条件不满足，则返回 true（应该跳过该技能）
+func (e *StrategyExecutor) isSkillRestrictedByCondition(strategy *models.BattleStrategy, skillID string, ctx *BattleContext) bool {
+	// 标准化技能ID（支持带或不带warrior_前缀）
+	normalizedSkillID := e.normalizeSkillID(skillID)
+	
+	for _, rule := range strategy.ConditionalRules {
+		if !rule.Enabled {
+			continue
+		}
+		// 检查规则是否针对该技能
+		if rule.Action.Type == "use_skill" && rule.Action.SkillID != "" {
+			normalizedRuleSkillID := e.normalizeSkillID(rule.Action.SkillID)
+			
+			// 如果技能ID匹配（标准化后），且条件不满足，说明该技能被限制使用
+			if normalizedRuleSkillID == normalizedSkillID {
+				// 条件不满足，该技能被限制
+				if !e.evaluateCondition(&rule.Condition, ctx) {
+					return true
+				}
 			}
 		}
 	}
