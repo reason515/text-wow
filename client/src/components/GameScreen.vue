@@ -364,6 +364,21 @@ function getEffectStatLabel(stat: string | undefined): string {
     spell_crit_damage: '法术暴击伤害',
     dodge_rate: '闪避率',
     hp: '生命值',
+    max_hp: '最大生命值',
+    attack: '攻击力',
+    defense: '防御',
+    damage: '伤害',
+    threat: '仇恨',
+    resistance: '控制抗性',
+    // 多属性被动技能
+    threat_and_defense: '仇恨和防御',
+    attack_and_crit: '攻击和暴击',
+    damage_and_threat: '伤害和仇恨',
+    hp_and_defense: '生命值和防御',
+    damage_and_crit: '伤害和暴击',
+    hp_defense_resistance: '生命值、防御和抗性',
+    damage_crit_threat: '伤害、暴击和仇恨',
+    hp_defense_resistance_immune: '生命值、防御、抗性和免疫',
   }
   return map[stat || ''] || (stat || '未知属性')
 }
