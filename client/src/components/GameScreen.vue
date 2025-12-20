@@ -38,6 +38,9 @@ const strategyCharacterSkills = ref<any[]>([])
 // 战斗统计面板
 const showStatsPanel = ref(false)
 
+// 敌人名称到攻击类型的映射，用于保持敌人颜色一致
+const enemyAttackTypeMap = ref<Record<string, string>>({})
+
 // 打开策略编辑器
 async function openStrategyEditor() {
   // 获取当前活跃角色
@@ -1031,7 +1034,7 @@ function formatLogMessage(log: any): string {
   const resourceType = character?.resourceType || 'mana'
   const resourceColor = getResourceColor(resourceType)
   
-  // 获取敌方角色名（从当前敌人或日志中的target/actor字段）
+  // 获取敌方角色名（从当前敌人或日志中的target/actor字段，或从消息文本中提取）
   let enemyName = ''
   // 优先使用target字段（如果actor是我方，target就是敌方）
   if (log.target && log.target !== playerName && !playerNameVariants.includes(log.target)) {
@@ -1041,10 +1044,32 @@ function formatLogMessage(log: any): string {
   else if (log.actor && log.actor !== playerName && !playerNameVariants.includes(log.actor) && log.actor !== 'system') {
     enemyName = log.actor
   } 
-  // 最后尝试从当前敌人列表获取
-  else if (game.currentEnemies && game.currentEnemies.length > 0) {
-    const currentEnemy = game.currentEnemies[0] as any
-    enemyName = currentEnemy?.name || ''
+  // 如果还没有找到，尝试从当前敌人列表中查找（检查消息中是否包含敌人名称）
+  if (!enemyName && game.currentEnemies && game.currentEnemies.length > 0) {
+    // 从消息文本中查找匹配的敌人名称
+    for (const enemy of game.currentEnemies) {
+      const enemyNameToCheck = (enemy as any)?.name || ''
+      if (enemyNameToCheck && message.includes(enemyNameToCheck)) {
+        enemyName = enemyNameToCheck
+        break
+      }
+    }
+    // 如果仍然没有找到，使用第一个敌人作为默认值
+    if (!enemyName) {
+      const currentEnemy = game.currentEnemies[0] as any
+      enemyName = currentEnemy?.name || ''
+    }
+  }
+  
+  // 如果仍然没有找到，尝试从已记录的敌人映射中查找（即使currentEnemies为空）
+  if (!enemyName) {
+    // 从消息文本中查找所有已记录的敌人名称
+    for (const recordedEnemyName of Object.keys(enemyAttackTypeMap.value)) {
+      if (recordedEnemyName && message.includes(recordedEnemyName)) {
+        enemyName = recordedEnemyName
+        break
+      }
+    }
   }
   
   // 获取技能名（从日志的action字段或消息中的方括号内容）
@@ -1053,8 +1078,64 @@ function formatLogMessage(log: any): string {
     skillName = log.action
   }
   
-  // 解析消息并添加颜色标记（传入资源颜色用于技能颜色）
-  return formatMessageWithColors(message, playerName, playerNameVariants, enemyName, skillName, playerColor, resourceColor)
+  // 根据敌人名称确定敌人颜色：物理攻击用红色，魔法攻击用蓝色
+  // 使用敌人名称到攻击类型的映射，确保同一敌人颜色一致
+  let enemyColor = '#ff7777' // 默认红色（物理攻击）
+  
+  if (enemyName) {
+    // 首先检查映射中是否已有该敌人的攻击类型
+    let attackType = enemyAttackTypeMap.value[enemyName]
+    
+    // 如果映射中没有，尝试从当前敌人列表中查找
+    if (!attackType && game.currentEnemies && game.currentEnemies.length > 0) {
+      const matchedEnemy = game.currentEnemies.find((e: any) => e?.name === enemyName) as any
+      if (matchedEnemy) {
+        // 优先使用敌人的attackType
+        if (matchedEnemy.attackType) {
+          attackType = matchedEnemy.attackType.toLowerCase()
+        } else if (matchedEnemy.magicAttack > matchedEnemy.physicalAttack && matchedEnemy.magicAttack > 0) {
+          // 如果魔法攻击更高，推断为魔法类型
+          attackType = 'magic'
+        } else {
+          attackType = 'physical'
+        }
+        // 保存到映射中
+        enemyAttackTypeMap.value[enemyName] = attackType
+      }
+    }
+    
+    // 如果仍然没有找到，尝试从当前日志的damageType推断（仅用于首次遇到）
+    if (!attackType && (log.damageType || log.damage_type)) {
+      const damageType = (log.damageType || log.damage_type || '').toLowerCase()
+      if (damageType === 'magic' || damageType === 'physical') {
+        attackType = damageType
+        enemyAttackTypeMap.value[enemyName] = attackType
+      }
+    }
+    
+    // 根据攻击类型设置颜色
+    if (attackType === 'magic') {
+      enemyColor = '#7777ff' // 魔法攻击用蓝色
+    }
+  }
+  
+  // 当遇到新敌人时，更新映射（从遭遇日志中）
+  if (log.logType === 'encounter' && game.currentEnemies && game.currentEnemies.length > 0) {
+    game.currentEnemies.forEach((enemy: any) => {
+      if (enemy?.name && !enemyAttackTypeMap.value[enemy.name]) {
+        if (enemy.attackType) {
+          enemyAttackTypeMap.value[enemy.name] = enemy.attackType.toLowerCase()
+        } else if (enemy.magicAttack > enemy.physicalAttack && enemy.magicAttack > 0) {
+          enemyAttackTypeMap.value[enemy.name] = 'magic'
+        } else {
+          enemyAttackTypeMap.value[enemy.name] = 'physical'
+        }
+      }
+    })
+  }
+  
+  // 解析消息并添加颜色标记（传入资源颜色用于技能颜色，传入敌人颜色）
+  return formatMessageWithColors(message, playerName, playerNameVariants, enemyName, skillName, playerColor, resourceColor, enemyColor)
 }
 
 // 格式化消息，为角色名和技能名添加颜色
@@ -1065,7 +1146,8 @@ function formatMessageWithColors(
   enemyName: string,
   skillName: string,
   playerColor: string = '#ffff55', // 默认金色，如果未传入则使用默认值
-  resourceColor: string = '#ffffff' // 资源颜色，用于技能颜色
+  resourceColor: string = '#ffffff', // 资源颜色，用于技能颜色
+  enemyColor: string = '#ff7777' // 敌人颜色，根据伤害类型传入
 ): string {
   // 转义HTML特殊字符
   const escapeHtml = (text: string) => {
@@ -1091,8 +1173,7 @@ function formatMessageWithColors(
     return lastSpanOpen > lastSpanClose
   }
   
-  // 定义颜色（使用传入的职业颜色，敌方使用固定颜色）
-  const enemyColor = '#ff7777' // var(--text-red)
+  // 定义颜色（使用传入的职业颜色，敌方使用传入的颜色）
   const normalAttackColor = '#ffffff' // 普通攻击使用白色
   const skillColor = resourceColor // 技能使用资源颜色（与消耗的资源颜色一致）
   
@@ -1150,24 +1231,83 @@ function formatMessageWithColors(
   })
   
   // 标记敌方角色名（避免与已标记的内容冲突）
+  // 如果enemyName为空，尝试从消息中提取所有可能的敌人名称
+  let enemiesToMark: string[] = []
   if (enemyName) {
-    const regex = new RegExp(escapeRegex(enemyName), 'g')
-    // 收集所有匹配位置（从后往前处理，避免索引变化）
-    const matches: Array<{ match: string; index: number }> = []
-    let match
-    while ((match = regex.exec(formatted)) !== null) {
-      matches.push({ match: match[0], index: match.index })
+    enemiesToMark = [enemyName]
+  } else {
+    // 首先从当前敌人列表中查找
+    if (game.currentEnemies && game.currentEnemies.length > 0) {
+      game.currentEnemies.forEach((enemy: any) => {
+        const name = enemy?.name || ''
+        if (name && formatted.includes(name) && !enemiesToMark.includes(name)) {
+          enemiesToMark.push(name)
+        }
+      })
     }
-    // 从后往前替换
-    for (let i = matches.length - 1; i >= 0; i--) {
-      const { match: matchText, index } = matches[i]
-      if (!isInHtmlTag(formatted, index) && !isInSpanTag(formatted, index)) {
-        formatted = formatted.substring(0, index) + 
-                    `<span style="color: ${enemyColor}">${matchText}</span>` + 
-                    formatted.substring(index + matchText.length)
+    // 如果仍然没有找到，从已记录的敌人映射中查找（即使currentEnemies为空）
+    if (enemiesToMark.length === 0) {
+      for (const recordedEnemyName of Object.keys(enemyAttackTypeMap.value)) {
+        if (recordedEnemyName && formatted.includes(recordedEnemyName) && !enemiesToMark.includes(recordedEnemyName)) {
+          enemiesToMark.push(recordedEnemyName)
+        }
       }
     }
   }
+  
+  // 为每个敌人名称设置颜色（按长度从长到短排序，避免短名称覆盖长名称）
+  const sortedEnemyNames = enemiesToMark.sort((a, b) => b.length - a.length)
+  sortedEnemyNames.forEach(name => {
+    if (name) {
+      // 获取该敌人的攻击类型和颜色
+      let color = '#ff7777' // 默认红色
+      let attackType = enemyAttackTypeMap.value[name]
+      // 如果映射中没有，尝试从当前敌人列表中查找
+      if (!attackType && game.currentEnemies && game.currentEnemies.length > 0) {
+        const matchedEnemy = game.currentEnemies.find((e: any) => e?.name === name) as any
+        if (matchedEnemy) {
+          if (matchedEnemy.attackType) {
+            attackType = matchedEnemy.attackType.toLowerCase()
+          } else if (matchedEnemy.magicAttack > matchedEnemy.physicalAttack && matchedEnemy.magicAttack > 0) {
+            attackType = 'magic'
+          } else {
+            attackType = 'physical'
+          }
+          enemyAttackTypeMap.value[name] = attackType
+        }
+      }
+      // 如果仍然没有找到，使用默认物理攻击类型（避免颜色丢失）
+      if (!attackType) {
+        attackType = 'physical'
+        // 如果映射中没有，也保存到映射中，避免下次查找
+        if (!enemyAttackTypeMap.value[name]) {
+          enemyAttackTypeMap.value[name] = attackType
+        }
+      }
+      if (attackType === 'magic') {
+        color = '#7777ff' // 魔法攻击用蓝色
+      }
+      
+      const regex = new RegExp(escapeRegex(name), 'g')
+      // 收集所有匹配位置（从后往前处理，避免索引变化）
+      const matches: Array<{ match: string; index: number }> = []
+      let match
+      while ((match = regex.exec(formatted)) !== null) {
+        matches.push({ match: match[0], index: match.index })
+      }
+      // 从后往前替换
+      for (let i = matches.length - 1; i >= 0; i--) {
+        const { match: matchText, index } = matches[i]
+        if (!isInHtmlTag(formatted, index) && !isInSpanTag(formatted, index)) {
+          const beforeReplace = formatted.substring(index, index + matchText.length)
+          // 使用 !important 确保敌人名称颜色不被父元素的颜色覆盖
+          formatted = formatted.substring(0, index) + 
+                      `<span style="color: ${color} !important">${matchText}</span>` + 
+                      formatted.substring(index + matchText.length)
+        }
+      }
+    }
+  })
   
   return formatted
 }

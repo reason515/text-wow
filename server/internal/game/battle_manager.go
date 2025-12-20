@@ -1459,14 +1459,10 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 			playerHPChangeText := m.formatHPChange(char.Name, originalHP, char.HP, char.MaxHP)
 
 			damageColor := "#ff4444"
-			attackLabel := "物理"
-			if attackType == "magic" {
-				attackLabel = "魔法"
-			}
 			if isEnemyCrit {
-				m.addLog(session, "combat", fmt.Sprintf("%s 进行了💥%s暴击，对 %s 造成 %d 点伤害%s%s%s", enemy.Name, attackLabel, char.Name, enemyDamage, enemyFormulaText, playerHPChangeText, resourceChangeText), damageColor, withDamageType(attackType))
+				m.addLog(session, "combat", fmt.Sprintf("%s 进行了💥暴击，对 %s 造成 %d 点伤害%s%s%s", enemy.Name, char.Name, enemyDamage, enemyFormulaText, playerHPChangeText, resourceChangeText), damageColor, withDamageType(attackType))
 			} else {
-				m.addLog(session, "combat", fmt.Sprintf("%s 的%s攻击命中 %s，造成 %d 点伤害%s%s%s", enemy.Name, attackLabel, char.Name, enemyDamage, enemyFormulaText, playerHPChangeText, resourceChangeText), damageColor, withDamageType(attackType))
+				m.addLog(session, "combat", fmt.Sprintf("%s 攻击命中 %s，造成 %d 点伤害%s%s%s", enemy.Name, char.Name, enemyDamage, enemyFormulaText, playerHPChangeText, resourceChangeText), damageColor, withDamageType(attackType))
 			}
 			logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
 
@@ -1777,7 +1773,7 @@ func (m *BattleManager) spawnEnemies(session *BattleSession, playerLevel int) er
 	if len(enemyNames) > 1 {
 		enemyList = fmt.Sprintf("%s 等 %d 个敌人", enemyNames[0], len(enemyNames))
 	}
-	m.addLog(session, "encounter", fmt.Sprintf("━━━ 战斗 #%d ━━━ 遭遇: %s", session.BattleCount, enemyList), "#ffff00")
+	m.addLog(session, "encounter", fmt.Sprintf("━━━ 战斗 #%d ━━━ 遭遇: %s", session.BattleCount, enemyList), "#00ff00")
 
 	return nil
 }
@@ -2111,14 +2107,14 @@ func (m *BattleManager) addBattleSummary(session *BattleSession, isVictory bool,
 	var summaryMsg string
 	if isVictory {
 		if session.CurrentBattleKills > 0 {
-			// 使用HTML标签为不同部分添加颜色
-			// 结果：金色 #ffd700，击杀：红色 #ff4444，经验：蓝色 #3d85c6，金币：金色 #ffd700
-			summaryMsg = fmt.Sprintf("━━━ 战斗总结 ━━━ 结果: <span style=\"color: #ffd700\">✓ 胜利</span> | 击杀: <span style=\"color: #ff4444\">%d</span> | 经验: <span style=\"color: #3d85c6\">%d</span> | 金币: <span style=\"color: #ffd700\">%d</span>",
-				session.CurrentBattleKills, session.CurrentBattleExp, session.CurrentBattleGold)
-		} else {
-			summaryMsg = "━━━ 战斗总结 ━━━ 结果: <span style=\"color: #ffd700\">✓ 胜利</span>"
-		}
-		m.addLog(session, "battle_summary", summaryMsg, "#ffd700")
+		// 使用HTML标签为不同部分添加颜色
+		// 结果：绿色 #00ff00，击杀：红色 #ff4444，经验：蓝色 #3d85c6，金币：金色 #ffd700
+		summaryMsg = fmt.Sprintf("━━━ 战斗总结 ━━━ 结果: <span style=\"color: #00ff00\">✓ 胜利</span> | 击杀: <span style=\"color: #ff4444\">%d</span> | 经验: <span style=\"color: #3d85c6\">%d</span> | 金币: <span style=\"color: #ffd700\">%d</span>",
+			session.CurrentBattleKills, session.CurrentBattleExp, session.CurrentBattleGold)
+	} else {
+		summaryMsg = "━━━ 战斗总结 ━━━ 结果: <span style=\"color: #00ff00\">✓ 胜利</span>"
+	}
+	m.addLog(session, "battle_summary", summaryMsg, "#00ff00")
 		*logs = append(*logs, session.BattleLogs[len(session.BattleLogs)-1])
 	} else {
 		// 失败时的总结
