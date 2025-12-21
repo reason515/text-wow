@@ -18,6 +18,7 @@ type BattleManager struct {
 	sessions            map[int]*BattleSession // key: userID
 	gameRepo            *repository.GameRepository
 	charRepo            *repository.CharacterRepository
+	explorationRepo     *repository.ExplorationRepository // 探索度仓库
 	skillManager        *SkillManager
 	buffManager         *BuffManager
 	passiveSkillManager *PassiveSkillManager
@@ -144,6 +145,7 @@ func NewBattleManager() *BattleManager {
 		sessions:            make(map[int]*BattleSession),
 		gameRepo:            repository.NewGameRepository(),
 		charRepo:            repository.NewCharacterRepository(),
+		explorationRepo:     repository.NewExplorationRepository(),
 		skillManager:        NewSkillManager(),
 		buffManager:         NewBuffManager(),
 		passiveSkillManager: NewPassiveSkillManager(),
@@ -171,6 +173,14 @@ func (m *BattleManager) GetOrCreateSession(userID int) *BattleSession {
 	defer m.mu.Unlock()
 
 	if session, exists := m.sessions[userID]; exists {
+		// 如果会话存在但没有地图，尝试从用户数据加载
+		if session.CurrentZone == nil {
+			// 这里可以尝试从用户表获取，但暂时使用默认地图
+			zone, err := m.gameRepo.GetZoneByID("elwynn")
+			if err == nil {
+				session.CurrentZone = zone
+			}
+		}
 		return session
 	}
 
@@ -182,6 +192,13 @@ func (m *BattleManager) GetOrCreateSession(userID int) *BattleSession {
 		CurrentTurnIndex: -1, // 初始化为玩家回合
 		RestSpeed:        1.0,
 	}
+	
+	// 尝试设置默认地图（可以根据用户数据设置，但暂时使用 elwynn）
+	zone, err := m.gameRepo.GetZoneByID("elwynn")
+	if err == nil {
+		session.CurrentZone = zone
+	}
+	
 	m.sessions[userID] = session
 	return session
 }
@@ -425,9 +442,11 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 
 	// 获取存活的敌人
 	aliveEnemies := make([]*models.Monster, 0)
-	for _, enemy := range session.CurrentEnemies {
-		if enemy != nil && enemy.HP > 0 {
-			aliveEnemies = append(aliveEnemies, enemy)
+	if session.CurrentEnemies != nil {
+		for _, enemy := range session.CurrentEnemies {
+			if enemy != nil && enemy.HP > 0 {
+				aliveEnemies = append(aliveEnemies, enemy)
+			}
 		}
 	}
 
@@ -450,7 +469,9 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 
 		err := m.spawnEnemies(session, char.Level)
 		if err != nil {
-			return nil, err
+			// 如果生成敌人失败，记录错误并返回
+			m.addLog(session, "error", fmt.Sprintf("生成敌人失败: %v", err), "#ff0000")
+			return nil, fmt.Errorf("failed to spawn enemies: %v", err)
 		}
 		logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
 
@@ -1182,6 +1203,14 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 				// 记录击杀统计
 				m.recordKill(session, char.ID, char.TeamSlot)
 
+				// 增加探索度（每击杀一个怪物增加1点探索度）
+				if session.CurrentZone != nil && m.explorationRepo != nil {
+					err := m.explorationRepo.AddExploration(session.UserID, session.CurrentZone.ID, 1)
+					if err != nil {
+						fmt.Printf("[WARN] Failed to add exploration: %v\n", err)
+					}
+				}
+
 				session.CurrentBattleExp += expGain
 				session.CurrentBattleGold += goldGain
 				session.CurrentBattleKills++
@@ -1722,14 +1751,28 @@ func (m *BattleManager) spawnEnemies(session *BattleSession, playerLevel int) er
 	// 获取区域怪物
 	monsters, err := m.gameRepo.GetMonstersByZone(session.CurrentZone.ID)
 	if err != nil {
-		fmt.Printf("[ERROR] Failed to get monsters: %v\n", err)
-		return fmt.Errorf("failed to get monsters: %v", err)
+		fmt.Printf("[ERROR] Failed to get monsters for zone %s: %v\n", session.CurrentZone.ID, err)
+		return fmt.Errorf("failed to get monsters for zone %s: %v", session.CurrentZone.ID, err)
 	}
 	if len(monsters) == 0 {
-		fmt.Printf("[ERROR] No monsters in zone %s\n", session.CurrentZone.ID)
-		return fmt.Errorf("no monsters in zone %s", session.CurrentZone.ID)
+		fmt.Printf("[ERROR] No monsters in zone %s (ID: %s)\n", session.CurrentZone.Name, session.CurrentZone.ID)
+		// 如果当前区域没有怪物，尝试使用默认区域
+		if session.CurrentZone.ID != "elwynn" {
+			fmt.Printf("[WARN] Trying fallback to elwynn zone\n")
+			fallbackZone, err := m.gameRepo.GetZoneByID("elwynn")
+			if err == nil {
+				monsters, err = m.gameRepo.GetMonstersByZone("elwynn")
+				if err == nil && len(monsters) > 0 {
+					session.CurrentZone = fallbackZone
+					fmt.Printf("[INFO] Using fallback zone: elwynn\n")
+				}
+			}
+		}
+		if len(monsters) == 0 {
+			return fmt.Errorf("no monsters available in zone %s", session.CurrentZone.ID)
+		}
 	}
-	fmt.Printf("[DEBUG] Found %d monsters in zone\n", len(monsters))
+	fmt.Printf("[DEBUG] Found %d monsters in zone %s\n", len(monsters), session.CurrentZone.ID)
 
 	// 随机生成1-3个敌人
 	enemyCount := 1 + rand.Intn(3) // 1-3个
@@ -1737,8 +1780,8 @@ func (m *BattleManager) spawnEnemies(session *BattleSession, playerLevel int) er
 
 	var enemyNames []string
 	for i := 0; i < enemyCount; i++ {
-		// 随机选择一个怪物模板
-		template := monsters[rand.Intn(len(monsters))]
+		// 使用加权随机选择怪物模板（根据 spawn_weight）
+		template := m.selectMonsterByWeight(monsters)
 
 		enemy := &models.Monster{
 			ID:              template.ID,
@@ -1778,8 +1821,51 @@ func (m *BattleManager) spawnEnemies(session *BattleSession, playerLevel int) er
 	return nil
 }
 
+// selectMonsterByWeight 根据权重随机选择怪物
+// 使用加权随机算法：权重越高，被选中的概率越大
+// 稀有怪物（elite/boss）的权重较低，普通怪物（normal）的权重较高
+func (m *BattleManager) selectMonsterByWeight(monsters []models.Monster) models.Monster {
+	if len(monsters) == 0 {
+		return models.Monster{}
+	}
+
+	// 计算总权重
+	totalWeight := 0
+	for _, monster := range monsters {
+		weight := monster.SpawnWeight
+		if weight <= 0 {
+			weight = 1 // 确保权重至少为1，避免除零错误
+		}
+		totalWeight += weight
+	}
+
+	if totalWeight == 0 {
+		// 如果所有怪物权重都是0，使用简单随机选择
+		return monsters[rand.Intn(len(monsters))]
+	}
+
+	// 生成 0 到 totalWeight 之间的随机数
+	randomValue := rand.Intn(totalWeight)
+
+	// 遍历怪物列表，累加权重，找到对应的怪物
+	currentWeight := 0
+	for _, monster := range monsters {
+		weight := monster.SpawnWeight
+		if weight <= 0 {
+			weight = 1
+		}
+		currentWeight += weight
+		if currentWeight > randomValue {
+			return monster
+		}
+	}
+
+	// 如果循环结束还没找到（理论上不应该发生），返回最后一个
+	return monsters[len(monsters)-1]
+}
+
 // ChangeZone 切换区域
-func (m *BattleManager) ChangeZone(userID int, zoneID string, playerLevel int) error {
+func (m *BattleManager) ChangeZone(userID int, zoneID string, playerLevel int, playerFaction string) error {
 	session := m.GetOrCreateSession(userID)
 
 	zone, err := m.gameRepo.GetZoneByID(zoneID)
@@ -1787,8 +1873,32 @@ func (m *BattleManager) ChangeZone(userID int, zoneID string, playerLevel int) e
 		return fmt.Errorf("zone not found: %s", zoneID)
 	}
 
+	// 检查探索度解锁条件
+	if m.explorationRepo != nil {
+		unlocked, err := m.explorationRepo.IsZoneUnlocked(userID, zone)
+		if err != nil {
+			return fmt.Errorf("failed to check zone unlock status: %v", err)
+		}
+		if !unlocked {
+			if zone.UnlockZoneID != nil {
+				unlockZone, _ := m.gameRepo.GetZoneByID(*zone.UnlockZoneID)
+				if unlockZone != nil {
+					exploration, _ := m.explorationRepo.GetExploration(userID, *zone.UnlockZoneID)
+					return fmt.Errorf("zone locked: need %d exploration in %s (current: %d)", zone.RequiredExploration, unlockZone.Name, exploration.Exploration)
+				}
+			}
+			return fmt.Errorf("zone locked: need %d exploration", zone.RequiredExploration)
+		}
+	}
+
+	// 检查等级限制（保留作为最低等级要求）
 	if playerLevel < zone.MinLevel {
 		return fmt.Errorf("level too low, need level %d", zone.MinLevel)
+	}
+
+	// 检查阵营限制
+	if zone.Faction != "" && zone.Faction != playerFaction {
+		return fmt.Errorf("faction mismatch, this zone is for %s only", zone.Faction)
 	}
 
 	m.mu.Lock()
@@ -1796,6 +1906,8 @@ func (m *BattleManager) ChangeZone(userID int, zoneID string, playerLevel int) e
 
 	session.CurrentZone = zone
 	session.CurrentEnemy = nil
+	session.CurrentEnemies = make([]*models.Monster, 0) // 清空所有敌人
+	session.JustEncountered = false // 重置遭遇标志
 
 	m.addLog(session, "zone", fmt.Sprintf(">> 你来到了 [%s]", zone.Name), "#00ffff")
 	m.addLog(session, "zone", zone.Description, "#888888")

@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"database/sql"
 	"text-wow/internal/database"
 	"text-wow/internal/models"
 )
@@ -125,7 +126,8 @@ func (r *GameRepository) GetClassByID(id string) (*models.Class, error) {
 func (r *GameRepository) GetZones() ([]models.Zone, error) {
 	rows, err := database.DB.Query(`
 		SELECT id, name, description, min_level, max_level, COALESCE(faction, ''), 
-		       COALESCE(exp_modifier, 1.0), COALESCE(gold_modifier, 1.0)
+		       COALESCE(exp_modifier, 1.0), COALESCE(gold_modifier, 1.0),
+		       unlock_zone_id, COALESCE(required_exploration, 0)
 		FROM zones ORDER BY min_level`)
 	if err != nil {
 		return nil, err
@@ -135,12 +137,17 @@ func (r *GameRepository) GetZones() ([]models.Zone, error) {
 	var zones []models.Zone
 	for rows.Next() {
 		zone := models.Zone{}
+		var unlockZoneID sql.NullString
 		err := rows.Scan(
 			&zone.ID, &zone.Name, &zone.Description, &zone.MinLevel, &zone.MaxLevel,
 			&zone.Faction, &zone.ExpMulti, &zone.GoldMulti,
+			&unlockZoneID, &zone.RequiredExploration,
 		)
 		if err != nil {
 			return nil, err
+		}
+		if unlockZoneID.Valid {
+			zone.UnlockZoneID = &unlockZoneID.String
 		}
 		zones = append(zones, zone)
 	}
@@ -151,16 +158,22 @@ func (r *GameRepository) GetZones() ([]models.Zone, error) {
 // GetZoneByID 根据ID获取区域
 func (r *GameRepository) GetZoneByID(id string) (*models.Zone, error) {
 	zone := &models.Zone{}
+	var unlockZoneID sql.NullString
 	err := database.DB.QueryRow(`
 		SELECT id, name, description, min_level, max_level, COALESCE(faction, ''), 
-		       COALESCE(exp_modifier, 1.0), COALESCE(gold_modifier, 1.0)
+		       COALESCE(exp_modifier, 1.0), COALESCE(gold_modifier, 1.0),
+		       unlock_zone_id, COALESCE(required_exploration, 0)
 		FROM zones WHERE id = ?`, id,
 	).Scan(
 		&zone.ID, &zone.Name, &zone.Description, &zone.MinLevel, &zone.MaxLevel,
 		&zone.Faction, &zone.ExpMulti, &zone.GoldMulti,
+		&unlockZoneID, &zone.RequiredExploration,
 	)
 	if err != nil {
 		return nil, err
+	}
+	if unlockZoneID.Valid {
+		zone.UnlockZoneID = &unlockZoneID.String
 	}
 	return zone, nil
 }

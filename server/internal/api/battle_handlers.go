@@ -156,11 +156,34 @@ func (h *BattleHandler) BattleTick(c *gin.Context) {
 // GetBattleStatus 获取战斗状态
 func (h *BattleHandler) GetBattleStatus(c *gin.Context) {
 	userID := c.GetInt("userID")
-
-	status := h.battleMgr.GetBattleStatus(userID)
-
+	
 	// 获取所有角色（所有角色都参与战斗）
 	characters, _ := h.charRepo.GetByUserID(userID)
+	
+	// 确保会话已创建，并根据角色阵营设置默认地图
+	if len(characters) > 0 {
+		// 先获取当前状态，检查是否已有地图
+		status := h.battleMgr.GetBattleStatus(userID)
+		if status.CurrentZoneID == "" {
+			// 根据角色阵营设置默认地图
+			faction := characters[0].Faction
+			defaultZoneID := "elwynn" // 默认联盟地图
+			if faction == "horde" {
+				defaultZoneID = "durotar" // 部落默认地图
+			}
+			
+			// 使用 ChangeZone 方法来设置默认地图
+			// 这会自动处理锁和验证
+			playerLevel := characters[0].Level
+			err := h.battleMgr.ChangeZone(userID, defaultZoneID, playerLevel, faction)
+			// 如果设置失败（比如等级不够），尝试使用更基础的默认地图
+			if err != nil && defaultZoneID != "elwynn" {
+				h.battleMgr.ChangeZone(userID, "elwynn", playerLevel, faction)
+			}
+		}
+	}
+	
+	status := h.battleMgr.GetBattleStatus(userID)
 	
 	// 为每个角色添加buff信息
 	for _, char := range characters {
@@ -209,7 +232,7 @@ func (h *BattleHandler) ChangeZone(c *gin.Context) {
 		return
 	}
 
-	// 获取玩家等级（使用第一个角色）
+	// 获取玩家等级和阵营（使用第一个角色）
 	characters, err := h.charRepo.GetByUserID(userID)
 	if err != nil || len(characters) == 0 {
 		c.JSON(http.StatusBadRequest, models.APIResponse{
@@ -220,9 +243,10 @@ func (h *BattleHandler) ChangeZone(c *gin.Context) {
 	}
 
 	playerLevel := characters[0].Level
+	playerFaction := characters[0].Faction
 
 	// 切换区域
-	err = h.battleMgr.ChangeZone(userID, req.ZoneID, playerLevel)
+	err = h.battleMgr.ChangeZone(userID, req.ZoneID, playerLevel, playerFaction)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, models.APIResponse{
 			Success: false,
@@ -246,6 +270,15 @@ func (h *BattleHandler) ChangeZone(c *gin.Context) {
 
 // GetZonesWithMonsters 获取区域列表（包含怪物信息）
 func (h *BattleHandler) GetZonesWithMonsters(c *gin.Context) {
+	userID := c.GetInt("userID")
+	
+	// 获取玩家阵营
+	characters, err := h.charRepo.GetByUserID(userID)
+	var playerFaction string
+	if err == nil && len(characters) > 0 {
+		playerFaction = characters[0].Faction
+	}
+
 	zones, err := h.gameRepo.GetZones()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.APIResponse{
@@ -255,17 +288,53 @@ func (h *BattleHandler) GetZonesWithMonsters(c *gin.Context) {
 		return
 	}
 
+	// 过滤区域：只返回玩家可以进入的区域（阵营匹配或中立区域）
+	var availableZones []models.Zone
+	for _, zone := range zones {
+		// 中立区域或阵营匹配的区域
+		if zone.Faction == "" || zone.Faction == playerFaction {
+			availableZones = append(availableZones, zone)
+		}
+	}
+
+	// 获取玩家所有地图的探索度
+	explorationRepo := repository.NewExplorationRepository()
+	explorations, _ := explorationRepo.GetAllExplorations(userID)
+
 	// 为每个区域加载怪物
-	for i := range zones {
-		monsters, err := h.gameRepo.GetMonstersByZone(zones[i].ID)
+	for i := range availableZones {
+		monsters, err := h.gameRepo.GetMonstersByZone(availableZones[i].ID)
 		if err == nil {
-			zones[i].Monsters = monsters
+			availableZones[i].Monsters = monsters
 		}
 	}
 
 	c.JSON(http.StatusOK, models.APIResponse{
 		Success: true,
-		Data:    zones,
+		Data: gin.H{
+			"zones": availableZones,
+			"explorations": explorations,
+		},
+	})
+}
+
+// GetExplorations 获取玩家所有地图的探索度
+func (h *BattleHandler) GetExplorations(c *gin.Context) {
+	userID := c.GetInt("userID")
+	
+	explorationRepo := repository.NewExplorationRepository()
+	explorations, err := explorationRepo.GetAllExplorations(userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Error:   "failed to get explorations",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.APIResponse{
+		Success: true,
+		Data:    explorations,
 	})
 }
 

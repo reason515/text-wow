@@ -307,8 +307,27 @@ CREATE TABLE IF NOT EXISTS zones (
     drop_modifier REAL DEFAULT 1.0,
     is_dungeon INTEGER DEFAULT 0,
     unlock_condition TEXT,
-    FOREIGN KEY (parent_zone_id) REFERENCES zones(id)
+    -- 探索度解锁系统
+    unlock_zone_id VARCHAR(32),              -- 需要探索的前置地图ID（NULL表示初始地图）
+    required_exploration INTEGER DEFAULT 0,   -- 解锁所需探索度（0表示无需探索度解锁）
+    FOREIGN KEY (parent_zone_id) REFERENCES zones(id),
+    FOREIGN KEY (unlock_zone_id) REFERENCES zones(id)
 );
+
+-- 玩家地图探索度表
+CREATE TABLE IF NOT EXISTS user_zone_exploration (
+    user_id INTEGER NOT NULL,
+    zone_id VARCHAR(32) NOT NULL,
+    exploration INTEGER DEFAULT 0,            -- 当前探索度
+    kills INTEGER DEFAULT 0,                   -- 在该地图的击杀数
+    last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, zone_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (zone_id) REFERENCES zones(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_exploration_user ON user_zone_exploration(user_id);
+CREATE INDEX IF NOT EXISTS idx_exploration_zone ON user_zone_exploration(zone_id);
 
 -- 怪物配置表
 CREATE TABLE IF NOT EXISTS monsters (

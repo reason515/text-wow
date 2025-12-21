@@ -33,6 +33,7 @@ export const useGameStore = defineStore('game', () => {
     totalExp: 0
   })
   const zones = ref<Zone[]>([])
+  const explorations = ref<Record<string, { exploration: number; kills: number }>>({})
   const isLoading = ref(false)
   const battleInterval = ref<number | null>(null)
   const currentZone = ref<Zone | null>(null)
@@ -180,12 +181,31 @@ export const useGameStore = defineStore('game', () => {
 
   async function fetchZones() {
     try {
-      const response = await get<{ zones: Zone[] }>('/zones')
+      const response = await get<any>('/battle/zones')
       if (response.success && response.data) {
-        zones.value = response.data.zones || []
+        zones.value = response.data.zones || response.data || []
+        // 保存探索度数据
+        if (response.data.explorations) {
+          explorations.value = response.data.explorations
+        }
+        // 设置当前区域
+        if (battleStatus.value?.currentZoneId) {
+          currentZone.value = zones.value.find(z => z.id === battleStatus.value.currentZoneId) || null
+        }
       }
     } catch (e) {
       console.error('Failed to fetch zones:', e)
+    }
+  }
+
+  async function fetchExplorations() {
+    try {
+      const response = await get<Record<string, { exploration: number; kills: number }>>('/battle/explorations')
+      if (response.success && response.data) {
+        explorations.value = response.data
+      }
+    } catch (e) {
+      console.error('Failed to fetch explorations:', e)
     }
   }
 
@@ -416,7 +436,7 @@ export const useGameStore = defineStore('game', () => {
 
   async function changeZone(zoneId: string): Promise<boolean> {
     try {
-      const response = await post<{ zoneId: string }>('/zone/change', { zone_id: zoneId })
+      const response = await post<any>('/battle/change-zone', { zoneId })
       if (response.success) {
         await fetchBattleStatus()
         await fetchBattleLogs()
@@ -604,6 +624,7 @@ export const useGameStore = defineStore('game', () => {
     battleLogs,
     battleStatus,
     zones,
+    explorations,
     currentZone,
     isLoading,
     // 计算属性
@@ -617,6 +638,7 @@ export const useGameStore = defineStore('game', () => {
     fetchBattleLogs,
     fetchBattleStatus,
     fetchZones,
+    fetchExplorations,
     toggleBattle,
     battleTick,
     changeZone,

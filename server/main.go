@@ -108,7 +108,9 @@ func main() {
 				battle.POST("/tick", battleHandler.BattleTick)
 				battle.GET("/status", battleHandler.GetBattleStatus)
 				battle.GET("/logs", battleHandler.GetBattleLogs)
-				battle.POST("/zone", battleHandler.ChangeZone)
+				battle.GET("/zones", battleHandler.GetZonesWithMonsters)
+				battle.GET("/explorations", battleHandler.GetExplorations)
+				battle.POST("/change-zone", battleHandler.ChangeZone)
 			}
 
 			// 策略
@@ -153,8 +155,9 @@ func main() {
 	log.Println("   POST /api/battle/toggle    - 切换战斗 (需认证)")
 	log.Println("   POST /api/battle/tick      - 战斗回合 (需认证)")
 	log.Println("   GET  /api/battle/status    - 战斗状态 (需认证)")
-	log.Println("   GET  /api/battle/logs      - 战斗日志 (需认证)")
-	log.Println("   POST /api/battle/zone      - 切换区域 (需认证)")
+		log.Println("   GET  /api/battle/logs      - 战斗日志 (需认证)")
+		log.Println("   GET  /api/battle/zones     - 获取地图列表 (需认证)")
+		log.Println("   POST /api/battle/change-zone - 切换区域 (需认证)")
 	log.Println("   GET  /api/characters/:id/strategies - 获取策略列表 (需认证)")
 	log.Println("   POST /api/characters/:id/strategies - 创建策略 (需认证)")
 	log.Println("   PUT  /api/strategies/:id   - 更新策略 (需认证)")

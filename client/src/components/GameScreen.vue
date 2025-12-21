@@ -38,8 +38,27 @@ const strategyCharacterSkills = ref<any[]>([])
 // 战斗统计面板
 const showStatsPanel = ref(false)
 
+// 地图选择面板
+const showZoneSelector = ref(false)
+const availableZones = ref<any[]>([])
+const loadingZones = ref(false)
+const zoneError = ref('')
+
 // 敌人名称到攻击类型的映射，用于保持敌人颜色一致
 const enemyAttackTypeMap = ref<Record<string, string>>({})
+
+// 当前地图名称
+const currentZoneName = computed(() => {
+  const zoneId = game.battleStatus?.currentZoneId || game.battleStatus?.current_zone
+  if (!zoneId) return '未知地图'
+  
+  // 从地图列表中查找
+  const zone = game.zones.find(z => z.id === zoneId)
+  if (zone) return zone.name
+  
+  // 如果还没加载地图列表，显示ID
+  return zoneId
+})
 
 // 打开策略编辑器
 async function openStrategyEditor() {
@@ -80,6 +99,84 @@ function openStatsPanel() {
 // 关闭战斗统计面板
 function closeStatsPanel() {
   showStatsPanel.value = false
+}
+
+// 打开地图选择器
+async function openZoneSelector() {
+  console.log('Opening zone selector...')
+  showZoneSelector.value = true
+  await loadZones()
+}
+
+// 关闭地图选择器
+function closeZoneSelector() {
+  showZoneSelector.value = false
+}
+
+// 加载地图列表
+async function loadZones() {
+  loadingZones.value = true
+  zoneError.value = ''
+  try {
+    console.log('Loading zones...')
+    await Promise.all([game.fetchZones(), game.fetchExplorations()])
+    console.log('Zones loaded:', game.zones)
+    console.log('Explorations loaded:', game.explorations)
+    availableZones.value = game.zones
+    if (availableZones.value.length === 0) {
+      zoneError.value = '没有可用的地图'
+    }
+  } catch (e) {
+    zoneError.value = '加载地图失败: ' + (e instanceof Error ? e.message : String(e))
+    console.error('Failed to load zones:', e)
+  } finally {
+    loadingZones.value = false
+  }
+}
+
+// 检查地图是否已解锁
+function isZoneUnlocked(zone: any): boolean {
+  // 如果没有解锁条件，直接返回true
+  if (!zone.unlockZoneId || zone.requiredExploration === 0 || zone.requiredExploration === undefined) {
+    return true // 初始地图或无需解锁
+  }
+  const exploration = game.explorations[zone.unlockZoneId]
+  if (!exploration) {
+    return false // 没有探索度数据，视为未解锁
+  }
+  return exploration.exploration >= zone.requiredExploration
+}
+
+// 获取解锁进度信息
+function getUnlockProgress(zone: any): { current: number; required: number; unlocked: boolean; unlockZoneName: string } | null {
+  // 如果没有解锁条件，不显示进度
+  if (!zone.unlockZoneId || zone.requiredExploration === 0 || zone.requiredExploration === undefined) {
+    return null // 初始地图
+  }
+  const exploration = game.explorations[zone.unlockZoneId]
+  const unlockZone = game.zones.find(z => z.id === zone.unlockZoneId)
+  return {
+    current: exploration?.exploration || 0,
+    required: zone.requiredExploration,
+    unlocked: isZoneUnlocked(zone),
+    unlockZoneName: unlockZone?.name || zone.unlockZoneId
+  }
+}
+
+// 切换地图
+async function selectZone(zoneId: string) {
+  console.log('Selecting zone:', zoneId)
+  zoneError.value = ''
+  const success = await game.changeZone(zoneId)
+  if (success) {
+    console.log('Zone changed successfully')
+    closeZoneSelector()
+    await game.fetchBattleStatus()
+    await game.fetchBattleLogs()
+  } else {
+    zoneError.value = '切换地图失败，请检查等级和阵营限制'
+    console.error('Failed to change zone')
+  }
 }
 
 // 显示角色详情
@@ -894,7 +991,19 @@ onMounted(async () => {
   // 获取战斗状态和日志
   await game.fetchBattleStatus()
   await game.fetchBattleLogs()
+  await game.fetchZones() // 确保地图列表已加载
   await refreshSkillSelection(true)
+  
+  // 检查是否需要选择地图（延迟一下，确保数据已加载）
+  await nextTick()
+  const zoneId = game.battleStatus?.currentZoneId || game.battleStatus?.current_zone
+  if (!zoneId || zoneId === '' || currentZoneName.value === '未知地图') {
+    // 如果没有地图，自动打开地图选择器引导玩家选择
+    console.log('No zone selected, opening zone selector...')
+    setTimeout(() => {
+      openZoneSelector()
+    }, 500) // 延迟500ms，让界面先渲染完成
+  }
   
   // 如果战斗状态中有队伍数据，使用第一个角色作为当前显示角色
   // Team 是一个数组，包含所有角色（所有角色都参与战斗）
@@ -1361,6 +1470,10 @@ function escapeRegex(str: string): string {
 
       <!-- 状态栏 -->
       <div class="status-line">
+        <span class="stat-zone" @click="openZoneSelector" title="点击切换地图">
+          🗺️ {{ currentZoneName }}
+        </span>
+        <span class="stat-separator">|</span>
         <span class="stat-battle">战斗: {{ (game.battleStatus as any)?.battleCount || (game.battleStatus as any)?.battle_count || 0 }}</span>
         <span class="stat-separator">|</span>
         <span class="stat-kills">击杀: {{ (game.battleStatus as any)?.totalKills || (game.battleStatus as any)?.session_kills || 0 }}</span>
@@ -1473,10 +1586,18 @@ function escapeRegex(str: string): string {
               v-for="(enemy, index) in game.currentEnemies" 
               :key="index"
               class="enemy-info"
-              :class="{ 'enemy-dead': (enemy as any)?.hp <= 0 }"
+              :class="{ 
+                'enemy-dead': (enemy as any)?.hp <= 0,
+                'enemy-normal': !(enemy as any)?.type || (enemy as any)?.type === 'normal',
+                'enemy-elite': (enemy as any)?.type === 'elite',
+                'enemy-boss': (enemy as any)?.type === 'boss'
+              }"
             >
               <span class="enemy-name">
-                ⚔ {{ (enemy as any)?.name || '未知敌人' }} (Lv.{{ (enemy as any)?.level || 1 }})
+                <span v-if="(enemy as any)?.type === 'elite'" class="enemy-rarity-icon">⭐</span>
+                <span v-else-if="(enemy as any)?.type === 'boss'" class="enemy-rarity-icon">👑</span>
+                <span v-else class="enemy-rarity-icon">⚔</span>
+                {{ (enemy as any)?.name || '未知敌人' }} (Lv.{{ (enemy as any)?.level || 1 }})
               </span>
               <div class="enemy-hp">
                 <span class="enemy-hp-label">HP:</span>
@@ -1540,7 +1661,10 @@ function escapeRegex(str: string): string {
             <button class="cmd-btn" disabled>
               [E] 装备
             </button>
-            <button class="cmd-btn" disabled>
+            <button 
+              class="cmd-btn" 
+              @click="openZoneSelector"
+            >
               [M] 地图
             </button>
           </div>
@@ -1563,6 +1687,76 @@ function escapeRegex(str: string): string {
         v-if="showStatsPanel"
         @close="closeStatsPanel"
       />
+
+      <!-- 地图选择面板 -->
+      <div v-if="showZoneSelector" class="zone-selector-overlay" @click.self="closeZoneSelector">
+        <div class="zone-selector">
+          <div class="zone-selector-header">
+            <h2>选择地图</h2>
+            <button class="close-btn" @click="closeZoneSelector">×</button>
+          </div>
+          
+          <div v-if="zoneError" class="zone-error">{{ zoneError }}</div>
+          
+          <div v-if="loadingZones" class="zone-loading">加载中...</div>
+          
+          <div v-else-if="availableZones.length === 0" class="zone-loading">
+            没有可用的地图，请检查你的等级和阵营
+          </div>
+          
+          <div v-else class="zone-list">
+            <div 
+              v-for="zone in availableZones" 
+              :key="zone.id"
+              class="zone-item"
+              :class="{ 
+                'zone-current': game.battleStatus?.currentZoneId === zone.id,
+                'zone-locked': (charStore.activeCharacter && charStore.activeCharacter.level < zone.minLevel) || !isZoneUnlocked(zone)
+              }"
+              @click="(charStore.activeCharacter && charStore.activeCharacter.level >= zone.minLevel && isZoneUnlocked(zone)) ? selectZone(zone.id) : null"
+            >
+              <div class="zone-name">{{ zone.name }}</div>
+              <div class="zone-info">
+                <span class="zone-level">等级: {{ zone.minLevel }}-{{ zone.maxLevel }}</span>
+                <span class="zone-faction" :class="`faction-${zone.faction || 'neutral'}`">
+                  {{ zone.faction === 'alliance' ? '联盟' : zone.faction === 'horde' ? '部落' : 'PVP' }}
+                </span>
+                <span class="zone-multiplier">倍率: {{ zone.expMulti }}x</span>
+              </div>
+              <div class="zone-description">{{ zone.description }}</div>
+              
+              <!-- 探索度进度显示 -->
+              <div v-if="getUnlockProgress(zone)" class="zone-exploration-progress">
+                <div class="exploration-label">
+                  解锁条件: 在 <strong>{{ getUnlockProgress(zone)?.unlockZoneName }}</strong> 探索度达到 {{ getUnlockProgress(zone)?.required }}
+                </div>
+                <div class="exploration-bar">
+                  <div 
+                    class="exploration-fill" 
+                    :style="{ width: `${Math.min(100, (getUnlockProgress(zone)?.current || 0) / getUnlockProgress(zone)?.required * 100)}%` }"
+                  ></div>
+                  <span class="exploration-text">
+                    {{ getUnlockProgress(zone)?.current }} / {{ getUnlockProgress(zone)?.required }}
+                  </span>
+                </div>
+              </div>
+              
+              <!-- 当前地图探索度显示 -->
+              <div v-if="game.explorations[zone.id]" class="zone-current-exploration">
+                当前探索度: {{ game.explorations[zone.id].exploration }} (击杀: {{ game.explorations[zone.id].kills }})
+              </div>
+              
+              <!-- 锁定提示 -->
+              <div v-if="charStore.activeCharacter && charStore.activeCharacter.level < zone.minLevel" class="zone-locked-hint">
+                需要等级 {{ zone.minLevel }}
+              </div>
+              <div v-if="!isZoneUnlocked(zone) && zone.unlockZoneId" class="zone-locked-hint">
+                未解锁（探索度不足）
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </template>
     
     <!-- 技能选择弹窗：被动/主动选择 -->
@@ -2008,6 +2202,19 @@ function escapeRegex(str: string): string {
   border-bottom: 1px solid var(--terminal-gray);
   background: rgba(0, 0, 0, 0.2);
   font-size: 12px;
+}
+
+.stat-zone {
+  color: var(--terminal-cyan);
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: var(--terminal-cyan);
+  transition: all 0.2s;
+}
+
+.stat-zone:hover {
+  color: var(--terminal-green);
+  text-decoration-color: var(--terminal-green);
 }
 
 .stat-battle {
@@ -3019,12 +3226,63 @@ function escapeRegex(str: string): string {
   flex: 1;
   max-width: 280px;
   background: rgba(50, 0, 0, 0.5);
-  transition: opacity 0.3s;
+  transition: all 0.3s;
+  border-radius: 4px;
+}
+
+/* 普通怪物样式 */
+.enemy-info.enemy-normal {
+  border: 1px solid var(--text-dim);
+  background: rgba(50, 0, 0, 0.5);
+}
+
+/* 精英怪物样式 - 蓝色边框，发光效果 */
+.enemy-info.enemy-elite {
+  border: 2px solid #4a90d9;
+  background: rgba(20, 30, 60, 0.6);
+  box-shadow: 0 0 8px rgba(74, 144, 217, 0.4), inset 0 0 8px rgba(74, 144, 217, 0.1);
+}
+
+.enemy-info.enemy-elite .enemy-name {
+  color: #4a90d9;
+  text-shadow: 0 0 6px rgba(74, 144, 217, 0.6);
+}
+
+.enemy-info.enemy-elite .enemy-rarity-icon {
+  color: #4a90d9;
+  text-shadow: 0 0 8px rgba(74, 144, 217, 0.8);
+  animation: elite-glow 2s ease-in-out infinite alternate;
+}
+
+/* Boss怪物样式 - 橙色边框，强烈发光效果 */
+.enemy-info.enemy-boss {
+  border: 3px solid #ff6b35;
+  background: rgba(60, 20, 20, 0.7);
+  box-shadow: 0 0 12px rgba(255, 107, 53, 0.6), 
+              0 0 20px rgba(255, 107, 53, 0.3),
+              inset 0 0 12px rgba(255, 107, 53, 0.2);
+  animation: boss-pulse 2s ease-in-out infinite;
+}
+
+.enemy-info.enemy-boss .enemy-name {
+  color: #ff6b35;
+  text-shadow: 0 0 8px rgba(255, 107, 53, 0.8),
+               0 0 12px rgba(255, 107, 53, 0.6);
+  font-weight: 900;
+}
+
+.enemy-info.enemy-boss .enemy-rarity-icon {
+  color: #ffd700;
+  text-shadow: 0 0 10px rgba(255, 215, 0, 1),
+               0 0 15px rgba(255, 215, 0, 0.8);
+  animation: boss-crown 1.5s ease-in-out infinite;
 }
 
 .enemy-info.enemy-dead {
   opacity: 0.5;
   border-color: var(--text-gray);
+  box-shadow: none;
+  animation: none;
 }
 
 .enemy-info .enemy-name {
@@ -3034,6 +3292,14 @@ function escapeRegex(str: string): string {
   text-overflow: ellipsis;
   color: var(--text-red);
   font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.enemy-rarity-icon {
+  font-size: 16px;
+  display: inline-block;
 }
 
 .enemy-info .enemy-hp {
@@ -3047,6 +3313,217 @@ function escapeRegex(str: string): string {
   color: var(--text-gray);
   font-size: 10px;
   min-width: 24px;
+}
+
+/* 地图选择器样式 */
+.zone-selector-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.zone-selector {
+  background: var(--bg-dark);
+  border: 2px solid var(--text-dim);
+  border-radius: 4px;
+  width: 90%;
+  max-width: 800px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  color: var(--text-bright);
+}
+
+.zone-selector-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  border-bottom: 1px solid var(--text-dim);
+}
+
+.zone-selector-header h2 {
+  margin: 0;
+  color: var(--text-bright);
+  font-size: 18px;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: var(--text-bright);
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-btn:hover {
+  color: var(--text-red);
+}
+
+.zone-error {
+  padding: 15px 20px;
+  color: var(--text-red);
+  background: rgba(255, 0, 0, 0.1);
+  border-bottom: 1px solid var(--text-dim);
+}
+
+.zone-loading {
+  padding: 40px;
+  text-align: center;
+  color: var(--text-dim);
+}
+
+.zone-list {
+  padding: 15px;
+  overflow-y: auto;
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 15px;
+}
+
+.zone-item {
+  background: rgba(50, 0, 0, 0.3);
+  border: 1px solid var(--text-dim);
+  border-radius: 4px;
+  padding: 15px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.zone-item:hover {
+  border-color: var(--text-bright);
+  background: rgba(50, 0, 0, 0.5);
+}
+
+.zone-item.zone-current {
+  border-color: var(--terminal-green);
+  background: rgba(0, 50, 0, 0.3);
+}
+
+.zone-item.zone-locked {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.zone-name {
+  font-size: 16px;
+  font-weight: bold;
+  color: var(--text-bright);
+  margin-bottom: 8px;
+}
+
+.zone-info {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.zone-level {
+  color: var(--text-dim);
+}
+
+.zone-faction {
+  padding: 2px 6px;
+  border-radius: 2px;
+  font-size: 11px;
+}
+
+.faction-alliance {
+  background: rgba(74, 144, 217, 0.3);
+  color: #4a90d9;
+}
+
+.faction-horde {
+  background: rgba(196, 30, 58, 0.3);
+  color: #c41e3a;
+}
+
+.faction-neutral {
+  background: rgba(255, 215, 0, 0.3);
+  color: #ffd700;
+}
+
+.zone-multiplier {
+  color: var(--terminal-green);
+}
+
+.zone-description {
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.4;
+  margin-top: 8px;
+}
+
+.zone-locked-hint {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--text-red);
+}
+
+.zone-exploration-progress {
+  margin-top: 10px;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+}
+
+.exploration-label {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+
+.exploration-label strong {
+  color: var(--text-bright);
+}
+
+.exploration-bar {
+  position: relative;
+  height: 20px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--text-dim);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.exploration-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--terminal-green), #4ade80);
+  transition: width 0.3s;
+}
+
+.exploration-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 10px;
+  color: var(--text-bright);
+  font-weight: bold;
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.8);
+}
+
+.zone-current-exploration {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--terminal-green);
+  font-weight: bold;
 }
 
 .enemy-info .enemy-bar {
@@ -3063,5 +3540,42 @@ function escapeRegex(str: string): string {
   white-space: nowrap;
   min-width: 50px;
   text-align: right;
+}
+
+/* 稀有度动画效果 */
+@keyframes elite-glow {
+  0% {
+    text-shadow: 0 0 8px rgba(74, 144, 217, 0.8);
+  }
+  100% {
+    text-shadow: 0 0 12px rgba(74, 144, 217, 1), 0 0 16px rgba(74, 144, 217, 0.6);
+  }
+}
+
+@keyframes boss-pulse {
+  0%, 100% {
+    box-shadow: 0 0 12px rgba(255, 107, 53, 0.6), 
+                0 0 20px rgba(255, 107, 53, 0.3),
+                inset 0 0 12px rgba(255, 107, 53, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(255, 107, 53, 0.8), 
+                0 0 28px rgba(255, 107, 53, 0.5),
+                inset 0 0 16px rgba(255, 107, 53, 0.3);
+  }
+}
+
+@keyframes boss-crown {
+  0%, 100% {
+    transform: scale(1) rotate(0deg);
+    text-shadow: 0 0 10px rgba(255, 215, 0, 1),
+                 0 0 15px rgba(255, 215, 0, 0.8);
+  }
+  50% {
+    transform: scale(1.1) rotate(5deg);
+    text-shadow: 0 0 15px rgba(255, 215, 0, 1),
+                 0 0 20px rgba(255, 215, 0, 1),
+                 0 0 25px rgba(255, 215, 0, 0.8);
+  }
 }
 </style>

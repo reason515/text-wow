@@ -190,6 +190,14 @@ func (r *ChatRepository) IsBlocked(userID, blockedID int) (bool, error) {
 
 // SetOnlineStatus 设置在线状态（character_name字段现在存储玩家名）
 func (r *ChatRepository) SetOnlineStatus(userID int, charID int, playerName, faction, zoneID string, online bool) error {
+	// 处理空值：charID 为 0 时使用 NULL，避免外键约束问题
+	var charIDVal interface{}
+	if charID > 0 {
+		charIDVal = charID
+	} else {
+		charIDVal = nil
+	}
+	
 	_, err := database.DB.Exec(`
 		INSERT INTO user_online_status (user_id, character_id, character_name, faction, zone_id, last_active, is_online)
 		VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -200,7 +208,7 @@ func (r *ChatRepository) SetOnlineStatus(userID int, charID int, playerName, fac
 			zone_id = excluded.zone_id,
 			last_active = excluded.last_active,
 			is_online = excluded.is_online`,
-		userID, charID, playerName, faction, zoneID, time.Now(), boolToInt(online),
+		userID, charIDVal, nullString(playerName), nullString(faction), nullString(zoneID), time.Now(), boolToInt(online),
 	)
 	return err
 }

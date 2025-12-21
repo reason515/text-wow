@@ -451,12 +451,16 @@ func (h *ChatHandler) SetOnline(c *gin.Context) {
 	if zoneID == "" {
 		zoneID = user.CurrentZoneID
 	}
+	// 如果 zoneID 仍然为空，使用默认值
+	if zoneID == "" {
+		zoneID = "elwynn"
+	}
 
 	// 使用玩家用户名而不是角色名
 	if err := h.chatRepo.SetOnlineStatus(userID, 0, user.Username, faction, zoneID, true); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
-			"error":   "failed to set online status",
+			"error":   "failed to set online status: " + err.Error(),
 		})
 		return
 	}

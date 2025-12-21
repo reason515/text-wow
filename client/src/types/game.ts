@@ -148,6 +148,8 @@ export interface Zone {
   faction: string
   expMulti: number
   goldMulti: number
+  unlockZoneId?: string | null
+  requiredExploration: number
 }
 
 export interface Monster {

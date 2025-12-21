@@ -165,15 +165,25 @@ type Class struct {
 
 // Zone 区域
 type Zone struct {
-	ID          string    `json:"id"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	MinLevel    int       `json:"minLevel"`
-	MaxLevel    int       `json:"maxLevel"`
-	Faction     string    `json:"faction"` // alliance/horde/neutral
-	ExpMulti    float64   `json:"expMulti"`
-	GoldMulti   float64   `json:"goldMulti"`
-	Monsters    []Monster `json:"monsters,omitempty"`
+	ID                  string    `json:"id"`
+	Name                string    `json:"name"`
+	Description         string    `json:"description"`
+	MinLevel            int       `json:"minLevel"`
+	MaxLevel            int       `json:"maxLevel"`
+	Faction             string    `json:"faction"` // alliance/horde/neutral
+	ExpMulti            float64   `json:"expMulti"`
+	GoldMulti           float64   `json:"goldMulti"`
+	UnlockZoneID        *string   `json:"unlockZoneId,omitempty"`        // 需要探索的前置地图ID
+	RequiredExploration int       `json:"requiredExploration"`            // 解锁所需探索度
+	Monsters            []Monster `json:"monsters,omitempty"`
+}
+
+// ZoneExploration 玩家地图探索度
+type ZoneExploration struct {
+	UserID      int    `json:"userId"`
+	ZoneID      string `json:"zoneId"`
+	Exploration int    `json:"exploration"` // 当前探索度
+	Kills       int    `json:"kills"`       // 在该地图的击杀数
 }
 
 // Monster 怪物
