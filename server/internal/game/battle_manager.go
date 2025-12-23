@@ -577,7 +577,6 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 			var skillName string
 			var playerDamage int
 			var resourceCost int
-			var resourceGain int
 			var usedSkill bool
 			var skillEffects map[string]interface{}
 			var isCrit bool
@@ -585,6 +584,10 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 			var shouldDealDamage bool // 是否应该造成伤害（只有attack类型的技能才造成伤害）
 			var isDodged bool         // 是否被闪避
 			var ignoresDodge bool     // 技能是否无视闪避
+			var originalResource int  // 资源变化前的值（用于日志显示）
+
+			// 保存资源变化前的值
+			originalResource = char.Resource
 
 			if skillState != nil && skillState.Skill != nil {
 				// 使用技能
@@ -726,6 +729,9 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 					// 应用Debuff到敌人（挫志怒吼、旋风斩等）
 					m.applySkillDebuffs(skillState, char, target, aliveEnemies, skillEffects)
 
+					// 保存资源变化前的值
+					originalResource := char.Resource
+
 					// 消耗资源
 					char.Resource -= resourceCost
 					if char.Resource < 0 {
@@ -741,7 +747,6 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 						// 应用被动技能的怒气获得加成（愤怒掌握等）
 						actualRageGain := m.applyRageGenerationModifiers(char.ID, rageGain)
 						char.Resource += actualRageGain
-						resourceGain = actualRageGain
 						if char.Resource > char.MaxResource {
 							char.Resource = char.MaxResource
 						}
@@ -861,12 +866,11 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 					} else {
 						// buff技能使用后，还需要进行普通攻击
 						// 先记录buff技能使用日志
-						buffResourceChangeText := m.formatResourceChange(char.ResourceType, resourceCost, resourceGain)
+						buffResourceChangeText := m.formatResourceChange(char.ResourceType, originalResource, char.Resource)
 						m.addLog(session, "combat", fmt.Sprintf("%s 使用 [%s]%s", char.Name, skillName, buffResourceChangeText), "#8888ff")
 						logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
 						// 重置资源消耗，避免普通攻击日志重复显示
 						resourceCost = 0
-						resourceGain = 0
 						// 设置skillState为nil，让后续代码进行普通攻击
 						skillState = nil
 					}
@@ -1026,7 +1030,6 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 				rageGain := m.applyRageGenerationModifiers(char.ID, baseRageGain)
 
 				char.Resource += rageGain
-				resourceGain = rageGain
 				// 确保不超过最大值
 				if char.Resource > char.MaxResource {
 					char.Resource = char.MaxResource
@@ -1039,7 +1042,7 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 			}
 
 			// 构建战斗日志消息，包含资源变化（带颜色）
-			resourceChangeText := m.formatResourceChange(char.ResourceType, resourceCost, resourceGain)
+			resourceChangeText := m.formatResourceChange(char.ResourceType, originalResource, char.Resource)
 
 			// 格式化伤害公式
 			formulaText := ""
@@ -1453,8 +1456,10 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 			// 记录受到伤害的统计
 			m.recordDamageTaken(session, char.ID, char.TeamSlot, enemyDamage, attackType, 0, 0)
 
+			// 保存资源变化前的值（用于日志显示）
+			originalResource := char.Resource
+
 			// 战士受到伤害时获得怒气
-			resourceGain := 0
 			if char.ResourceType == "rage" && enemyDamage > 0 {
 				// 受到伤害获得怒气: 伤害/最大HP × 50，至少1点
 				baseRageGain := int(float64(enemyDamage) / float64(char.MaxHP) * 50)
@@ -1466,7 +1471,6 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 				rageGain := m.applyRageGenerationModifiers(char.ID, baseRageGain)
 
 				char.Resource += rageGain
-				resourceGain = rageGain
 				if char.Resource > char.MaxResource {
 					char.Resource = char.MaxResource
 				}
@@ -1476,7 +1480,7 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 			}
 
 			// 构建战斗日志消息，包含资源变化（带颜色）
-			resourceChangeText := m.formatResourceChange(char.ResourceType, 0, resourceGain)
+			resourceChangeText := m.formatResourceChange(char.ResourceType, originalResource, char.Resource)
 
 			// 格式化伤害公式
 			enemyFormulaText := ""
@@ -2369,38 +2373,17 @@ func (m *BattleManager) formatHPChange(name string, oldHP, newHP, maxHP int) str
 	return fmt.Sprintf(" <span style=\"color: %s\">〈%s: %d→%d〉</span>", color, name, oldHP, newHP)
 }
 
-// formatResourceChange 格式化资源变化文本（带颜色）
-func (m *BattleManager) formatResourceChange(resourceType string, cost int, gain int) string {
-	if cost == 0 && gain == 0 {
+// formatResourceChange 格式化资源变化文本（带颜色），显示为 A->B 格式
+func (m *BattleManager) formatResourceChange(resourceType string, originalValue int, finalValue int) string {
+	if originalValue == finalValue {
 		return ""
 	}
 
 	resourceName := m.getResourceName(resourceType)
 	color := m.getResourceColor(resourceType)
 
-	var parts []string
-	if cost > 0 {
-		parts = append(parts, fmt.Sprintf("<span style=\"color: %s\">-%d</span>", color, cost))
-	}
-	if gain > 0 {
-		parts = append(parts, fmt.Sprintf("<span style=\"color: %s\">+%d</span>", color, gain))
-	}
-
-	if len(parts) == 0 {
-		return ""
-	}
-
-	// 将多个部分用空格连接
-	changeText := ""
-	for i, part := range parts {
-		if i > 0 {
-			changeText += " "
-		}
-		changeText += part
-	}
-
-	// 使用圆括号，资源名和变化值都带颜色
-	return fmt.Sprintf(" <span style=\"color: %s\">(%s %s)</span>", color, resourceName, changeText)
+	// 显示为 A->B 格式
+	return fmt.Sprintf(" <span style=\"color: %s\">(%s %d->%d)</span>", color, resourceName, originalValue, finalValue)
 }
 
 // calculateReviveTime 计算复活时间（根据死亡人数）
