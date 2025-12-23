@@ -467,7 +467,7 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 			char.MaxResource = 100
 		}
 
-		err := m.spawnEnemies(session, char.Level)
+		err := m.spawnEnemies(session, char.Level, len(characters))
 		if err != nil {
 			// 如果生成敌人失败，记录错误并返回
 			m.addLog(session, "error", fmt.Sprintf("生成敌人失败: %v", err), "#ff0000")
@@ -1739,8 +1739,9 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 	}, nil
 }
 
-// spawnEnemies 生成多个敌人（1-3个随机）
-func (m *BattleManager) spawnEnemies(session *BattleSession, playerLevel int) error {
+// spawnEnemies 生成多个敌人
+// 敌人数量基于玩家角色数量：最高概率出现在等于玩家数量的敌人，最多相差不超过2
+func (m *BattleManager) spawnEnemies(session *BattleSession, playerLevel int, playerCount int) error {
 	if session.CurrentZone == nil {
 		// 加载默认区域
 		zone, err := m.gameRepo.GetZoneByID("elwynn")
@@ -1778,8 +1779,48 @@ func (m *BattleManager) spawnEnemies(session *BattleSession, playerLevel int) er
 	}
 	fmt.Printf("[DEBUG] Found %d monsters in zone %s\n", len(monsters), session.CurrentZone.ID)
 
-	// 随机生成1-3个敌人
-	enemyCount := 1 + rand.Intn(3) // 1-3个
+	// 基于玩家角色数量生成敌人数量（加权随机）
+	// 敌人数量范围：max(1, playerCount-2) 到 playerCount+2
+	// 权重：等于玩家数量的权重最高（3），相差1的权重为2，相差2的权重为1
+	minEnemyCount := 1
+	if playerCount > 2 {
+		minEnemyCount = playerCount - 2
+	}
+	maxEnemyCount := playerCount + 2
+
+	// 构建加权随机：每个可能的敌人数量及其权重
+	type enemyCountWeight struct {
+		count  int
+		weight int
+	}
+	weights := make([]enemyCountWeight, 0)
+	for count := minEnemyCount; count <= maxEnemyCount; count++ {
+		diff := int(math.Abs(float64(count - playerCount)))
+		// 权重：相差0（相等）=3，相差1=2，相差2=1
+		weight := 3 - diff
+		if weight < 1 {
+			weight = 1
+		}
+		weights = append(weights, enemyCountWeight{count: count, weight: weight})
+	}
+
+	// 计算总权重
+	totalWeight := 0
+	for _, w := range weights {
+		totalWeight += w.weight
+	}
+
+	// 加权随机选择
+	randomValue := rand.Intn(totalWeight)
+	currentWeight := 0
+	enemyCount := minEnemyCount // 默认值
+	for _, w := range weights {
+		currentWeight += w.weight
+		if currentWeight > randomValue {
+			enemyCount = w.count
+			break
+		}
+	}
 	session.CurrentEnemies = make([]*models.Monster, 0, enemyCount)
 
 	var enemyNames []string

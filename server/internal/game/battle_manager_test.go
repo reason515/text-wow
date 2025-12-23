@@ -232,8 +232,15 @@ func TestBattleManager_MultipleEnemies_Spawn(t *testing.T) {
 	session := manager.GetSession(userID)
 	assert.NotNil(t, session)
 	assert.NotEmpty(t, session.CurrentEnemies, "应该生成至少一个敌人")
-	assert.LessOrEqual(t, len(session.CurrentEnemies), 3, "最多应该生成3个敌人")
-	assert.GreaterOrEqual(t, len(session.CurrentEnemies), 1, "至少应该生成1个敌人")
+	// 敌人数量应该在 playerCount-2 到 playerCount+2 范围内（至少为1）
+	playerCount := len(characters)
+	expectedMin := 1
+	if playerCount > 2 {
+		expectedMin = playerCount - 2
+	}
+	expectedMax := playerCount + 2
+	assert.GreaterOrEqual(t, len(session.CurrentEnemies), expectedMin, "敌人数量应该至少为 %d", expectedMin)
+	assert.LessOrEqual(t, len(session.CurrentEnemies), expectedMax, "敌人数量应该最多为 %d", expectedMax)
 
 	// 验证所有敌人都有有效的HP
 	for _, enemy := range session.CurrentEnemies {
