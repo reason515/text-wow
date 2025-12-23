@@ -1079,6 +1079,31 @@ function getEnemyHpPercent(enemy: any): number {
   return maxHp > 0 ? (hp / maxHp) * 100 : 0
 }
 
+// 获取怪物名称颜色（根据攻击类型，与战斗日志保持一致）
+function getEnemyNameColor(enemy: any): string {
+  if (!enemy) return '#ff7777' // 默认红色（物理攻击）
+  
+  // 优先使用 attackType 字段
+  let attackType = enemy.attackType || enemy.attack_type
+  if (attackType) {
+    attackType = attackType.toLowerCase()
+    if (attackType === 'magic') {
+      return '#7777ff' // 魔法攻击用蓝色
+    }
+    return '#ff7777' // 物理攻击用红色
+  }
+  
+  // 如果没有 attackType，根据魔法攻击和物理攻击的数值推断
+  const magicAttack = enemy.magicAttack || enemy.magic_attack || 0
+  const physicalAttack = enemy.physicalAttack || enemy.physical_attack || 0
+  
+  if (magicAttack > physicalAttack && magicAttack > 0) {
+    return '#7777ff' // 魔法攻击用蓝色
+  }
+  
+  return '#ff7777' // 默认物理攻击用红色
+}
+
 // 获取资源类型名称
 
 // 获取日志类型的CSS类
@@ -1593,7 +1618,12 @@ function escapeRegex(str: string): string {
                 'enemy-boss': (enemy as any)?.type === 'boss'
               }"
             >
-              <span class="enemy-name">
+              <span 
+                class="enemy-name"
+                :style="{
+                  color: getEnemyNameColor(enemy)
+                }"
+              >
                 <span v-if="(enemy as any)?.type === 'elite'" class="enemy-rarity-icon">⭐</span>
                 <span v-else-if="(enemy as any)?.type === 'boss'" class="enemy-rarity-icon">👑</span>
                 <span v-else class="enemy-rarity-icon">⚔</span>
@@ -3234,48 +3264,153 @@ function escapeRegex(str: string): string {
 .enemy-info.enemy-normal {
   border: 1px solid var(--text-dim);
   background: rgba(50, 0, 0, 0.5);
+  position: relative;
+}
+
+.enemy-info.enemy-normal::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border: 1px solid rgba(100, 100, 100, 0.3);
+  border-radius: 4px;
+  pointer-events: none;
 }
 
 /* 精英怪物样式 - 蓝色边框，发光效果 */
 .enemy-info.enemy-elite {
-  border: 2px solid #4a90d9;
-  background: rgba(20, 30, 60, 0.6);
-  box-shadow: 0 0 8px rgba(74, 144, 217, 0.4), inset 0 0 8px rgba(74, 144, 217, 0.1);
+  border: 2px solid #4a90d9 !important;
+  background: linear-gradient(135deg, rgba(20, 30, 60, 0.8), rgba(30, 50, 90, 0.6)) !important;
+  box-shadow: 0 0 12px rgba(74, 144, 217, 0.6), 
+              0 0 20px rgba(74, 144, 217, 0.3),
+              inset 0 0 12px rgba(74, 144, 217, 0.15),
+              0 0 0 1px rgba(74, 144, 217, 0.5) !important;
+  position: relative;
+  animation: elite-glow-border 2s ease-in-out infinite alternate;
+}
+
+.enemy-info.enemy-elite::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  background: linear-gradient(45deg, 
+    transparent 30%, 
+    rgba(74, 144, 217, 0.3) 50%, 
+    transparent 70%);
+  border-radius: 6px;
+  pointer-events: none;
+  animation: elite-shine 3s linear infinite;
 }
 
 .enemy-info.enemy-elite .enemy-name {
-  color: #4a90d9;
-  text-shadow: 0 0 6px rgba(74, 144, 217, 0.6);
+  /* 颜色由 getEnemyNameColor 函数动态设置，这里只设置阴影效果 */
+  text-shadow: 0 0 8px currentColor,
+               0 0 12px currentColor,
+               0 0 4px currentColor !important;
+  font-weight: 700;
 }
 
 .enemy-info.enemy-elite .enemy-rarity-icon {
-  color: #4a90d9;
-  text-shadow: 0 0 8px rgba(74, 144, 217, 0.8);
+  color: #6bb3ff !important;
+  text-shadow: 0 0 10px rgba(74, 144, 217, 1),
+               0 0 15px rgba(74, 144, 217, 0.8),
+               0 0 20px rgba(74, 144, 217, 0.6) !important;
   animation: elite-glow 2s ease-in-out infinite alternate;
+  filter: drop-shadow(0 0 4px rgba(74, 144, 217, 0.8));
 }
 
-/* Boss怪物样式 - 橙色边框，强烈发光效果 */
+.enemy-info.enemy-elite .enemy-bar {
+  border-color: #4a90d9 !important;
+  box-shadow: 0 0 4px rgba(74, 144, 217, 0.4);
+}
+
+.enemy-info.enemy-elite .enemy-bar-fill {
+  background: linear-gradient(90deg, #4a90d9, #6bb3ff) !important;
+  box-shadow: 0 0 6px rgba(74, 144, 217, 0.6);
+}
+
+/* Boss怪物样式 - 橙色/金色边框，强烈发光效果 */
 .enemy-info.enemy-boss {
-  border: 3px solid #ff6b35;
-  background: rgba(60, 20, 20, 0.7);
-  box-shadow: 0 0 12px rgba(255, 107, 53, 0.6), 
-              0 0 20px rgba(255, 107, 53, 0.3),
-              inset 0 0 12px rgba(255, 107, 53, 0.2);
+  border: 3px solid #ff6b35 !important;
+  background: linear-gradient(135deg, rgba(60, 20, 20, 0.9), rgba(80, 30, 30, 0.7)) !important;
+  box-shadow: 0 0 16px rgba(255, 107, 53, 0.8), 
+              0 0 28px rgba(255, 107, 53, 0.5),
+              0 0 40px rgba(255, 107, 53, 0.3),
+              inset 0 0 16px rgba(255, 107, 53, 0.25),
+              0 0 0 2px rgba(255, 215, 0, 0.6) !important;
+  position: relative;
   animation: boss-pulse 2s ease-in-out infinite;
+  transform: scale(1.02);
+}
+
+.enemy-info.enemy-boss::before {
+  content: '';
+  position: absolute;
+  top: -3px;
+  left: -3px;
+  right: -3px;
+  bottom: -3px;
+  background: linear-gradient(45deg, 
+    transparent 30%, 
+    rgba(255, 215, 0, 0.4) 50%, 
+    transparent 70%);
+  border-radius: 8px;
+  pointer-events: none;
+  animation: boss-shine 2s linear infinite;
+  z-index: -1;
+}
+
+.enemy-info.enemy-boss::after {
+  content: '⚡';
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  font-size: 20px;
+  color: #ffd700;
+  text-shadow: 0 0 10px rgba(255, 215, 0, 1),
+               0 0 20px rgba(255, 215, 0, 0.8);
+  animation: boss-sparkle 1.5s ease-in-out infinite;
+  pointer-events: none;
 }
 
 .enemy-info.enemy-boss .enemy-name {
-  color: #ff6b35;
-  text-shadow: 0 0 8px rgba(255, 107, 53, 0.8),
-               0 0 12px rgba(255, 107, 53, 0.6);
+  /* 颜色由 getEnemyNameColor 函数动态设置，这里只设置阴影效果 */
+  text-shadow: 0 0 10px currentColor,
+               0 0 16px currentColor,
+               0 0 24px currentColor,
+               0 0 6px rgba(255, 215, 0, 0.8) !important;
   font-weight: 900;
+  font-size: 15px;
+  letter-spacing: 0.5px;
 }
 
 .enemy-info.enemy-boss .enemy-rarity-icon {
-  color: #ffd700;
-  text-shadow: 0 0 10px rgba(255, 215, 0, 1),
-               0 0 15px rgba(255, 215, 0, 0.8);
+  color: #ffd700 !important;
+  text-shadow: 0 0 12px rgba(255, 215, 0, 1),
+               0 0 18px rgba(255, 215, 0, 1),
+               0 0 24px rgba(255, 215, 0, 0.8),
+               0 0 30px rgba(255, 215, 0, 0.6) !important;
   animation: boss-crown 1.5s ease-in-out infinite;
+  filter: drop-shadow(0 0 6px rgba(255, 215, 0, 1));
+  font-size: 18px;
+}
+
+.enemy-info.enemy-boss .enemy-bar {
+  border: 2px solid #ff6b35 !important;
+  box-shadow: 0 0 8px rgba(255, 107, 53, 0.6),
+              inset 0 0 4px rgba(255, 107, 53, 0.3);
+}
+
+.enemy-info.enemy-boss .enemy-bar-fill {
+  background: linear-gradient(90deg, #ff6b35, #ff8c5a, #ffd700) !important;
+  box-shadow: 0 0 10px rgba(255, 107, 53, 0.8),
+              inset 0 0 4px rgba(255, 215, 0, 0.4);
+  animation: boss-bar-glow 1.5s ease-in-out infinite alternate;
 }
 
 .enemy-info.enemy-dead {
@@ -3290,7 +3425,8 @@ function escapeRegex(str: string): string {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: var(--text-red);
+  /* 颜色由 getEnemyNameColor 函数动态设置 */
+  color: #ff7777; /* 默认红色（物理攻击），会被内联样式覆盖 */
   font-weight: bold;
   display: flex;
   align-items: center;
@@ -3545,37 +3681,125 @@ function escapeRegex(str: string): string {
 /* 稀有度动画效果 */
 @keyframes elite-glow {
   0% {
-    text-shadow: 0 0 8px rgba(74, 144, 217, 0.8);
+    text-shadow: 0 0 10px rgba(74, 144, 217, 1),
+                 0 0 15px rgba(74, 144, 217, 0.8),
+                 0 0 20px rgba(74, 144, 217, 0.6);
   }
   100% {
-    text-shadow: 0 0 12px rgba(74, 144, 217, 1), 0 0 16px rgba(74, 144, 217, 0.6);
+    text-shadow: 0 0 15px rgba(74, 144, 217, 1),
+                 0 0 20px rgba(74, 144, 217, 1),
+                 0 0 30px rgba(74, 144, 217, 0.8);
+  }
+}
+
+@keyframes elite-glow-border {
+  0% {
+    box-shadow: 0 0 12px rgba(74, 144, 217, 0.6), 
+                0 0 20px rgba(74, 144, 217, 0.3),
+                inset 0 0 12px rgba(74, 144, 217, 0.15),
+                0 0 0 1px rgba(74, 144, 217, 0.5);
+  }
+  100% {
+    box-shadow: 0 0 16px rgba(74, 144, 217, 0.8), 
+                0 0 28px rgba(74, 144, 217, 0.5),
+                inset 0 0 16px rgba(74, 144, 217, 0.25),
+                0 0 0 2px rgba(74, 144, 217, 0.7);
+  }
+}
+
+@keyframes elite-shine {
+  0% {
+    transform: translateX(-100%) translateY(-100%);
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(100%) translateY(100%);
+    opacity: 0;
   }
 }
 
 @keyframes boss-pulse {
   0%, 100% {
-    box-shadow: 0 0 12px rgba(255, 107, 53, 0.6), 
-                0 0 20px rgba(255, 107, 53, 0.3),
-                inset 0 0 12px rgba(255, 107, 53, 0.2);
-  }
-  50% {
     box-shadow: 0 0 16px rgba(255, 107, 53, 0.8), 
                 0 0 28px rgba(255, 107, 53, 0.5),
-                inset 0 0 16px rgba(255, 107, 53, 0.3);
+                0 0 40px rgba(255, 107, 53, 0.3),
+                inset 0 0 16px rgba(255, 107, 53, 0.25),
+                0 0 0 2px rgba(255, 215, 0, 0.6);
+    transform: scale(1.02);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(255, 107, 53, 1), 
+                0 0 36px rgba(255, 107, 53, 0.7),
+                0 0 50px rgba(255, 107, 53, 0.5),
+                inset 0 0 20px rgba(255, 107, 53, 0.35),
+                0 0 0 3px rgba(255, 215, 0, 0.8);
+    transform: scale(1.03);
   }
 }
 
 @keyframes boss-crown {
   0%, 100% {
     transform: scale(1) rotate(0deg);
-    text-shadow: 0 0 10px rgba(255, 215, 0, 1),
-                 0 0 15px rgba(255, 215, 0, 0.8);
+    text-shadow: 0 0 12px rgba(255, 215, 0, 1),
+                 0 0 18px rgba(255, 215, 0, 1),
+                 0 0 24px rgba(255, 215, 0, 0.8);
+  }
+  25% {
+    transform: scale(1.1) rotate(-3deg);
+    text-shadow: 0 0 15px rgba(255, 215, 0, 1),
+                 0 0 22px rgba(255, 215, 0, 1),
+                 0 0 30px rgba(255, 215, 0, 1);
   }
   50% {
-    transform: scale(1.1) rotate(5deg);
+    transform: scale(1.15) rotate(0deg);
+    text-shadow: 0 0 18px rgba(255, 215, 0, 1),
+                 0 0 26px rgba(255, 215, 0, 1),
+                 0 0 36px rgba(255, 215, 0, 1);
+  }
+  75% {
+    transform: scale(1.1) rotate(3deg);
     text-shadow: 0 0 15px rgba(255, 215, 0, 1),
-                 0 0 20px rgba(255, 215, 0, 1),
-                 0 0 25px rgba(255, 215, 0, 0.8);
+                 0 0 22px rgba(255, 215, 0, 1),
+                 0 0 30px rgba(255, 215, 0, 1);
+  }
+}
+
+@keyframes boss-shine {
+  0% {
+    transform: translateX(-100%) translateY(-100%) rotate(45deg);
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(100%) translateY(100%) rotate(45deg);
+    opacity: 0;
+  }
+}
+
+@keyframes boss-sparkle {
+  0%, 100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.2) rotate(180deg);
+    opacity: 1;
+  }
+}
+
+@keyframes boss-bar-glow {
+  0% {
+    box-shadow: 0 0 10px rgba(255, 107, 53, 0.8),
+                inset 0 0 4px rgba(255, 215, 0, 0.4);
+  }
+  100% {
+    box-shadow: 0 0 15px rgba(255, 107, 53, 1),
+                inset 0 0 6px rgba(255, 215, 0, 0.6);
   }
 }
 </style>

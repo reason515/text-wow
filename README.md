@@ -33,7 +33,20 @@ Text WoW 是一款放置类文字RPG游戏，玩家制定策略，角色自动�
 - Node.js 18+
 - pnpm / npm / yarn
 
-### 1. 启动后端
+### 1. 初始化数据库（首次运行或重置数据库后）
+
+```bash
+cd server
+go run cmd/init_database/main.go
+```
+
+这会自动：
+- 创建数据库表结构
+- 加载基础数据（区域、怪物等）
+- 加载战士技能数据
+- 添加杜隆塔尔区域怪物
+
+### 2. 启动后端
 
 ```bash
 cd server
@@ -43,7 +56,7 @@ go run main.go
 
 后端将在 `http://localhost:8080` 启动
 
-### 2. 启动前端
+### 3. 启动前端
 
 ```bash
 cd client
@@ -53,7 +66,7 @@ npm run dev
 
 前端将在 `http://localhost:5173` 启动
 
-### 3. 开始游戏
+### 4. 开始游戏
 
 浏览器访问 `http://localhost:5173`
 
