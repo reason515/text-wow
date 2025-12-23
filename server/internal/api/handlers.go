@@ -789,6 +789,22 @@ func (h *Handler) GetInitialSkillSelection(c *gin.Context) {
 
 	selection, err := h.skillService.GetInitialSkillSelection(charID)
 	if err != nil {
+		// 如果是技能数据缺失的错误，返回500状态码和详细错误信息
+		if strings.Contains(err.Error(), "无法获取初始技能列表") || strings.Contains(err.Error(), "缺少") {
+			c.JSON(http.StatusInternalServerError, models.APIResponse{
+				Success: false,
+				Error:   err.Error(),
+			})
+			return
+		}
+		// 如果是"初始技能已选择"的错误，返回200但success=false，让前端知道可以跳过
+		if strings.Contains(err.Error(), "初始技能已选择") {
+			c.JSON(http.StatusOK, models.APIResponse{
+				Success: false,
+				Error:   err.Error(),
+			})
+			return
+		}
 		c.JSON(http.StatusBadRequest, models.APIResponse{
 			Success: false,
 			Error:   err.Error(),

@@ -237,6 +237,10 @@ func runMigrations() error {
 	if err := migrateBattleStrategies(); err != nil {
 		return fmt.Errorf("failed to migrate battle_strategies: %w", err)
 	}
+	// 迁移2: 创建怪物强度配置表
+	if err := migrateMonsterStrengthConfig(); err != nil {
+		return fmt.Errorf("failed to migrate monster_strength_config: %w", err)
+	}
 	return nil
 }
 
@@ -339,5 +343,64 @@ func migrateBattleStrategies() error {
 		log.Println("✅ battle_strategies table migrated successfully")
 	}
 
+	return nil
+}
+
+// migrateMonsterStrengthConfig 迁移怪物强度配置表
+func migrateMonsterStrengthConfig() error {
+	// 检查表是否已存在
+	var tableName string
+	err := DB.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name='monster_strength_config'").Scan(&tableName)
+	if err == nil {
+		// 表已存在，跳过
+		return nil
+	}
+	if err != sql.ErrNoRows {
+		return err
+	}
+
+	// 创建配置表
+	log.Println("🔄 Creating monster_strength_config table...")
+	_, err = DB.Exec(`
+		CREATE TABLE IF NOT EXISTS monster_strength_config (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			level_min INTEGER NOT NULL,
+			level_max INTEGER NOT NULL,
+			hp_multiplier REAL DEFAULT 1.0,
+			attack_multiplier REAL DEFAULT 1.0,
+			defense_multiplier REAL DEFAULT 1.0,
+			crit_rate_bonus REAL DEFAULT 0.0,
+			description TEXT,
+			is_active INTEGER DEFAULT 1,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			UNIQUE(level_min, level_max)
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create monster_strength_config table: %w", err)
+	}
+
+	// 创建索引
+	DB.Exec("CREATE INDEX IF NOT EXISTS idx_strength_config_level ON monster_strength_config(level_min, level_max)")
+	DB.Exec("CREATE INDEX IF NOT EXISTS idx_strength_config_active ON monster_strength_config(is_active)")
+
+	// 插入默认配置
+	_, err = DB.Exec(`
+		INSERT OR IGNORE INTO monster_strength_config 
+		(level_min, level_max, hp_multiplier, attack_multiplier, defense_multiplier, crit_rate_bonus, description) 
+		VALUES
+		(1, 10, 1.5, 1.4, 1.4, 0.02, '1-10级：HP +50%, 攻击 +40%, 防御 +40%, 暴击率 +2%'),
+		(11, 20, 1.45, 1.35, 1.35, 0.02, '10-20级：HP +45%, 攻击 +35%, 防御 +35%, 暴击率 +2%'),
+		(21, 30, 1.4, 1.35, 1.35, 0.02, '20-30级：HP +40%, 攻击 +35%, 防御 +35%, 暴击率 +2%'),
+		(31, 40, 1.4, 1.35, 1.35, 0.03, '30-40级：HP +40%, 攻击 +35%, 防御 +35%, 暴击率 +3%'),
+		(41, 50, 1.35, 1.3, 1.3, 0.03, '40-50级：HP +35%, 攻击 +30%, 防御 +30%, 暴击率 +3%'),
+		(51, 60, 1.35, 1.3, 1.3, 0.03, '50-60级：HP +35%, 攻击 +30%, 防御 +30%, 暴击率 +3%')
+	`)
+	if err != nil {
+		log.Printf("⚠️ Failed to insert default configs: %v", err)
+	}
+
+	log.Println("✅ monster_strength_config table created successfully")
 	return nil
 }

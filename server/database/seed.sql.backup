@@ -553,160 +553,160 @@ INSERT OR REPLACE INTO zones (id, name, description, min_level, max_level, facti
 
 -- 艾尔文森林 (1-10级) - HP: 15~45, 攻击: 3~10
 INSERT OR REPLACE INTO monsters (
-id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
-attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
-exp_reward, gold_min, gold_max, spawn_weight
+    id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
+    attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
+    exp_reward, gold_min, gold_max, spawn_weight
 ) VALUES
-('wolf', 'elwynn', '森林狼', 1, 'normal', 22, 4, 0, 1, 1, 'physical', 0.07, 1.5, 0.07, 1.5, 5, 1, 2, 100),
-('young_boar', 'elwynn', '小野猪', 1, 'normal', 18, 4, 0, 1, 1, 'physical', 0.07, 1.5, 0.07, 1.5, 4, 1, 1, 100),
-('kobold_worker', 'elwynn', '狗头人矿工', 2, 'normal', 27, 6, 0, 1, 1, 'physical', 0.07, 1.5, 0.07, 1.5, 6, 1, 2, 80),
-('kobold_tunneler', 'elwynn', '狗头人掘地工', 3, 'normal', 33, 7, 0, 3, 3, 'physical', 0.07, 1.5, 0.07, 1.5, 7, 1, 3, 60),
-('defias_thug', 'elwynn', '迪菲亚暴徒', 4, 'normal', 39, 8, 0, 3, 3, 'physical', 0.07, 1.5, 0.07, 1.5, 8, 2, 3, 50),
-('defias_bandit', 'elwynn', '迪菲亚劫匪', 5, 'normal', 45, 10, 0, 4, 4, 'physical', 0.07, 1.5, 0.07, 1.5, 10, 2, 4, 40),
-('murloc', 'elwynn', '鱼人', 3, 'normal', 30, 7, 0, 3, 3, 'physical', 0.07, 1.5, 0.07, 1.5, 7, 1, 3, 70),
-('murloc_warrior', 'elwynn', '鱼人战士', 5, 'normal', 42, 10, 0, 4, 4, 'physical', 0.07, 1.5, 0.07, 1.5, 9, 2, 4, 30),
-('kobold_geomancer', 'elwynn', '狗头人地卜师', 6, 'normal', 45, 6, 14, 3, 4, 'magic', 0.07, 1.5, 0.10, 1.6, 12, 2, 5, 35),
-('prowler', 'elwynn', '潜伏者', 6, 'normal', 48, 11, 0, 4, 4, 'physical', 0.07, 1.5, 0.07, 1.5, 11, 2, 5, 25),
+('wolf', 'elwynn', '森林狼', 1, 'normal', 22, 4, 0, 1, 1, 'physical', 0.07, 1.5, 0.07, 1.5, 5, 1, 2, 100),);
+('young_boar', 'elwynn', '小野猪', 1, 'normal', 18, 4, 0, 1, 1, 'physical', 0.07, 1.5, 0.07, 1.5, 4, 1, 1, 100),);
+('kobold_worker', 'elwynn', '狗头人矿工', 2, 'normal', 27, 6, 0, 1, 1, 'physical', 0.07, 1.5, 0.07, 1.5, 6, 1, 2, 80),);
+('kobold_tunneler', 'elwynn', '狗头人掘地工', 3, 'normal', 33, 7, 0, 3, 3, 'physical', 0.07, 1.5, 0.07, 1.5, 7, 1, 3, 60),);
+('defias_thug', 'elwynn', '迪菲亚暴徒', 4, 'normal', 39, 8, 0, 3, 3, 'physical', 0.07, 1.5, 0.07, 1.5, 8, 2, 3, 50),);
+('defias_bandit', 'elwynn', '迪菲亚劫匪', 5, 'normal', 45, 10, 0, 4, 4, 'physical', 0.07, 1.5, 0.07, 1.5, 10, 2, 4, 40),);
+('murloc', 'elwynn', '鱼人', 3, 'normal', 30, 7, 0, 3, 3, 'physical', 0.07, 1.5, 0.07, 1.5, 7, 1, 3, 70),);
+('murloc_warrior', 'elwynn', '鱼人战士', 5, 'normal', 42, 10, 0, 4, 4, 'physical', 0.07, 1.5, 0.07, 1.5, 9, 2, 4, 30),);
+('kobold_geomancer', 'elwynn', '狗头人地卜师', 6, 'normal', 45, 6, 14, 3, 4, 'magic', 0.07, 1.5, 0.10, 1.6, 12, 2, 5, 35),);
+('prowler', 'elwynn', '潜伏者', 6, 'normal', 48, 11, 0, 4, 4, 'physical', 0.07, 1.5, 0.07, 1.5, 11, 2, 5, 25),);
 ('hogger', 'elwynn', '霍格', 8, 'elite', 120, 17, 0, 7, 7, 'physical', 0.10, 1.6, 0.07, 1.5, 35, 5, 12, 5);
 
 -- 丹莫罗 (1-10级) - HP: 15~45, 攻击: 3~10
 INSERT OR REPLACE INTO monsters (
-id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
-attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
-exp_reward, gold_min, gold_max, spawn_weight
+    id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
+    attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
+    exp_reward, gold_min, gold_max, spawn_weight
 ) VALUES
-('frost_wolf', 'dun_morogh', '霜狼', 1, 'normal', 22, 4, 0, 1, 1, 'physical', 0.07, 1.5, 0.07, 1.5, 5, 1, 2, 100),
-('snow_boar', 'dun_morogh', '雪野猪', 1, 'normal', 18, 4, 0, 1, 1, 'physical', 0.07, 1.5, 0.07, 1.5, 4, 1, 1, 100),
-('trogg_worker', 'dun_morogh', '穴居人苦工', 2, 'normal', 27, 6, 0, 1, 1, 'physical', 0.07, 1.5, 0.07, 1.5, 6, 1, 2, 80),
-('ice_troll', 'dun_morogh', '冰霜巨魔', 3, 'normal', 33, 7, 0, 3, 3, 'physical', 0.07, 1.5, 0.07, 1.5, 7, 1, 3, 60),
-('frostmane_scout', 'dun_morogh', '霜鬃斥候', 4, 'normal', 39, 8, 0, 3, 3, 'physical', 0.07, 1.5, 0.07, 1.5, 8, 2, 3, 50),
-('frostmane_warrior', 'dun_morogh', '霜鬃战士', 5, 'normal', 45, 10, 0, 4, 4, 'physical', 0.07, 1.5, 0.07, 1.5, 10, 2, 4, 40),
-('crag_boar', 'dun_morogh', '峭壁野猪', 3, 'normal', 30, 7, 0, 3, 3, 'physical', 0.07, 1.5, 0.07, 1.5, 7, 1, 3, 70),
-('young_wendigo', 'dun_morogh', '幼年温迪戈', 5, 'normal', 42, 10, 0, 4, 4, 'physical', 0.07, 1.5, 0.07, 1.5, 9, 2, 4, 30),
-('frostmane_shaman', 'dun_morogh', '霜鬃萨满', 6, 'normal', 45, 6, 14, 3, 4, 'magic', 0.07, 1.5, 0.10, 1.6, 12, 2, 5, 35),
-('wendigo', 'dun_morogh', '温迪戈', 6, 'normal', 48, 11, 0, 4, 4, 'physical', 0.07, 1.5, 0.07, 1.5, 11, 2, 5, 25),
+('frost_wolf', 'dun_morogh', '霜狼', 1, 'normal', 22, 4, 0, 1, 1, 'physical', 0.07, 1.5, 0.07, 1.5, 5, 1, 2, 100),);
+('snow_boar', 'dun_morogh', '雪野猪', 1, 'normal', 18, 4, 0, 1, 1, 'physical', 0.07, 1.5, 0.07, 1.5, 4, 1, 1, 100),);
+('trogg_worker', 'dun_morogh', '穴居人苦工', 2, 'normal', 27, 6, 0, 1, 1, 'physical', 0.07, 1.5, 0.07, 1.5, 6, 1, 2, 80),);
+('ice_troll', 'dun_morogh', '冰霜巨魔', 3, 'normal', 33, 7, 0, 3, 3, 'physical', 0.07, 1.5, 0.07, 1.5, 7, 1, 3, 60),);
+('frostmane_scout', 'dun_morogh', '霜鬃斥候', 4, 'normal', 39, 8, 0, 3, 3, 'physical', 0.07, 1.5, 0.07, 1.5, 8, 2, 3, 50),);
+('frostmane_warrior', 'dun_morogh', '霜鬃战士', 5, 'normal', 45, 10, 0, 4, 4, 'physical', 0.07, 1.5, 0.07, 1.5, 10, 2, 4, 40),);
+('crag_boar', 'dun_morogh', '峭壁野猪', 3, 'normal', 30, 7, 0, 3, 3, 'physical', 0.07, 1.5, 0.07, 1.5, 7, 1, 3, 70),);
+('young_wendigo', 'dun_morogh', '幼年温迪戈', 5, 'normal', 42, 10, 0, 4, 4, 'physical', 0.07, 1.5, 0.07, 1.5, 9, 2, 4, 30),);
+('frostmane_shaman', 'dun_morogh', '霜鬃萨满', 6, 'normal', 45, 6, 14, 3, 4, 'magic', 0.07, 1.5, 0.10, 1.6, 12, 2, 5, 35),);
+('wendigo', 'dun_morogh', '温迪戈', 6, 'normal', 48, 11, 0, 4, 4, 'physical', 0.07, 1.5, 0.07, 1.5, 11, 2, 5, 25),);
 ('great_father_arctica', 'dun_morogh', '大熊阿卡提卡', 8, 'elite', 80, 12, 0, 5, 5, 'physical', 0.08, 1.6, 0.05, 1.5, 35, 5, 12, 5);
 
 -- 泰达希尔 (1-10级) - HP: 15~45, 攻击: 3~10
 INSERT OR REPLACE INTO monsters (
-id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
-attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
-exp_reward, gold_min, gold_max, spawn_weight
+    id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
+    attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
+    exp_reward, gold_min, gold_max, spawn_weight
 ) VALUES
-('young_nightsaber', 'teldrassil', '幼年夜刃豹', 1, 'normal', 22, 4, 0, 1, 1, 'physical', 0.07, 1.5, 0.07, 1.5, 5, 1, 2, 100),
-('webwood_lurker', 'teldrassil', '蛛网潜伏者', 1, 'normal', 18, 4, 0, 1, 1, 'physical', 0.07, 1.5, 0.07, 1.5, 4, 1, 1, 100),
-('greymane_cub', 'teldrassil', '灰鬃幼崽', 2, 'normal', 27, 6, 0, 1, 1, 'physical', 0.07, 1.5, 0.07, 1.5, 6, 1, 2, 80),
-('moonkin', 'teldrassil', '枭兽', 3, 'normal', 33, 7, 0, 3, 3, 'physical', 0.07, 1.5, 0.07, 1.5, 7, 1, 3, 60),
-('furbolg_scout', 'teldrassil', '熊怪斥候', 4, 'normal', 39, 8, 0, 3, 3, 'physical', 0.07, 1.5, 0.07, 1.5, 8, 2, 3, 50),
-('furbolg_warrior', 'teldrassil', '熊怪战士', 5, 'normal', 45, 10, 0, 4, 4, 'physical', 0.07, 1.5, 0.07, 1.5, 10, 2, 4, 40),
-('nightsaber', 'teldrassil', '夜刃豹', 3, 'normal', 30, 7, 0, 3, 3, 'physical', 0.07, 1.5, 0.07, 1.5, 7, 1, 3, 70),
-('greymane', 'teldrassil', '灰鬃', 5, 'normal', 42, 10, 0, 4, 4, 'physical', 0.07, 1.5, 0.07, 1.5, 9, 2, 4, 30),
-('furbolg_shaman', 'teldrassil', '熊怪萨满', 6, 'normal', 45, 6, 14, 3, 4, 'magic', 0.07, 1.5, 0.10, 1.6, 12, 2, 5, 35),
-('webwood_spider', 'teldrassil', '蛛网蜘蛛', 6, 'normal', 48, 11, 0, 4, 4, 'physical', 0.07, 1.5, 0.07, 1.5, 11, 2, 5, 25),
+('young_nightsaber', 'teldrassil', '幼年夜刃豹', 1, 'normal', 22, 4, 0, 1, 1, 'physical', 0.07, 1.5, 0.07, 1.5, 5, 1, 2, 100),);
+('webwood_lurker', 'teldrassil', '蛛网潜伏者', 1, 'normal', 18, 4, 0, 1, 1, 'physical', 0.07, 1.5, 0.07, 1.5, 4, 1, 1, 100),);
+('greymane_cub', 'teldrassil', '灰鬃幼崽', 2, 'normal', 27, 6, 0, 1, 1, 'physical', 0.07, 1.5, 0.07, 1.5, 6, 1, 2, 80),);
+('moonkin', 'teldrassil', '枭兽', 3, 'normal', 33, 7, 0, 3, 3, 'physical', 0.07, 1.5, 0.07, 1.5, 7, 1, 3, 60),);
+('furbolg_scout', 'teldrassil', '熊怪斥候', 4, 'normal', 39, 8, 0, 3, 3, 'physical', 0.07, 1.5, 0.07, 1.5, 8, 2, 3, 50),);
+('furbolg_warrior', 'teldrassil', '熊怪战士', 5, 'normal', 45, 10, 0, 4, 4, 'physical', 0.07, 1.5, 0.07, 1.5, 10, 2, 4, 40),);
+('nightsaber', 'teldrassil', '夜刃豹', 3, 'normal', 30, 7, 0, 3, 3, 'physical', 0.07, 1.5, 0.07, 1.5, 7, 1, 3, 70),);
+('greymane', 'teldrassil', '灰鬃', 5, 'normal', 42, 10, 0, 4, 4, 'physical', 0.07, 1.5, 0.07, 1.5, 9, 2, 4, 30),);
+('furbolg_shaman', 'teldrassil', '熊怪萨满', 6, 'normal', 45, 6, 14, 3, 4, 'magic', 0.07, 1.5, 0.10, 1.6, 12, 2, 5, 35),);
+('webwood_spider', 'teldrassil', '蛛网蜘蛛', 6, 'normal', 48, 11, 0, 4, 4, 'physical', 0.07, 1.5, 0.07, 1.5, 11, 2, 5, 25),);
 ('ursal_the_mauler', 'teldrassil', '猛击者乌萨尔', 8, 'elite', 80, 12, 0, 5, 5, 'physical', 0.08, 1.6, 0.05, 1.5, 35, 5, 12, 5);
 
 -- 西部荒野 (10-20级) - HP: 35~80, 攻击: 9~18
 INSERT OR REPLACE INTO monsters (
-id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
-attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
-exp_reward, gold_min, gold_max, spawn_weight
+    id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
+    attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
+    exp_reward, gold_min, gold_max, spawn_weight
 ) VALUES
-('harvest_golem', 'westfall', '收割傀儡', 10, 'normal', 60, 14, 0, 7, 7, 'physical', 0.08, 1.5, 0.07, 1.5, 14, 2, 5, 100),
-('defias_rogue', 'westfall', '迪菲亚盗贼', 11, 'normal', 64, 15, 0, 7, 7, 'physical', 0.10, 1.6, 0.07, 1.5, 16, 3, 6, 80),
-('defias_highwayman', 'westfall', '迪菲亚拦路贼', 12, 'normal', 70, 16, 0, 8, 8, 'physical', 0.10, 1.6, 0.07, 1.5, 18, 3, 7, 60),
-('gnoll_brute', 'westfall', '豺狼人蛮兵', 13, 'normal', 75, 18, 0, 8, 8, 'physical', 0.09, 1.5, 0.07, 1.5, 20, 4, 8, 50),
-('gnoll_mystic', 'westfall', '豺狼人秘法师', 14, 'normal', 65, 11, 20, 7, 11, 'magic', 0.07, 1.5, 0.12, 1.6, 22, 4, 9, 40),
-('defias_pyromancer', 'westfall', '迪菲亚纵火者', 15, 'normal', 72, 12, 24, 8, 11, 'magic', 0.07, 1.5, 0.14, 1.65, 26, 6, 12, 25),
-('defias_overlord', 'westfall', '迪菲亚霸主', 16, 'elite', 174, 27, 0, 14, 14, 'physical', 0.14, 1.7, 0.07, 1.5, 50, 10, 20, 5),
+('harvest_golem', 'westfall', '收割傀儡', 10, 'normal', 60, 14, 0, 7, 7, 'physical', 0.08, 1.5, 0.07, 1.5, 14, 2, 5, 100),);
+('defias_rogue', 'westfall', '迪菲亚盗贼', 11, 'normal', 64, 15, 0, 7, 7, 'physical', 0.10, 1.6, 0.07, 1.5, 16, 3, 6, 80),);
+('defias_highwayman', 'westfall', '迪菲亚拦路贼', 12, 'normal', 70, 16, 0, 8, 8, 'physical', 0.10, 1.6, 0.07, 1.5, 18, 3, 7, 60),);
+('gnoll_brute', 'westfall', '豺狼人蛮兵', 13, 'normal', 75, 18, 0, 8, 8, 'physical', 0.09, 1.5, 0.07, 1.5, 20, 4, 8, 50),);
+('gnoll_mystic', 'westfall', '豺狼人秘法师', 14, 'normal', 65, 11, 20, 7, 11, 'magic', 0.07, 1.5, 0.12, 1.6, 22, 4, 9, 40),);
+('defias_pyromancer', 'westfall', '迪菲亚纵火者', 15, 'normal', 72, 12, 24, 8, 11, 'magic', 0.07, 1.5, 0.14, 1.65, 26, 6, 12, 25),);
+('defias_overlord', 'westfall', '迪菲亚霸主', 16, 'elite', 174, 27, 0, 14, 14, 'physical', 0.14, 1.7, 0.07, 1.5, 50, 10, 20, 5),);
 ('dust_devil', 'westfall', '尘土恶魔', 15, 'normal', 55, 14, 0, 6, 6, 'physical', 0.07, 1.5, 0.05, 1.5, 24, 5, 10, 30);
 
 -- 洛克莫丹 (10-20级) - HP: 35~80, 攻击: 9~18
 INSERT OR REPLACE INTO monsters (
-id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
-attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
-exp_reward, gold_min, gold_max, spawn_weight
+    id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
+    attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
+    exp_reward, gold_min, gold_max, spawn_weight
 ) VALUES
-('mountain_boar', 'loch_modan', '山猪', 10, 'normal', 60, 14, 0, 7, 7, 'physical', 0.08, 1.5, 0.07, 1.5, 14, 2, 5, 100),
-('trogg_brute', 'loch_modan', '穴居人蛮兵', 11, 'normal', 64, 15, 0, 7, 7, 'physical', 0.10, 1.6, 0.07, 1.5, 16, 3, 6, 80),
-('dark_iron_dwarf', 'loch_modan', '黑铁矮人', 12, 'normal', 70, 16, 0, 8, 8, 'physical', 0.10, 1.6, 0.07, 1.5, 18, 3, 7, 60),
-('mountain_cougar', 'loch_modan', '山猫', 13, 'normal', 75, 18, 0, 8, 8, 'physical', 0.09, 1.5, 0.07, 1.5, 20, 4, 8, 50),
-('dark_iron_sorcerer', 'loch_modan', '黑铁术士', 14, 'normal', 65, 11, 20, 7, 11, 'magic', 0.07, 1.5, 0.12, 1.6, 22, 4, 9, 40),
-('stone_elemental', 'loch_modan', '石元素', 15, 'normal', 72, 12, 24, 8, 11, 'magic', 0.07, 1.5, 0.14, 1.65, 26, 6, 12, 25),
-('dark_iron_commander', 'loch_modan', '黑铁指挥官', 16, 'elite', 174, 27, 0, 14, 14, 'physical', 0.14, 1.7, 0.07, 1.5, 50, 10, 20, 5),
+('mountain_boar', 'loch_modan', '山猪', 10, 'normal', 60, 14, 0, 7, 7, 'physical', 0.08, 1.5, 0.07, 1.5, 14, 2, 5, 100),);
+('trogg_brute', 'loch_modan', '穴居人蛮兵', 11, 'normal', 64, 15, 0, 7, 7, 'physical', 0.10, 1.6, 0.07, 1.5, 16, 3, 6, 80),);
+('dark_iron_dwarf', 'loch_modan', '黑铁矮人', 12, 'normal', 70, 16, 0, 8, 8, 'physical', 0.10, 1.6, 0.07, 1.5, 18, 3, 7, 60),);
+('mountain_cougar', 'loch_modan', '山猫', 13, 'normal', 75, 18, 0, 8, 8, 'physical', 0.09, 1.5, 0.07, 1.5, 20, 4, 8, 50),);
+('dark_iron_sorcerer', 'loch_modan', '黑铁术士', 14, 'normal', 65, 11, 20, 7, 11, 'magic', 0.07, 1.5, 0.12, 1.6, 22, 4, 9, 40),);
+('stone_elemental', 'loch_modan', '石元素', 15, 'normal', 72, 12, 24, 8, 11, 'magic', 0.07, 1.5, 0.14, 1.65, 26, 6, 12, 25),);
+('dark_iron_commander', 'loch_modan', '黑铁指挥官', 16, 'elite', 174, 27, 0, 14, 14, 'physical', 0.14, 1.7, 0.07, 1.5, 50, 10, 20, 5),);
 ('elder_mountain_boar', 'loch_modan', '老山猪', 15, 'normal', 55, 14, 0, 6, 6, 'physical', 0.07, 1.5, 0.05, 1.5, 24, 5, 10, 30);
 
 -- 黑海岸 (10-20级) - HP: 35~80, 攻击: 9~18
 INSERT OR REPLACE INTO monsters (
-id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
-attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
-exp_reward, gold_min, gold_max, spawn_weight
+    id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
+    attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
+    exp_reward, gold_min, gold_max, spawn_weight
 ) VALUES
-('darkshore_thresher', 'darkshore', '黑海岸鞭尾鱼', 10, 'normal', 60, 14, 0, 7, 7, 'physical', 0.08, 1.5, 0.07, 1.5, 14, 2, 5, 100),
-('greymist_warrior', 'darkshore', '灰雾战士', 11, 'normal', 64, 15, 0, 7, 7, 'physical', 0.10, 1.6, 0.07, 1.5, 16, 3, 6, 80),
-('moonstalker', 'darkshore', '月夜豹', 12, 'normal', 70, 16, 0, 8, 8, 'physical', 0.10, 1.6, 0.07, 1.5, 18, 3, 7, 60),
-('vile_sprite', 'darkshore', '邪恶精灵', 13, 'normal', 75, 18, 0, 8, 8, 'physical', 0.09, 1.5, 0.07, 1.5, 20, 4, 8, 50),
-('darkstrider', 'darkshore', '暗行者', 14, 'normal', 65, 11, 20, 7, 11, 'magic', 0.07, 1.5, 0.12, 1.6, 22, 4, 9, 40),
-('naga_myrmidon', 'darkshore', '纳迦战士', 15, 'normal', 72, 12, 24, 8, 11, 'magic', 0.07, 1.5, 0.14, 1.65, 26, 6, 12, 25),
-('naga_siren', 'darkshore', '纳迦海妖', 16, 'elite', 174, 27, 0, 14, 14, 'physical', 0.14, 1.7, 0.07, 1.5, 50, 10, 20, 5),
+('darkshore_thresher', 'darkshore', '黑海岸鞭尾鱼', 10, 'normal', 60, 14, 0, 7, 7, 'physical', 0.08, 1.5, 0.07, 1.5, 14, 2, 5, 100),);
+('greymist_warrior', 'darkshore', '灰雾战士', 11, 'normal', 64, 15, 0, 7, 7, 'physical', 0.10, 1.6, 0.07, 1.5, 16, 3, 6, 80),);
+('moonstalker', 'darkshore', '月夜豹', 12, 'normal', 70, 16, 0, 8, 8, 'physical', 0.10, 1.6, 0.07, 1.5, 18, 3, 7, 60),);
+('vile_sprite', 'darkshore', '邪恶精灵', 13, 'normal', 75, 18, 0, 8, 8, 'physical', 0.09, 1.5, 0.07, 1.5, 20, 4, 8, 50),);
+('darkstrider', 'darkshore', '暗行者', 14, 'normal', 65, 11, 20, 7, 11, 'magic', 0.07, 1.5, 0.12, 1.6, 22, 4, 9, 40),);
+('naga_myrmidon', 'darkshore', '纳迦战士', 15, 'normal', 72, 12, 24, 8, 11, 'magic', 0.07, 1.5, 0.14, 1.65, 26, 6, 12, 25),);
+('naga_siren', 'darkshore', '纳迦海妖', 16, 'elite', 174, 27, 0, 14, 14, 'physical', 0.14, 1.7, 0.07, 1.5, 50, 10, 20, 5),);
 ('ancient_of_war', 'darkshore', '战争古树', 15, 'normal', 55, 14, 0, 6, 6, 'physical', 0.07, 1.5, 0.05, 1.5, 24, 5, 10, 30);
 
 -- 暮色森林 (20-30级) - HP: 55~150, 攻击: 16~35
 INSERT OR REPLACE INTO monsters (
-id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
-attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
-exp_reward, gold_min, gold_max, spawn_weight
+    id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
+    attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
+    exp_reward, gold_min, gold_max, spawn_weight
 ) VALUES
-('skeleton_warrior', 'duskwood', '骷髅战士', 20, 'normal', 94, 24, 0, 12, 12, 'physical', 0.10, 1.6, 0.07, 1.5, 28, 5, 10, 100),
-('skeleton_mage', 'duskwood', '骷髅法师', 21, 'normal', 77, 11, 30, 9, 16, 'magic', 0.07, 1.5, 0.14, 1.65, 30, 5, 11, 80),
-('ghoul', 'duskwood', '食尸鬼', 22, 'normal', 98, 27, 0, 12, 12, 'physical', 0.10, 1.6, 0.07, 1.5, 32, 6, 12, 70),
-('dire_wolf', 'duskwood', '恐狼', 23, 'normal', 105, 30, 0, 14, 14, 'physical', 0.11, 1.6, 0.07, 1.5, 34, 6, 13, 60),
-('worgen', 'duskwood', '狼人', 24, 'normal', 119, 34, 0, 15, 15, 'physical', 0.12, 1.6, 0.07, 1.5, 36, 7, 14, 50),
-('shadow_cultist', 'duskwood', '暗影邪教徒', 25, 'normal', 126, 16, 38, 15, 19, 'magic', 0.08, 1.5, 0.16, 1.7, 40, 8, 18, 35),
-('worgen_alpha', 'duskwood', '狼人首领', 26, 'elite', 252, 47, 0, 20, 20, 'physical', 0.16, 1.7, 0.07, 1.5, 65, 12, 25, 5),
-('abomination', 'duskwood', '憎恶', 28, 'elite', 308, 54, 0, 24, 24, 'physical', 0.17, 1.7, 0.07, 1.5, 75, 15, 30, 3),
+('skeleton_warrior', 'duskwood', '骷髅战士', 20, 'normal', 94, 24, 0, 12, 12, 'physical', 0.10, 1.6, 0.07, 1.5, 28, 5, 10, 100),);
+('skeleton_mage', 'duskwood', '骷髅法师', 21, 'normal', 77, 11, 30, 9, 16, 'magic', 0.07, 1.5, 0.14, 1.65, 30, 5, 11, 80),);
+('ghoul', 'duskwood', '食尸鬼', 22, 'normal', 98, 27, 0, 12, 12, 'physical', 0.10, 1.6, 0.07, 1.5, 32, 6, 12, 70),);
+('dire_wolf', 'duskwood', '恐狼', 23, 'normal', 105, 30, 0, 14, 14, 'physical', 0.11, 1.6, 0.07, 1.5, 34, 6, 13, 60),);
+('worgen', 'duskwood', '狼人', 24, 'normal', 119, 34, 0, 15, 15, 'physical', 0.12, 1.6, 0.07, 1.5, 36, 7, 14, 50),);
+('shadow_cultist', 'duskwood', '暗影邪教徒', 25, 'normal', 126, 16, 38, 15, 19, 'magic', 0.08, 1.5, 0.16, 1.7, 40, 8, 18, 35),);
+('worgen_alpha', 'duskwood', '狼人首领', 26, 'elite', 252, 47, 0, 20, 20, 'physical', 0.16, 1.7, 0.07, 1.5, 65, 12, 25, 5),);
+('abomination', 'duskwood', '憎恶', 28, 'elite', 308, 54, 0, 24, 24, 'physical', 0.17, 1.7, 0.07, 1.5, 75, 15, 30, 3),);
 ('stitches', 'duskwood', '缝合怪', 30, 'boss', 490, 68, 0, 30, 30, 'physical', 0.20, 1.8, 0.08, 1.5, 100, 25, 50, 1);
 
 -- 莫高雷 (1-10级) - HP: 15~45, 攻击: 3~10
 INSERT OR REPLACE INTO monsters (
-id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
-attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
-exp_reward, gold_min, gold_max, spawn_weight
+    id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
+    attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
+    exp_reward, gold_min, gold_max, spawn_weight
 ) VALUES
-('plainstrider', 'mulgore', '平原陆行鸟', 1, 'normal', 22, 4, 0, 1, 1, 'physical', 0.07, 1.5, 0.07, 1.5, 5, 1, 2, 100),
-('prairie_wolf', 'mulgore', '草原狼', 1, 'normal', 18, 4, 0, 1, 1, 'physical', 0.07, 1.5, 0.07, 1.5, 4, 1, 1, 100),
-('windfury_harpy', 'mulgore', '风怒鹰身人', 2, 'normal', 27, 6, 0, 1, 1, 'physical', 0.07, 1.5, 0.07, 1.5, 6, 1, 2, 80),
-('bristleback_quillboar', 'mulgore', '刺背野猪人', 3, 'normal', 33, 7, 0, 3, 3, 'physical', 0.07, 1.5, 0.07, 1.5, 7, 1, 3, 60),
-('bristleback_thornweaver', 'mulgore', '刺背织棘者', 4, 'normal', 39, 8, 0, 3, 3, 'physical', 0.07, 1.5, 0.07, 1.5, 8, 2, 3, 50),
-('bristleback_battleboar', 'mulgore', '刺背战猪', 5, 'normal', 45, 10, 0, 4, 4, 'physical', 0.07, 1.5, 0.07, 1.5, 10, 2, 4, 40),
-('adult_plainstrider', 'mulgore', '成年平原陆行鸟', 3, 'normal', 30, 7, 0, 3, 3, 'physical', 0.07, 1.5, 0.07, 1.5, 7, 1, 3, 70),
-('elder_plainstrider', 'mulgore', '老平原陆行鸟', 5, 'normal', 42, 10, 0, 4, 4, 'physical', 0.07, 1.5, 0.07, 1.5, 9, 2, 4, 30),
-('bristleback_shaman', 'mulgore', '刺背萨满', 6, 'normal', 45, 6, 14, 3, 4, 'magic', 0.07, 1.5, 0.10, 1.6, 12, 2, 5, 35),
-('windfury_matron', 'mulgore', '风怒主母', 6, 'normal', 48, 11, 0, 4, 4, 'physical', 0.07, 1.5, 0.07, 1.5, 11, 2, 5, 25),
+('plainstrider', 'mulgore', '平原陆行鸟', 1, 'normal', 22, 4, 0, 1, 1, 'physical', 0.07, 1.5, 0.07, 1.5, 5, 1, 2, 100),);
+('prairie_wolf', 'mulgore', '草原狼', 1, 'normal', 18, 4, 0, 1, 1, 'physical', 0.07, 1.5, 0.07, 1.5, 4, 1, 1, 100),);
+('windfury_harpy', 'mulgore', '风怒鹰身人', 2, 'normal', 27, 6, 0, 1, 1, 'physical', 0.07, 1.5, 0.07, 1.5, 6, 1, 2, 80),);
+('bristleback_quillboar', 'mulgore', '刺背野猪人', 3, 'normal', 33, 7, 0, 3, 3, 'physical', 0.07, 1.5, 0.07, 1.5, 7, 1, 3, 60),);
+('bristleback_thornweaver', 'mulgore', '刺背织棘者', 4, 'normal', 39, 8, 0, 3, 3, 'physical', 0.07, 1.5, 0.07, 1.5, 8, 2, 3, 50),);
+('bristleback_battleboar', 'mulgore', '刺背战猪', 5, 'normal', 45, 10, 0, 4, 4, 'physical', 0.07, 1.5, 0.07, 1.5, 10, 2, 4, 40),);
+('adult_plainstrider', 'mulgore', '成年平原陆行鸟', 3, 'normal', 30, 7, 0, 3, 3, 'physical', 0.07, 1.5, 0.07, 1.5, 7, 1, 3, 70),);
+('elder_plainstrider', 'mulgore', '老平原陆行鸟', 5, 'normal', 42, 10, 0, 4, 4, 'physical', 0.07, 1.5, 0.07, 1.5, 9, 2, 4, 30),);
+('bristleback_shaman', 'mulgore', '刺背萨满', 6, 'normal', 45, 6, 14, 3, 4, 'magic', 0.07, 1.5, 0.10, 1.6, 12, 2, 5, 35),);
+('windfury_matron', 'mulgore', '风怒主母', 6, 'normal', 48, 11, 0, 4, 4, 'physical', 0.07, 1.5, 0.07, 1.5, 11, 2, 5, 25),);
 ('chief_bloodhoof', 'mulgore', '血蹄酋长', 8, 'elite', 80, 12, 0, 5, 5, 'physical', 0.08, 1.6, 0.05, 1.5, 35, 5, 12, 5);
 
 -- 提瑞斯法林地 (1-10级) - HP: 15~45, 攻击: 3~10
 INSERT OR REPLACE INTO monsters (
-id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
-attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
-exp_reward, gold_min, gold_max, spawn_weight
+    id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
+    attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
+    exp_reward, gold_min, gold_max, spawn_weight
 ) VALUES
-('rotting_dead', 'tirisfal', '腐烂的尸体', 1, 'normal', 22, 4, 0, 1, 1, 'physical', 0.07, 1.5, 0.07, 1.5, 5, 1, 2, 100),
-('vile_fang', 'tirisfal', '邪恶之牙', 1, 'normal', 18, 4, 0, 1, 1, 'physical', 0.07, 1.5, 0.07, 1.5, 4, 1, 1, 100),
-('scavenger', 'tirisfal', '食腐者', 2, 'normal', 27, 6, 0, 1, 1, 'physical', 0.07, 1.5, 0.07, 1.5, 6, 1, 2, 80),
-('darkhound', 'tirisfal', '暗影猎犬', 3, 'normal', 33, 7, 0, 3, 3, 'physical', 0.07, 1.5, 0.07, 1.5, 7, 1, 3, 60),
-('skeletal_warrior', 'tirisfal', '骷髅战士', 4, 'normal', 39, 8, 0, 3, 3, 'physical', 0.07, 1.5, 0.07, 1.5, 8, 2, 3, 50),
-('skeletal_mage', 'tirisfal', '骷髅法师', 5, 'normal', 45, 10, 0, 4, 4, 'physical', 0.07, 1.5, 0.07, 1.5, 10, 2, 4, 40),
-('duskbat', 'tirisfal', '暮色蝙蝠', 3, 'normal', 30, 7, 0, 3, 3, 'physical', 0.07, 1.5, 0.07, 1.5, 7, 1, 3, 70),
-('grave_robber', 'tirisfal', '盗墓者', 5, 'normal', 42, 10, 0, 4, 4, 'physical', 0.07, 1.5, 0.07, 1.5, 9, 2, 4, 30),
-('necrotic_shade', 'tirisfal', '死灵阴影', 6, 'normal', 45, 6, 14, 3, 4, 'magic', 0.07, 1.5, 0.10, 1.6, 12, 2, 5, 35),
-('cursed_undead', 'tirisfal', '被诅咒的不死生物', 6, 'normal', 48, 11, 0, 4, 4, 'physical', 0.07, 1.5, 0.07, 1.5, 11, 2, 5, 25),
+('rotting_dead', 'tirisfal', '腐烂的尸体', 1, 'normal', 22, 4, 0, 1, 1, 'physical', 0.07, 1.5, 0.07, 1.5, 5, 1, 2, 100),);
+('vile_fang', 'tirisfal', '邪恶之牙', 1, 'normal', 18, 4, 0, 1, 1, 'physical', 0.07, 1.5, 0.07, 1.5, 4, 1, 1, 100),);
+('scavenger', 'tirisfal', '食腐者', 2, 'normal', 27, 6, 0, 1, 1, 'physical', 0.07, 1.5, 0.07, 1.5, 6, 1, 2, 80),);
+('darkhound', 'tirisfal', '暗影猎犬', 3, 'normal', 33, 7, 0, 3, 3, 'physical', 0.07, 1.5, 0.07, 1.5, 7, 1, 3, 60),);
+('skeletal_warrior', 'tirisfal', '骷髅战士', 4, 'normal', 39, 8, 0, 3, 3, 'physical', 0.07, 1.5, 0.07, 1.5, 8, 2, 3, 50),);
+('skeletal_mage', 'tirisfal', '骷髅法师', 5, 'normal', 45, 10, 0, 4, 4, 'physical', 0.07, 1.5, 0.07, 1.5, 10, 2, 4, 40),);
+('duskbat', 'tirisfal', '暮色蝙蝠', 3, 'normal', 30, 7, 0, 3, 3, 'physical', 0.07, 1.5, 0.07, 1.5, 7, 1, 3, 70),);
+('grave_robber', 'tirisfal', '盗墓者', 5, 'normal', 42, 10, 0, 4, 4, 'physical', 0.07, 1.5, 0.07, 1.5, 9, 2, 4, 30),);
+('necrotic_shade', 'tirisfal', '死灵阴影', 6, 'normal', 45, 6, 14, 3, 4, 'magic', 0.07, 1.5, 0.10, 1.6, 12, 2, 5, 35),);
+('cursed_undead', 'tirisfal', '被诅咒的不死生物', 6, 'normal', 48, 11, 0, 4, 4, 'physical', 0.07, 1.5, 0.07, 1.5, 11, 2, 5, 25),);
 ('captain_perolde', 'tirisfal', '佩罗尔德船长', 8, 'elite', 80, 12, 0, 5, 5, 'physical', 0.08, 1.6, 0.05, 1.5, 35, 5, 12, 5);
 
 -- 杜隆塔尔 (1-10级) - HP: 15~45, 攻击: 3~10
 INSERT OR REPLACE INTO monsters (
-id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
-attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
-exp_reward, gold_min, gold_max, spawn_weight
+    id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
+    attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
+    exp_reward, gold_min, gold_max, spawn_weight
 ) VALUES
 ('scorpid_durotar', 'durotar', '蝎子', 1, 'normal', 22, 4, 0, 1, 1, 'physical', 0.07, 1.5, 0.07, 1.5, 5, 1, 2, 100),
 ('dire_wolf_durotar', 'durotar', '恐狼', 1, 'normal', 18, 4, 0, 1, 1, 'physical', 0.07, 1.5, 0.07, 1.5, 4, 1, 1, 100),
@@ -722,337 +722,337 @@ exp_reward, gold_min, gold_max, spawn_weight
 
 -- 银松森林 (10-20级) - HP: 35~80, 攻击: 9~18
 INSERT OR REPLACE INTO monsters (
-id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
-attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
-exp_reward, gold_min, gold_max, spawn_weight
+    id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
+    attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
+    exp_reward, gold_min, gold_max, spawn_weight
 ) VALUES
-('rotting_dead', 'silverpine', '腐烂的尸体', 10, 'normal', 60, 14, 0, 7, 7, 'physical', 0.08, 1.5, 0.07, 1.5, 14, 2, 5, 100),
-('vile_fang', 'silverpine', '邪恶之牙', 11, 'normal', 64, 15, 0, 7, 7, 'physical', 0.10, 1.6, 0.07, 1.5, 16, 3, 6, 80),
-('shadowfang_worgen', 'silverpine', '影牙狼人', 12, 'normal', 70, 16, 0, 8, 8, 'physical', 0.10, 1.6, 0.07, 1.5, 18, 3, 7, 60),
-('skeletal_warrior', 'silverpine', '骷髅战士', 13, 'normal', 75, 18, 0, 8, 8, 'physical', 0.09, 1.5, 0.07, 1.5, 20, 4, 8, 50),
-('skeletal_mage', 'silverpine', '骷髅法师', 14, 'normal', 65, 11, 20, 7, 11, 'magic', 0.07, 1.5, 0.12, 1.6, 22, 4, 9, 40),
-('shadowfang_cultist', 'silverpine', '影牙邪教徒', 15, 'normal', 72, 12, 24, 8, 11, 'magic', 0.07, 1.5, 0.14, 1.65, 26, 6, 12, 25),
-('archmage_aratus', 'silverpine', '大法师阿拉图斯', 16, 'elite', 174, 27, 0, 14, 14, 'physical', 0.14, 1.7, 0.07, 1.5, 50, 10, 20, 5),
+('rotting_dead', 'silverpine', '腐烂的尸体', 10, 'normal', 60, 14, 0, 7, 7, 'physical', 0.08, 1.5, 0.07, 1.5, 14, 2, 5, 100),);
+('vile_fang', 'silverpine', '邪恶之牙', 11, 'normal', 64, 15, 0, 7, 7, 'physical', 0.10, 1.6, 0.07, 1.5, 16, 3, 6, 80),);
+('shadowfang_worgen', 'silverpine', '影牙狼人', 12, 'normal', 70, 16, 0, 8, 8, 'physical', 0.10, 1.6, 0.07, 1.5, 18, 3, 7, 60),);
+('skeletal_warrior', 'silverpine', '骷髅战士', 13, 'normal', 75, 18, 0, 8, 8, 'physical', 0.09, 1.5, 0.07, 1.5, 20, 4, 8, 50),);
+('skeletal_mage', 'silverpine', '骷髅法师', 14, 'normal', 65, 11, 20, 7, 11, 'magic', 0.07, 1.5, 0.12, 1.6, 22, 4, 9, 40),);
+('shadowfang_cultist', 'silverpine', '影牙邪教徒', 15, 'normal', 72, 12, 24, 8, 11, 'magic', 0.07, 1.5, 0.14, 1.65, 26, 6, 12, 25),);
+('archmage_aratus', 'silverpine', '大法师阿拉图斯', 16, 'elite', 174, 27, 0, 14, 14, 'physical', 0.14, 1.7, 0.07, 1.5, 50, 10, 20, 5),);
 ('cursed_undead', 'silverpine', '被诅咒的不死生物', 15, 'normal', 55, 14, 0, 6, 6, 'physical', 0.07, 1.5, 0.05, 1.5, 24, 5, 10, 30);
 
 -- 贫瘠之地 (10-25级) - HP: 35~90, 攻击: 9~20
 INSERT OR REPLACE INTO monsters (
-id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
-attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
-exp_reward, gold_min, gold_max, spawn_weight
+    id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
+    attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
+    exp_reward, gold_min, gold_max, spawn_weight
 ) VALUES
-('plainstrider', 'barrens', '平原陆行鸟', 10, 'normal', 60, 14, 0, 7, 7, 'physical', 0.08, 1.5, 0.07, 1.5, 14, 2, 5, 100),
-('zhevra', 'barrens', '斑马', 11, 'normal', 64, 15, 0, 7, 7, 'physical', 0.10, 1.6, 0.07, 1.5, 16, 3, 6, 80),
-('bristleback_quillboar', 'barrens', '刺背野猪人', 12, 'normal', 70, 16, 0, 8, 8, 'physical', 0.10, 1.6, 0.07, 1.5, 18, 3, 7, 60),
-('bristleback_thornweaver', 'barrens', '刺背织棘者', 13, 'normal', 75, 18, 0, 8, 8, 'physical', 0.09, 1.5, 0.07, 1.5, 20, 4, 8, 50),
-('bristleback_shaman', 'barrens', '刺背萨满', 14, 'normal', 65, 11, 20, 7, 11, 'magic', 0.07, 1.5, 0.12, 1.6, 22, 4, 9, 40),
-('kolkar_brute', 'barrens', '科卡尔蛮兵', 15, 'normal', 72, 12, 24, 8, 11, 'magic', 0.07, 1.5, 0.14, 1.65, 26, 6, 12, 25),
-('kolkar_chieftain', 'barrens', '科卡尔酋长', 18, 'elite', 203, 32, 0, 16, 16, 'physical', 0.15, 1.7, 0.07, 1.5, 55, 12, 22, 5),
-('razormane_warrior', 'barrens', '钢鬃战士', 16, 'normal', 80, 19, 0, 8, 8, 'physical', 0.09, 1.5, 0.07, 1.5, 24, 5, 10, 30),
-('razormane_geomancer', 'barrens', '钢鬃地卜师', 17, 'normal', 87, 14, 27, 9, 12, 'magic', 0.07, 1.5, 0.15, 1.65, 28, 6, 13, 25),
+('plainstrider', 'barrens', '平原陆行鸟', 10, 'normal', 60, 14, 0, 7, 7, 'physical', 0.08, 1.5, 0.07, 1.5, 14, 2, 5, 100),);
+('zhevra', 'barrens', '斑马', 11, 'normal', 64, 15, 0, 7, 7, 'physical', 0.10, 1.6, 0.07, 1.5, 16, 3, 6, 80),);
+('bristleback_quillboar', 'barrens', '刺背野猪人', 12, 'normal', 70, 16, 0, 8, 8, 'physical', 0.10, 1.6, 0.07, 1.5, 18, 3, 7, 60),);
+('bristleback_thornweaver', 'barrens', '刺背织棘者', 13, 'normal', 75, 18, 0, 8, 8, 'physical', 0.09, 1.5, 0.07, 1.5, 20, 4, 8, 50),);
+('bristleback_shaman', 'barrens', '刺背萨满', 14, 'normal', 65, 11, 20, 7, 11, 'magic', 0.07, 1.5, 0.12, 1.6, 22, 4, 9, 40),);
+('kolkar_brute', 'barrens', '科卡尔蛮兵', 15, 'normal', 72, 12, 24, 8, 11, 'magic', 0.07, 1.5, 0.14, 1.65, 26, 6, 12, 25),);
+('kolkar_chieftain', 'barrens', '科卡尔酋长', 18, 'elite', 203, 32, 0, 16, 16, 'physical', 0.15, 1.7, 0.07, 1.5, 55, 12, 22, 5),);
+('razormane_warrior', 'barrens', '钢鬃战士', 16, 'normal', 80, 19, 0, 8, 8, 'physical', 0.09, 1.5, 0.07, 1.5, 24, 5, 10, 30),);
+('razormane_geomancer', 'barrens', '钢鬃地卜师', 17, 'normal', 87, 14, 27, 9, 12, 'magic', 0.07, 1.5, 0.15, 1.65, 28, 6, 13, 25),);
 ('razormane_champion', 'barrens', '钢鬃勇士', 20, 'elite', 160, 28, 0, 13, 13, 'physical', 0.14, 1.7, 0.05, 1.5, 60, 14, 25, 3);
 
 -- 赤脊山 (15-25级) - HP: 45~95, 攻击: 11~22
 INSERT OR REPLACE INTO monsters (
-id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
-attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
-exp_reward, gold_min, gold_max, spawn_weight
+    id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
+    attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
+    exp_reward, gold_min, gold_max, spawn_weight
 ) VALUES
-('blackrock_orc', 'redridge', '黑石兽人', 15, 'normal', 72, 15, 0, 9, 9, 'physical', 0.09, 1.5, 0.07, 1.5, 26, 6, 12, 100),
-('blackrock_grunt', 'redridge', '黑石步兵', 16, 'normal', 78, 16, 0, 9, 9, 'physical', 0.10, 1.6, 0.07, 1.5, 28, 6, 13, 80),
-('blackrock_warrior', 'redridge', '黑石战士', 17, 'normal', 84, 18, 0, 11, 11, 'physical', 0.10, 1.6, 0.07, 1.5, 30, 7, 14, 60),
-('blackrock_shaman', 'redridge', '黑石萨满', 18, 'normal', 75, 12, 22, 9, 12, 'magic', 0.07, 1.5, 0.13, 1.65, 32, 7, 15, 50),
-('blackrock_warlock', 'redridge', '黑石术士', 19, 'normal', 81, 14, 26, 11, 14, 'magic', 0.07, 1.5, 0.15, 1.7, 34, 8, 16, 40),
-('blackrock_ogre', 'redridge', '黑石食人魔', 20, 'normal', 102, 24, 0, 12, 12, 'physical', 0.11, 1.6, 0.07, 1.5, 36, 8, 17, 30),
-('blackrock_commander', 'redridge', '黑石指挥官', 22, 'elite', 210, 40, 0, 19, 19, 'physical', 0.15, 1.7, 0.07, 1.5, 60, 12, 24, 5),
+('blackrock_orc', 'redridge', '黑石兽人', 15, 'normal', 72, 15, 0, 9, 9, 'physical', 0.09, 1.5, 0.07, 1.5, 26, 6, 12, 100),);
+('blackrock_grunt', 'redridge', '黑石步兵', 16, 'normal', 78, 16, 0, 9, 9, 'physical', 0.10, 1.6, 0.07, 1.5, 28, 6, 13, 80),);
+('blackrock_warrior', 'redridge', '黑石战士', 17, 'normal', 84, 18, 0, 11, 11, 'physical', 0.10, 1.6, 0.07, 1.5, 30, 7, 14, 60),);
+('blackrock_shaman', 'redridge', '黑石萨满', 18, 'normal', 75, 12, 22, 9, 12, 'magic', 0.07, 1.5, 0.13, 1.65, 32, 7, 15, 50),);
+('blackrock_warlock', 'redridge', '黑石术士', 19, 'normal', 81, 14, 26, 11, 14, 'magic', 0.07, 1.5, 0.15, 1.7, 34, 8, 16, 40),);
+('blackrock_ogre', 'redridge', '黑石食人魔', 20, 'normal', 102, 24, 0, 12, 12, 'physical', 0.11, 1.6, 0.07, 1.5, 36, 8, 17, 30),);
+('blackrock_commander', 'redridge', '黑石指挥官', 22, 'elite', 210, 40, 0, 19, 19, 'physical', 0.15, 1.7, 0.07, 1.5, 60, 12, 24, 5),);
 ('redridge_basilisk', 'redridge', '赤脊山蜥蜴', 21, 'normal', 65, 16, 0, 8, 8, 'physical', 0.08, 1.6, 0.05, 1.5, 38, 8, 18, 25);
 
 -- 湿地 (20-30级) - HP: 55~120, 攻击: 16~28
 INSERT OR REPLACE INTO monsters (
-id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
-attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
-exp_reward, gold_min, gold_max, spawn_weight
+    id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
+    attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
+    exp_reward, gold_min, gold_max, spawn_weight
 ) VALUES
-('mire_creeper', 'wetlands', '泥沼爬行者', 20, 'normal', 94, 24, 0, 12, 12, 'physical', 0.10, 1.6, 0.07, 1.5, 28, 5, 10, 100),
-('dragonmaw_orc', 'wetlands', '龙喉兽人', 21, 'normal', 98, 26, 0, 12, 12, 'physical', 0.10, 1.6, 0.07, 1.5, 30, 5, 11, 80),
-('dragonmaw_warrior', 'wetlands', '龙喉战士', 22, 'normal', 105, 27, 0, 14, 14, 'physical', 0.10, 1.6, 0.07, 1.5, 32, 6, 12, 70),
-('dragonmaw_shaman', 'wetlands', '龙喉萨满', 23, 'normal', 95, 15, 32, 12, 16, 'magic', 0.07, 1.5, 0.15, 1.7, 34, 6, 13, 60),
-('dragonmaw_warlock', 'wetlands', '龙喉术士', 24, 'normal', 101, 16, 35, 14, 18, 'magic', 0.07, 1.5, 0.16, 1.7, 36, 7, 14, 50),
-('green_dragon_whelp', 'wetlands', '绿龙幼崽', 25, 'normal', 112, 30, 0, 15, 15, 'physical', 0.12, 1.6, 0.07, 1.5, 38, 7, 15, 40),
-('dragonmaw_commander', 'wetlands', '龙喉指挥官', 26, 'elite', 252, 47, 0, 20, 20, 'physical', 0.16, 1.7, 0.07, 1.5, 65, 12, 25, 5),
+('mire_creeper', 'wetlands', '泥沼爬行者', 20, 'normal', 94, 24, 0, 12, 12, 'physical', 0.10, 1.6, 0.07, 1.5, 28, 5, 10, 100),);
+('dragonmaw_orc', 'wetlands', '龙喉兽人', 21, 'normal', 98, 26, 0, 12, 12, 'physical', 0.10, 1.6, 0.07, 1.5, 30, 5, 11, 80),);
+('dragonmaw_warrior', 'wetlands', '龙喉战士', 22, 'normal', 105, 27, 0, 14, 14, 'physical', 0.10, 1.6, 0.07, 1.5, 32, 6, 12, 70),);
+('dragonmaw_shaman', 'wetlands', '龙喉萨满', 23, 'normal', 95, 15, 32, 12, 16, 'magic', 0.07, 1.5, 0.15, 1.7, 34, 6, 13, 60),);
+('dragonmaw_warlock', 'wetlands', '龙喉术士', 24, 'normal', 101, 16, 35, 14, 18, 'magic', 0.07, 1.5, 0.16, 1.7, 36, 7, 14, 50),);
+('green_dragon_whelp', 'wetlands', '绿龙幼崽', 25, 'normal', 112, 30, 0, 15, 15, 'physical', 0.12, 1.6, 0.07, 1.5, 38, 7, 15, 40),);
+('dragonmaw_commander', 'wetlands', '龙喉指挥官', 26, 'elite', 252, 47, 0, 20, 20, 'physical', 0.16, 1.7, 0.07, 1.5, 65, 12, 25, 5),);
 ('mire_lurker', 'wetlands', '泥沼潜伏者', 24, 'normal', 78, 21, 0, 10, 10, 'physical', 0.09, 1.6, 0.05, 1.5, 36, 7, 14, 35);
 
 -- 希尔斯布莱德丘陵 (20-30级) - HP: 55~120, 攻击: 16~28
 INSERT OR REPLACE INTO monsters (
-id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
-attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
-exp_reward, gold_min, gold_max, spawn_weight
+    id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
+    attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
+    exp_reward, gold_min, gold_max, spawn_weight
 ) VALUES
-('hillsbrad_farmer', 'hillsbrad', '希尔斯布莱德农夫', 20, 'normal', 94, 24, 0, 12, 12, 'physical', 0.10, 1.6, 0.07, 1.5, 28, 5, 10, 100),
-('syndicate_thug', 'hillsbrad', '辛迪加暴徒', 21, 'normal', 98, 26, 0, 12, 12, 'physical', 0.10, 1.6, 0.07, 1.5, 30, 5, 11, 80),
-('syndicate_rogue', 'hillsbrad', '辛迪加盗贼', 22, 'normal', 105, 27, 0, 14, 14, 'physical', 0.10, 1.6, 0.07, 1.5, 32, 6, 12, 70),
-('syndicate_mage', 'hillsbrad', '辛迪加法师', 23, 'normal', 95, 15, 32, 12, 16, 'magic', 0.07, 1.5, 0.15, 1.7, 34, 6, 13, 60),
-('syndicate_assassin', 'hillsbrad', '辛迪加刺客', 24, 'normal', 101, 16, 35, 14, 18, 'magic', 0.07, 1.5, 0.16, 1.7, 36, 7, 14, 50),
-('hillsbrad_peasant', 'hillsbrad', '希尔斯布莱德农民', 25, 'normal', 112, 30, 0, 15, 15, 'physical', 0.12, 1.6, 0.07, 1.5, 38, 7, 15, 40),
-('syndicate_master', 'hillsbrad', '辛迪加首领', 26, 'elite', 252, 47, 0, 20, 20, 'physical', 0.16, 1.7, 0.07, 1.5, 65, 12, 25, 5),
+('hillsbrad_farmer', 'hillsbrad', '希尔斯布莱德农夫', 20, 'normal', 94, 24, 0, 12, 12, 'physical', 0.10, 1.6, 0.07, 1.5, 28, 5, 10, 100),);
+('syndicate_thug', 'hillsbrad', '辛迪加暴徒', 21, 'normal', 98, 26, 0, 12, 12, 'physical', 0.10, 1.6, 0.07, 1.5, 30, 5, 11, 80),);
+('syndicate_rogue', 'hillsbrad', '辛迪加盗贼', 22, 'normal', 105, 27, 0, 14, 14, 'physical', 0.10, 1.6, 0.07, 1.5, 32, 6, 12, 70),);
+('syndicate_mage', 'hillsbrad', '辛迪加法师', 23, 'normal', 95, 15, 32, 12, 16, 'magic', 0.07, 1.5, 0.15, 1.7, 34, 6, 13, 60),);
+('syndicate_assassin', 'hillsbrad', '辛迪加刺客', 24, 'normal', 101, 16, 35, 14, 18, 'magic', 0.07, 1.5, 0.16, 1.7, 36, 7, 14, 50),);
+('hillsbrad_peasant', 'hillsbrad', '希尔斯布莱德农民', 25, 'normal', 112, 30, 0, 15, 15, 'physical', 0.12, 1.6, 0.07, 1.5, 38, 7, 15, 40),);
+('syndicate_master', 'hillsbrad', '辛迪加首领', 26, 'elite', 252, 47, 0, 20, 20, 'physical', 0.16, 1.7, 0.07, 1.5, 65, 12, 25, 5),);
 ('hillsbrad_guard', 'hillsbrad', '希尔斯布莱德守卫', 24, 'normal', 78, 21, 0, 10, 10, 'physical', 0.09, 1.6, 0.05, 1.5, 36, 7, 14, 35);
 
 -- 阿拉希高地 (30-40级) - HP: 75~140, 攻击: 22~35
 INSERT OR REPLACE INTO monsters (
-id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
-attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
-exp_reward, gold_min, gold_max, spawn_weight
+    id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
+    attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
+    exp_reward, gold_min, gold_max, spawn_weight
 ) VALUES
-('ogre_brute', 'arathi', '食人魔蛮兵', 30, 'normal', 133, 38, 0, 16, 16, 'physical', 0.12, 1.6, 0.07, 1.5, 42, 8, 16, 100),
-('ogre_mage', 'arathi', '食人魔法师', 31, 'normal', 123, 14, 40, 15, 19, 'magic', 0.08, 1.5, 0.18, 1.7, 44, 8, 17, 80),
-('ogre_warrior', 'arathi', '食人魔战士', 32, 'normal', 140, 40, 0, 18, 18, 'physical', 0.14, 1.6, 0.08, 1.5, 46, 9, 18, 70),
-('ogre_lord', 'arathi', '食人魔领主', 33, 'elite', 280, 51, 0, 22, 22, 'physical', 0.18, 1.7, 0.08, 1.5, 70, 14, 28, 5),
-('witherbark_troll', 'arathi', '枯木巨魔', 34, 'normal', 147, 43, 0, 19, 19, 'physical', 0.15, 1.6, 0.08, 1.5, 48, 9, 19, 60),
-('witherbark_shaman', 'arathi', '枯木萨满', 35, 'normal', 137, 16, 43, 18, 20, 'magic', 0.08, 1.5, 0.19, 1.7, 50, 10, 20, 50),
-('witherbark_chieftain', 'arathi', '枯木酋长', 36, 'elite', 308, 54, 0, 23, 23, 'physical', 0.19, 1.7, 0.08, 1.5, 75, 15, 30, 3),
+('ogre_brute', 'arathi', '食人魔蛮兵', 30, 'normal', 133, 38, 0, 16, 16, 'physical', 0.12, 1.6, 0.07, 1.5, 42, 8, 16, 100),);
+('ogre_mage', 'arathi', '食人魔法师', 31, 'normal', 123, 14, 40, 15, 19, 'magic', 0.08, 1.5, 0.18, 1.7, 44, 8, 17, 80),);
+('ogre_warrior', 'arathi', '食人魔战士', 32, 'normal', 140, 40, 0, 18, 18, 'physical', 0.14, 1.6, 0.08, 1.5, 46, 9, 18, 70),);
+('ogre_lord', 'arathi', '食人魔领主', 33, 'elite', 280, 51, 0, 22, 22, 'physical', 0.18, 1.7, 0.08, 1.5, 70, 14, 28, 5),);
+('witherbark_troll', 'arathi', '枯木巨魔', 34, 'normal', 147, 43, 0, 19, 19, 'physical', 0.15, 1.6, 0.08, 1.5, 48, 9, 19, 60),);
+('witherbark_shaman', 'arathi', '枯木萨满', 35, 'normal', 137, 16, 43, 18, 20, 'magic', 0.08, 1.5, 0.19, 1.7, 50, 10, 20, 50),);
+('witherbark_chieftain', 'arathi', '枯木酋长', 36, 'elite', 308, 54, 0, 23, 23, 'physical', 0.19, 1.7, 0.08, 1.5, 75, 15, 30, 3),);
 ('hammerfall_guard', 'arathi', '落锤守卫', 34, 'normal', 103, 31, 0, 13, 13, 'physical', 0.11, 1.6, 0.05, 1.5, 48, 9, 19, 40);
 
 -- 石爪山脉 (15-25级) - HP: 45~95, 攻击: 11~22
 INSERT OR REPLACE INTO monsters (
-id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
-attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
-exp_reward, gold_min, gold_max, spawn_weight
+    id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
+    attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
+    exp_reward, gold_min, gold_max, spawn_weight
 ) VALUES
-('windfury_harpy', 'stonetalon', '风怒鹰身人', 15, 'normal', 72, 15, 0, 9, 9, 'physical', 0.09, 1.5, 0.07, 1.5, 26, 6, 12, 100),
-('windfury_rogue', 'stonetalon', '风怒盗贼', 16, 'normal', 78, 16, 0, 9, 9, 'physical', 0.10, 1.6, 0.07, 1.5, 28, 6, 13, 80),
-('windfury_witch', 'stonetalon', '风怒女巫', 17, 'normal', 70, 11, 22, 8, 12, 'magic', 0.07, 1.5, 0.13, 1.65, 30, 7, 14, 60),
-('windfury_matron', 'stonetalon', '风怒主母', 18, 'normal', 84, 18, 0, 11, 11, 'physical', 0.10, 1.6, 0.07, 1.5, 32, 7, 15, 50),
-('grimtotem_tauren', 'stonetalon', '恐怖图腾牛头人', 19, 'normal', 90, 19, 0, 11, 11, 'physical', 0.10, 1.6, 0.07, 1.5, 34, 8, 16, 40),
-('grimtotem_shaman', 'stonetalon', '恐怖图腾萨满', 20, 'normal', 81, 12, 24, 9, 14, 'magic', 0.07, 1.5, 0.14, 1.65, 36, 8, 17, 30),
-('windfury_queen', 'stonetalon', '风怒女王', 22, 'elite', 210, 40, 0, 19, 19, 'physical', 0.15, 1.7, 0.07, 1.5, 60, 12, 24, 5),
+('windfury_harpy', 'stonetalon', '风怒鹰身人', 15, 'normal', 72, 15, 0, 9, 9, 'physical', 0.09, 1.5, 0.07, 1.5, 26, 6, 12, 100),);
+('windfury_rogue', 'stonetalon', '风怒盗贼', 16, 'normal', 78, 16, 0, 9, 9, 'physical', 0.10, 1.6, 0.07, 1.5, 28, 6, 13, 80),);
+('windfury_witch', 'stonetalon', '风怒女巫', 17, 'normal', 70, 11, 22, 8, 12, 'magic', 0.07, 1.5, 0.13, 1.65, 30, 7, 14, 60),);
+('windfury_matron', 'stonetalon', '风怒主母', 18, 'normal', 84, 18, 0, 11, 11, 'physical', 0.10, 1.6, 0.07, 1.5, 32, 7, 15, 50),);
+('grimtotem_tauren', 'stonetalon', '恐怖图腾牛头人', 19, 'normal', 90, 19, 0, 11, 11, 'physical', 0.10, 1.6, 0.07, 1.5, 34, 8, 16, 40),);
+('grimtotem_shaman', 'stonetalon', '恐怖图腾萨满', 20, 'normal', 81, 12, 24, 9, 14, 'magic', 0.07, 1.5, 0.14, 1.65, 36, 8, 17, 30),);
+('windfury_queen', 'stonetalon', '风怒女王', 22, 'elite', 210, 40, 0, 19, 19, 'physical', 0.15, 1.7, 0.07, 1.5, 60, 12, 24, 5),);
 ('stonetalon_bear', 'stonetalon', '石爪山熊', 21, 'normal', 65, 16, 0, 8, 8, 'physical', 0.08, 1.6, 0.05, 1.5, 38, 8, 18, 25);
 
 -- 灰谷 (18-30级) - HP: 50~120, 攻击: 14~28
 INSERT OR REPLACE INTO monsters (
-id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
-attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
-exp_reward, gold_min, gold_max, spawn_weight
+    id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
+    attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
+    exp_reward, gold_min, gold_max, spawn_weight
 ) VALUES
-('ashenvale_bear', 'ashenvale', '灰谷熊', 18, 'normal', 87, 22, 0, 11, 11, 'physical', 0.10, 1.6, 0.07, 1.5, 32, 7, 15, 100),
-('satyr_rogue', 'ashenvale', '萨特盗贼', 19, 'normal', 93, 23, 0, 11, 11, 'physical', 0.10, 1.6, 0.07, 1.5, 34, 7, 16, 80),
-('satyr_shadowdancer', 'ashenvale', '萨特暗影舞者', 20, 'normal', 99, 24, 0, 12, 12, 'physical', 0.10, 1.6, 0.07, 1.5, 36, 8, 17, 70),
-('satyr_felsworn', 'ashenvale', '萨特恶魔信徒', 21, 'normal', 87, 14, 30, 11, 15, 'magic', 0.07, 1.5, 0.15, 1.7, 38, 8, 18, 60),
-('satyr_hellcaller', 'ashenvale', '萨特地狱召唤者', 22, 'normal', 92, 15, 32, 12, 16, 'magic', 0.07, 1.5, 0.16, 1.7, 40, 9, 19, 50),
-('furbolg_warrior', 'ashenvale', '熊怪战士', 23, 'normal', 101, 27, 0, 14, 14, 'physical', 0.11, 1.6, 0.07, 1.5, 42, 9, 20, 40),
-('satyr_lord', 'ashenvale', '萨特领主', 25, 'elite', 266, 49, 0, 20, 20, 'physical', 0.16, 1.7, 0.07, 1.5, 68, 13, 26, 5),
+('ashenvale_bear', 'ashenvale', '灰谷熊', 18, 'normal', 87, 22, 0, 11, 11, 'physical', 0.10, 1.6, 0.07, 1.5, 32, 7, 15, 100),);
+('satyr_rogue', 'ashenvale', '萨特盗贼', 19, 'normal', 93, 23, 0, 11, 11, 'physical', 0.10, 1.6, 0.07, 1.5, 34, 7, 16, 80),);
+('satyr_shadowdancer', 'ashenvale', '萨特暗影舞者', 20, 'normal', 99, 24, 0, 12, 12, 'physical', 0.10, 1.6, 0.07, 1.5, 36, 8, 17, 70),);
+('satyr_felsworn', 'ashenvale', '萨特恶魔信徒', 21, 'normal', 87, 14, 30, 11, 15, 'magic', 0.07, 1.5, 0.15, 1.7, 38, 8, 18, 60),);
+('satyr_hellcaller', 'ashenvale', '萨特地狱召唤者', 22, 'normal', 92, 15, 32, 12, 16, 'magic', 0.07, 1.5, 0.16, 1.7, 40, 9, 19, 50),);
+('furbolg_warrior', 'ashenvale', '熊怪战士', 23, 'normal', 101, 27, 0, 14, 14, 'physical', 0.11, 1.6, 0.07, 1.5, 42, 9, 20, 40),);
+('satyr_lord', 'ashenvale', '萨特领主', 25, 'elite', 266, 49, 0, 20, 20, 'physical', 0.16, 1.7, 0.07, 1.5, 68, 13, 26, 5),);
 ('ashenvale_stag', 'ashenvale', '灰谷雄鹿', 24, 'normal', 70, 19, 0, 9, 9, 'physical', 0.08, 1.6, 0.05, 1.5, 40, 9, 19, 35);
 
 -- 塔伦米尔 (20-30级) - HP: 55~120, 攻击: 16~28
 INSERT OR REPLACE INTO monsters (
-id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
-attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
-exp_reward, gold_min, gold_max, spawn_weight
+    id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
+    attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
+    exp_reward, gold_min, gold_max, spawn_weight
 ) VALUES
-('syndicate_thug', 'tarren_mill', '辛迪加暴徒', 20, 'normal', 94, 24, 0, 12, 12, 'physical', 0.10, 1.6, 0.07, 1.5, 28, 5, 10, 100),
-('syndicate_rogue', 'tarren_mill', '辛迪加盗贼', 21, 'normal', 98, 26, 0, 12, 12, 'physical', 0.10, 1.6, 0.07, 1.5, 30, 5, 11, 80),
-('syndicate_mage', 'tarren_mill', '辛迪加法师', 22, 'normal', 105, 27, 0, 14, 14, 'physical', 0.10, 1.6, 0.07, 1.5, 32, 6, 12, 70),
-('syndicate_assassin', 'tarren_mill', '辛迪加刺客', 23, 'normal', 95, 15, 32, 12, 16, 'magic', 0.07, 1.5, 0.15, 1.7, 34, 6, 13, 60),
-('syndicate_warlock', 'tarren_mill', '辛迪加术士', 24, 'normal', 101, 16, 35, 14, 18, 'magic', 0.07, 1.5, 0.16, 1.7, 36, 7, 14, 50),
-('hillsbrad_peasant', 'tarren_mill', '希尔斯布莱德农民', 25, 'normal', 112, 30, 0, 15, 15, 'physical', 0.12, 1.6, 0.07, 1.5, 38, 7, 15, 40),
-('syndicate_master', 'tarren_mill', '辛迪加首领', 26, 'elite', 252, 47, 0, 20, 20, 'physical', 0.16, 1.7, 0.07, 1.5, 65, 12, 25, 5),
+('syndicate_thug', 'tarren_mill', '辛迪加暴徒', 20, 'normal', 94, 24, 0, 12, 12, 'physical', 0.10, 1.6, 0.07, 1.5, 28, 5, 10, 100),);
+('syndicate_rogue', 'tarren_mill', '辛迪加盗贼', 21, 'normal', 98, 26, 0, 12, 12, 'physical', 0.10, 1.6, 0.07, 1.5, 30, 5, 11, 80),);
+('syndicate_mage', 'tarren_mill', '辛迪加法师', 22, 'normal', 105, 27, 0, 14, 14, 'physical', 0.10, 1.6, 0.07, 1.5, 32, 6, 12, 70),);
+('syndicate_assassin', 'tarren_mill', '辛迪加刺客', 23, 'normal', 95, 15, 32, 12, 16, 'magic', 0.07, 1.5, 0.15, 1.7, 34, 6, 13, 60),);
+('syndicate_warlock', 'tarren_mill', '辛迪加术士', 24, 'normal', 101, 16, 35, 14, 18, 'magic', 0.07, 1.5, 0.16, 1.7, 36, 7, 14, 50),);
+('hillsbrad_peasant', 'tarren_mill', '希尔斯布莱德农民', 25, 'normal', 112, 30, 0, 15, 15, 'physical', 0.12, 1.6, 0.07, 1.5, 38, 7, 15, 40),);
+('syndicate_master', 'tarren_mill', '辛迪加首领', 26, 'elite', 252, 47, 0, 20, 20, 'physical', 0.16, 1.7, 0.07, 1.5, 65, 12, 25, 5),);
 ('tarren_mill_guard', 'tarren_mill', '塔伦米尔守卫', 24, 'normal', 78, 21, 0, 10, 10, 'physical', 0.09, 1.6, 0.05, 1.5, 36, 7, 14, 35);
 
 -- 千针石林 (25-35级) - HP: 65~130, 攻击: 18~32
 INSERT OR REPLACE INTO monsters (
-id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
-attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
-exp_reward, gold_min, gold_max, spawn_weight
+    id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
+    attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
+    exp_reward, gold_min, gold_max, spawn_weight
 ) VALUES
-('centaur_brave', 'thousand_needles', '半人马勇士', 25, 'normal', 119, 34, 0, 15, 15, 'physical', 0.12, 1.6, 0.07, 1.5, 38, 7, 15, 100),
-('centaur_warrior', 'thousand_needles', '半人马战士', 26, 'normal', 126, 35, 0, 16, 16, 'physical', 0.12, 1.6, 0.07, 1.5, 40, 8, 16, 80),
-('centaur_shaman', 'thousand_needles', '半人马萨满', 27, 'normal', 116, 16, 38, 15, 19, 'magic', 0.07, 1.5, 0.17, 1.7, 42, 8, 17, 70),
-('centaur_outrunner', 'thousand_needles', '半人马斥候', 28, 'normal', 133, 38, 0, 18, 18, 'physical', 0.13, 1.6, 0.07, 1.5, 44, 9, 18, 60),
-('centaur_chieftain', 'thousand_needles', '半人马酋长', 30, 'elite', 280, 51, 0, 22, 22, 'physical', 0.17, 1.7, 0.07, 1.5, 70, 14, 28, 5),
-('windfury_harpy', 'thousand_needles', '风怒鹰身人', 29, 'normal', 123, 35, 0, 16, 16, 'physical', 0.12, 1.6, 0.07, 1.5, 46, 9, 19, 50),
-('windfury_matron', 'thousand_needles', '风怒主母', 31, 'normal', 129, 36, 0, 18, 18, 'physical', 0.14, 1.6, 0.08, 1.5, 48, 10, 20, 40),
+('centaur_brave', 'thousand_needles', '半人马勇士', 25, 'normal', 119, 34, 0, 15, 15, 'physical', 0.12, 1.6, 0.07, 1.5, 38, 7, 15, 100),);
+('centaur_warrior', 'thousand_needles', '半人马战士', 26, 'normal', 126, 35, 0, 16, 16, 'physical', 0.12, 1.6, 0.07, 1.5, 40, 8, 16, 80),);
+('centaur_shaman', 'thousand_needles', '半人马萨满', 27, 'normal', 116, 16, 38, 15, 19, 'magic', 0.07, 1.5, 0.17, 1.7, 42, 8, 17, 70),);
+('centaur_outrunner', 'thousand_needles', '半人马斥候', 28, 'normal', 133, 38, 0, 18, 18, 'physical', 0.13, 1.6, 0.07, 1.5, 44, 9, 18, 60),);
+('centaur_chieftain', 'thousand_needles', '半人马酋长', 30, 'elite', 280, 51, 0, 22, 22, 'physical', 0.17, 1.7, 0.07, 1.5, 70, 14, 28, 5),);
+('windfury_harpy', 'thousand_needles', '风怒鹰身人', 29, 'normal', 123, 35, 0, 16, 16, 'physical', 0.12, 1.6, 0.07, 1.5, 46, 9, 19, 50),);
+('windfury_matron', 'thousand_needles', '风怒主母', 31, 'normal', 129, 36, 0, 18, 18, 'physical', 0.14, 1.6, 0.08, 1.5, 48, 10, 20, 40),);
 ('thousand_needles_basilisk', 'thousand_needles', '千针石林蜥蜴', 30, 'normal', 90, 28, 0, 12, 12, 'physical', 0.1, 1.6, 0.05, 1.5, 46, 9, 19, 35);
 
 -- 凄凉之地 (30-40级) - HP: 75~140, 攻击: 22~35
 INSERT OR REPLACE INTO monsters (
-id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
-attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
-exp_reward, gold_min, gold_max, spawn_weight
+    id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
+    attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
+    exp_reward, gold_min, gold_max, spawn_weight
 ) VALUES
-('centaur_brave', 'desolace', '半人马勇士', 30, 'normal', 133, 38, 0, 16, 16, 'physical', 0.12, 1.6, 0.07, 1.5, 42, 8, 16, 100),
-('centaur_warrior', 'desolace', '半人马战士', 31, 'normal', 140, 39, 0, 18, 18, 'physical', 0.14, 1.6, 0.08, 1.5, 44, 8, 17, 80),
-('centaur_shaman', 'desolace', '半人马萨满', 32, 'normal', 130, 18, 40, 16, 20, 'magic', 0.08, 1.5, 0.19, 1.7, 46, 9, 18, 70),
-('centaur_outrunner', 'desolace', '半人马斥候', 33, 'normal', 147, 42, 0, 19, 19, 'physical', 0.15, 1.6, 0.08, 1.5, 48, 9, 19, 60),
-('centaur_chieftain', 'desolace', '半人马酋长', 35, 'elite', 308, 54, 0, 23, 23, 'physical', 0.19, 1.7, 0.08, 1.5, 75, 15, 30, 5),
-('felhound', 'desolace', '地狱犬', 34, 'normal', 137, 19, 43, 18, 22, 'magic', 0.08, 1.5, 0.20, 1.7, 50, 10, 20, 50),
-('doomguard', 'desolace', '末日守卫', 36, 'elite', 336, 57, 0, 24, 24, 'physical', 0.20, 1.7, 0.08, 1.5, 80, 16, 32, 3),
+('centaur_brave', 'desolace', '半人马勇士', 30, 'normal', 133, 38, 0, 16, 16, 'physical', 0.12, 1.6, 0.07, 1.5, 42, 8, 16, 100),);
+('centaur_warrior', 'desolace', '半人马战士', 31, 'normal', 140, 39, 0, 18, 18, 'physical', 0.14, 1.6, 0.08, 1.5, 44, 8, 17, 80),);
+('centaur_shaman', 'desolace', '半人马萨满', 32, 'normal', 130, 18, 40, 16, 20, 'magic', 0.08, 1.5, 0.19, 1.7, 46, 9, 18, 70),);
+('centaur_outrunner', 'desolace', '半人马斥候', 33, 'normal', 147, 42, 0, 19, 19, 'physical', 0.15, 1.6, 0.08, 1.5, 48, 9, 19, 60),);
+('centaur_chieftain', 'desolace', '半人马酋长', 35, 'elite', 308, 54, 0, 23, 23, 'physical', 0.19, 1.7, 0.08, 1.5, 75, 15, 30, 5),);
+('felhound', 'desolace', '地狱犬', 34, 'normal', 137, 19, 43, 18, 22, 'magic', 0.08, 1.5, 0.20, 1.7, 50, 10, 20, 50),);
+('doomguard', 'desolace', '末日守卫', 36, 'elite', 336, 57, 0, 24, 24, 'physical', 0.20, 1.7, 0.08, 1.5, 80, 16, 32, 3),);
 ('desolace_basilisk', 'desolace', '凄凉之地蜥蜴', 33, 'normal', 103, 30, 0, 13, 13, 'physical', 0.11, 1.6, 0.05, 1.5, 48, 9, 19, 40);
 
 -- 荆棘谷 (30-45级) - HP: 75~160, 攻击: 22~40
 INSERT OR REPLACE INTO monsters (
-id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
-attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
-exp_reward, gold_min, gold_max, spawn_weight
+    id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
+    attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
+    exp_reward, gold_min, gold_max, spawn_weight
 ) VALUES
-('jungle_stalker', 'stranglethorn', '丛林潜伏者', 30, 'normal', 133, 38, 0, 16, 16, 'physical', 0.12, 1.6, 0.07, 1.5, 42, 8, 16, 100),
-('gurubashi_troll', 'stranglethorn', '古拉巴什巨魔', 32, 'normal', 140, 40, 0, 18, 18, 'physical', 0.14, 1.6, 0.08, 1.5, 46, 9, 18, 80),
-('gurubashi_warrior', 'stranglethorn', '古拉巴什战士', 34, 'normal', 147, 43, 0, 19, 19, 'physical', 0.15, 1.6, 0.08, 1.5, 50, 10, 20, 70),
-('gurubashi_shaman', 'stranglethorn', '古拉巴什萨满', 35, 'normal', 137, 19, 43, 18, 22, 'magic', 0.08, 1.5, 0.19, 1.7, 52, 10, 21, 60),
-('gurubashi_berserker', 'stranglethorn', '古拉巴什狂战士', 36, 'normal', 154, 46, 0, 20, 20, 'physical', 0.16, 1.6, 0.08, 1.5, 54, 11, 22, 50),
-('panther', 'stranglethorn', '黑豹', 37, 'normal', 151, 45, 0, 19, 19, 'physical', 0.15, 1.6, 0.08, 1.5, 56, 11, 23, 40),
-('gurubashi_chieftain', 'stranglethorn', '古拉巴什酋长', 38, 'elite', 336, 57, 0, 24, 24, 'physical', 0.20, 1.7, 0.08, 1.5, 85, 17, 34, 5),
-('tiger', 'stranglethorn', '猛虎', 39, 'normal', 161, 49, 0, 22, 22, 'physical', 0.17, 1.6, 0.08, 1.5, 58, 12, 24, 30),
-('bloodscalp_troll', 'stranglethorn', '血顶巨魔', 40, 'normal', 168, 51, 0, 23, 23, 'physical', 0.18, 1.6, 0.08, 1.5, 60, 12, 25, 25),
+('jungle_stalker', 'stranglethorn', '丛林潜伏者', 30, 'normal', 133, 38, 0, 16, 16, 'physical', 0.12, 1.6, 0.07, 1.5, 42, 8, 16, 100),);
+('gurubashi_troll', 'stranglethorn', '古拉巴什巨魔', 32, 'normal', 140, 40, 0, 18, 18, 'physical', 0.14, 1.6, 0.08, 1.5, 46, 9, 18, 80),);
+('gurubashi_warrior', 'stranglethorn', '古拉巴什战士', 34, 'normal', 147, 43, 0, 19, 19, 'physical', 0.15, 1.6, 0.08, 1.5, 50, 10, 20, 70),);
+('gurubashi_shaman', 'stranglethorn', '古拉巴什萨满', 35, 'normal', 137, 19, 43, 18, 22, 'magic', 0.08, 1.5, 0.19, 1.7, 52, 10, 21, 60),);
+('gurubashi_berserker', 'stranglethorn', '古拉巴什狂战士', 36, 'normal', 154, 46, 0, 20, 20, 'physical', 0.16, 1.6, 0.08, 1.5, 54, 11, 22, 50),);
+('panther', 'stranglethorn', '黑豹', 37, 'normal', 151, 45, 0, 19, 19, 'physical', 0.15, 1.6, 0.08, 1.5, 56, 11, 23, 40),);
+('gurubashi_chieftain', 'stranglethorn', '古拉巴什酋长', 38, 'elite', 336, 57, 0, 24, 24, 'physical', 0.20, 1.7, 0.08, 1.5, 85, 17, 34, 5),);
+('tiger', 'stranglethorn', '猛虎', 39, 'normal', 161, 49, 0, 22, 22, 'physical', 0.17, 1.6, 0.08, 1.5, 58, 12, 24, 30),);
+('bloodscalp_troll', 'stranglethorn', '血顶巨魔', 40, 'normal', 168, 51, 0, 23, 23, 'physical', 0.18, 1.6, 0.08, 1.5, 60, 12, 25, 25),);
 ('bloodscalp_chieftain', 'stranglethorn', '血顶酋长', 42, 'elite', 260, 45, 0, 19, 19, 'physical', 0.18, 1.7, 0.05, 1.5, 90, 18, 36, 3);
 
 -- 荒芜之地 (35-45级) - HP: 85~160, 攻击: 25~40
 INSERT OR REPLACE INTO monsters (
-id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
-attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
-exp_reward, gold_min, gold_max, spawn_weight
+    id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
+    attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
+    exp_reward, gold_min, gold_max, spawn_weight
 ) VALUES
-('rock_elemental', 'badlands', '石元素', 35, 'normal', 137, 19, 43, 18, 22, 'magic', 0.08, 1.5, 0.19, 1.7, 52, 10, 21, 100),
-('dark_iron_dwarf', 'badlands', '黑铁矮人', 36, 'normal', 154, 46, 0, 20, 20, 'physical', 0.16, 1.6, 0.08, 1.5, 54, 11, 22, 80),
-('dark_iron_warrior', 'badlands', '黑石战士', 37, 'normal', 161, 47, 0, 22, 22, 'physical', 0.17, 1.6, 0.08, 1.5, 56, 11, 23, 70),
-('dark_iron_sorcerer', 'badlands', '黑铁术士', 38, 'normal', 151, 20, 46, 20, 23, 'magic', 0.08, 1.5, 0.20, 1.7, 58, 12, 24, 60),
-('dark_iron_commander', 'badlands', '黑铁指挥官', 40, 'elite', 364, 61, 0, 26, 26, 'physical', 0.21, 1.7, 0.08, 1.5, 90, 18, 36, 5),
-('basilisk', 'badlands', '蜥蜴', 39, 'normal', 168, 50, 0, 23, 23, 'physical', 0.18, 1.6, 0.08, 1.5, 60, 12, 25, 50),
-('rock_giant', 'badlands', '岩石巨人', 42, 'elite', 378, 62, 0, 26, 26, 'physical', 0.22, 1.7, 0.08, 1.5, 95, 19, 38, 3),
+('rock_elemental', 'badlands', '石元素', 35, 'normal', 137, 19, 43, 18, 22, 'magic', 0.08, 1.5, 0.19, 1.7, 52, 10, 21, 100),);
+('dark_iron_dwarf', 'badlands', '黑铁矮人', 36, 'normal', 154, 46, 0, 20, 20, 'physical', 0.16, 1.6, 0.08, 1.5, 54, 11, 22, 80),);
+('dark_iron_warrior', 'badlands', '黑石战士', 37, 'normal', 161, 47, 0, 22, 22, 'physical', 0.17, 1.6, 0.08, 1.5, 56, 11, 23, 70),);
+('dark_iron_sorcerer', 'badlands', '黑铁术士', 38, 'normal', 151, 20, 46, 20, 23, 'magic', 0.08, 1.5, 0.20, 1.7, 58, 12, 24, 60),);
+('dark_iron_commander', 'badlands', '黑铁指挥官', 40, 'elite', 364, 61, 0, 26, 26, 'physical', 0.21, 1.7, 0.08, 1.5, 90, 18, 36, 5),);
+('basilisk', 'badlands', '蜥蜴', 39, 'normal', 168, 50, 0, 23, 23, 'physical', 0.18, 1.6, 0.08, 1.5, 60, 12, 25, 50),);
+('rock_giant', 'badlands', '岩石巨人', 42, 'elite', 378, 62, 0, 26, 26, 'physical', 0.22, 1.7, 0.08, 1.5, 95, 19, 38, 3),);
 ('badlands_scorpion', 'badlands', '荒芜之地蝎子', 41, 'normal', 125, 39, 0, 18, 18, 'physical', 0.16, 1.6, 0.05, 1.5, 62, 13, 26, 40);
 
 -- 悲伤沼泽 (35-45级) - HP: 85~160, 攻击: 25~40
 INSERT OR REPLACE INTO monsters (
-id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
-attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
-exp_reward, gold_min, gold_max, spawn_weight
+    id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
+    attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
+    exp_reward, gold_min, gold_max, spawn_weight
 ) VALUES
-('mire_creeper', 'swamp_of_sorrows', '泥沼爬行者', 35, 'normal', 137, 19, 43, 18, 22, 'magic', 0.08, 1.5, 0.19, 1.7, 52, 10, 21, 100),
-('green_dragon_whelp', 'swamp_of_sorrows', '绿龙幼崽', 36, 'normal', 154, 46, 0, 20, 20, 'physical', 0.16, 1.6, 0.08, 1.5, 54, 11, 22, 80),
-('green_dragon_scalebane', 'swamp_of_sorrows', '绿龙鳞片守卫', 37, 'normal', 161, 47, 0, 22, 22, 'physical', 0.17, 1.6, 0.08, 1.5, 56, 11, 23, 70),
-('green_dragon_mage', 'swamp_of_sorrows', '绿龙法师', 38, 'normal', 151, 20, 46, 20, 23, 'magic', 0.08, 1.5, 0.20, 1.7, 58, 12, 24, 60),
-('green_dragon_guardian', 'swamp_of_sorrows', '绿龙守护者', 40, 'elite', 364, 61, 0, 26, 26, 'physical', 0.21, 1.7, 0.08, 1.5, 90, 18, 36, 5),
-('marsh_lurker', 'swamp_of_sorrows', '沼泽潜伏者', 39, 'normal', 168, 50, 0, 23, 23, 'physical', 0.18, 1.6, 0.08, 1.5, 60, 12, 25, 50),
-('green_dragon_ancient', 'swamp_of_sorrows', '绿龙古龙', 42, 'elite', 378, 62, 0, 26, 26, 'physical', 0.22, 1.7, 0.08, 1.5, 95, 19, 38, 3),
+('mire_creeper', 'swamp_of_sorrows', '泥沼爬行者', 35, 'normal', 137, 19, 43, 18, 22, 'magic', 0.08, 1.5, 0.19, 1.7, 52, 10, 21, 100),);
+('green_dragon_whelp', 'swamp_of_sorrows', '绿龙幼崽', 36, 'normal', 154, 46, 0, 20, 20, 'physical', 0.16, 1.6, 0.08, 1.5, 54, 11, 22, 80),);
+('green_dragon_scalebane', 'swamp_of_sorrows', '绿龙鳞片守卫', 37, 'normal', 161, 47, 0, 22, 22, 'physical', 0.17, 1.6, 0.08, 1.5, 56, 11, 23, 70),);
+('green_dragon_mage', 'swamp_of_sorrows', '绿龙法师', 38, 'normal', 151, 20, 46, 20, 23, 'magic', 0.08, 1.5, 0.20, 1.7, 58, 12, 24, 60),);
+('green_dragon_guardian', 'swamp_of_sorrows', '绿龙守护者', 40, 'elite', 364, 61, 0, 26, 26, 'physical', 0.21, 1.7, 0.08, 1.5, 90, 18, 36, 5),);
+('marsh_lurker', 'swamp_of_sorrows', '沼泽潜伏者', 39, 'normal', 168, 50, 0, 23, 23, 'physical', 0.18, 1.6, 0.08, 1.5, 60, 12, 25, 50),);
+('green_dragon_ancient', 'swamp_of_sorrows', '绿龙古龙', 42, 'elite', 378, 62, 0, 26, 26, 'physical', 0.22, 1.7, 0.08, 1.5, 95, 19, 38, 3),);
 ('swamp_elemental', 'swamp_of_sorrows', '沼泽元素', 41, 'normal', 125, 16, 36, 18, 19, 'magic', 0.05, 1.5, 0.18, 1.7, 62, 13, 26, 40);
 
 -- 尘泥沼泽 (35-45级) - HP: 85~160, 攻击: 25~40
 INSERT OR REPLACE INTO monsters (
-id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
-attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
-exp_reward, gold_min, gold_max, spawn_weight
+    id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
+    attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
+    exp_reward, gold_min, gold_max, spawn_weight
 ) VALUES
-('mire_creeper', 'dustwallow', '泥沼爬行者', 35, 'normal', 137, 19, 43, 18, 22, 'magic', 0.08, 1.5, 0.19, 1.7, 52, 10, 21, 100),
-('black_dragon_whelp', 'dustwallow', '黑龙幼崽', 36, 'normal', 154, 46, 0, 20, 20, 'physical', 0.16, 1.6, 0.08, 1.5, 54, 11, 22, 80),
-('black_dragon_scalebane', 'dustwallow', '黑龙鳞片守卫', 37, 'normal', 161, 47, 0, 22, 22, 'physical', 0.17, 1.6, 0.08, 1.5, 56, 11, 23, 70),
-('black_dragon_mage', 'dustwallow', '黑龙法师', 38, 'normal', 151, 20, 46, 20, 23, 'magic', 0.08, 1.5, 0.20, 1.7, 58, 12, 24, 60),
-('black_dragon_guardian', 'dustwallow', '黑龙守护者', 40, 'elite', 364, 61, 0, 26, 26, 'physical', 0.21, 1.7, 0.08, 1.5, 90, 18, 36, 5),
-('marsh_lurker', 'dustwallow', '沼泽潜伏者', 39, 'normal', 168, 50, 0, 23, 23, 'physical', 0.18, 1.6, 0.08, 1.5, 60, 12, 25, 50),
-('black_dragon_ancient', 'dustwallow', '黑龙古龙', 42, 'elite', 378, 62, 0, 26, 26, 'physical', 0.22, 1.7, 0.08, 1.5, 95, 19, 38, 3),
+('mire_creeper', 'dustwallow', '泥沼爬行者', 35, 'normal', 137, 19, 43, 18, 22, 'magic', 0.08, 1.5, 0.19, 1.7, 52, 10, 21, 100),);
+('black_dragon_whelp', 'dustwallow', '黑龙幼崽', 36, 'normal', 154, 46, 0, 20, 20, 'physical', 0.16, 1.6, 0.08, 1.5, 54, 11, 22, 80),);
+('black_dragon_scalebane', 'dustwallow', '黑龙鳞片守卫', 37, 'normal', 161, 47, 0, 22, 22, 'physical', 0.17, 1.6, 0.08, 1.5, 56, 11, 23, 70),);
+('black_dragon_mage', 'dustwallow', '黑龙法师', 38, 'normal', 151, 20, 46, 20, 23, 'magic', 0.08, 1.5, 0.20, 1.7, 58, 12, 24, 60),);
+('black_dragon_guardian', 'dustwallow', '黑龙守护者', 40, 'elite', 364, 61, 0, 26, 26, 'physical', 0.21, 1.7, 0.08, 1.5, 90, 18, 36, 5),);
+('marsh_lurker', 'dustwallow', '沼泽潜伏者', 39, 'normal', 168, 50, 0, 23, 23, 'physical', 0.18, 1.6, 0.08, 1.5, 60, 12, 25, 50),);
+('black_dragon_ancient', 'dustwallow', '黑龙古龙', 42, 'elite', 378, 62, 0, 26, 26, 'physical', 0.22, 1.7, 0.08, 1.5, 95, 19, 38, 3),);
 ('dustwallow_elemental', 'dustwallow', '尘泥元素', 41, 'normal', 125, 16, 36, 18, 19, 'magic', 0.05, 1.5, 0.18, 1.7, 62, 13, 26, 40);
 
 -- 塔纳利斯 (40-50级) - HP: 95~180, 攻击: 28~45
 INSERT OR REPLACE INTO monsters (
-id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
-attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
-exp_reward, gold_min, gold_max, spawn_weight
+    id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
+    attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
+    exp_reward, gold_min, gold_max, spawn_weight
 ) VALUES
-('sand_elemental', 'tanaris', '沙元素', 40, 'normal', 168, 51, 0, 23, 23, 'physical', 0.18, 1.6, 0.08, 1.5, 60, 12, 25, 100),
-('wastewander_bandit', 'tanaris', '废土强盗', 41, 'normal', 169, 51, 0, 23, 23, 'physical', 0.19, 1.6, 0.08, 1.5, 62, 13, 26, 80),
-('wastewander_rogue', 'tanaris', '废土盗贼', 42, 'normal', 176, 52, 0, 25, 25, 'physical', 0.20, 1.6, 0.08, 1.5, 64, 13, 27, 70),
-('wastewander_mage', 'tanaris', '废土法师', 43, 'normal', 166, 22, 49, 23, 26, 'magic', 0.08, 1.5, 0.22, 1.7, 66, 14, 28, 60),
-('wastewander_chieftain', 'tanaris', '废土酋长', 45, 'elite', 405, 65, 0, 29, 29, 'physical', 0.23, 1.8, 0.08, 1.5, 100, 20, 40, 5),
-('sand_giant', 'tanaris', '沙巨人', 44, 'normal', 182, 55, 0, 26, 26, 'physical', 0.21, 1.6, 0.08, 1.5, 68, 14, 29, 50),
-('ancient_sand_elemental', 'tanaris', '古沙元素', 46, 'elite', 432, 68, 0, 30, 30, 'physical', 0.24, 1.8, 0.08, 1.5, 105, 21, 42, 3),
+('sand_elemental', 'tanaris', '沙元素', 40, 'normal', 168, 51, 0, 23, 23, 'physical', 0.18, 1.6, 0.08, 1.5, 60, 12, 25, 100),);
+('wastewander_bandit', 'tanaris', '废土强盗', 41, 'normal', 169, 51, 0, 23, 23, 'physical', 0.19, 1.6, 0.08, 1.5, 62, 13, 26, 80),);
+('wastewander_rogue', 'tanaris', '废土盗贼', 42, 'normal', 176, 52, 0, 25, 25, 'physical', 0.20, 1.6, 0.08, 1.5, 64, 13, 27, 70),);
+('wastewander_mage', 'tanaris', '废土法师', 43, 'normal', 166, 22, 49, 23, 26, 'magic', 0.08, 1.5, 0.22, 1.7, 66, 14, 28, 60),);
+('wastewander_chieftain', 'tanaris', '废土酋长', 45, 'elite', 405, 65, 0, 29, 29, 'physical', 0.23, 1.8, 0.08, 1.5, 100, 20, 40, 5),);
+('sand_giant', 'tanaris', '沙巨人', 44, 'normal', 182, 55, 0, 26, 26, 'physical', 0.21, 1.6, 0.08, 1.5, 68, 14, 29, 50),);
+('ancient_sand_elemental', 'tanaris', '古沙元素', 46, 'elite', 432, 68, 0, 30, 30, 'physical', 0.24, 1.8, 0.08, 1.5, 105, 21, 42, 3),);
 ('tanaris_scorpion', 'tanaris', '塔纳利斯蝎子', 43, 'normal', 128, 41, 0, 19, 19, 'physical', 0.17, 1.6, 0.05, 1.5, 66, 14, 28, 40);
 
 -- 菲拉斯 (40-50级) - HP: 95~180, 攻击: 28~45
 INSERT OR REPLACE INTO monsters (
-id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
-attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
-exp_reward, gold_min, gold_max, spawn_weight
+    id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
+    attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
+    exp_reward, gold_min, gold_max, spawn_weight
 ) VALUES
-('feralas_bear', 'feralas', '菲拉斯熊', 40, 'normal', 168, 51, 0, 23, 23, 'physical', 0.18, 1.6, 0.08, 1.5, 60, 12, 25, 100),
-('feralas_panther', 'feralas', '菲拉斯黑豹', 41, 'normal', 169, 51, 0, 23, 23, 'physical', 0.19, 1.6, 0.08, 1.5, 62, 13, 26, 80),
-('feralas_tiger', 'feralas', '菲拉斯猛虎', 42, 'normal', 176, 52, 0, 25, 25, 'physical', 0.20, 1.6, 0.08, 1.5, 64, 13, 27, 70),
-('highborne_ruins_guardian', 'feralas', '上层精灵废墟守卫', 43, 'normal', 166, 22, 49, 23, 26, 'magic', 0.08, 1.5, 0.22, 1.7, 66, 14, 28, 60),
-('highborne_ruins_mage', 'feralas', '上层精灵废墟法师', 44, 'normal', 173, 23, 52, 25, 27, 'magic', 0.08, 1.5, 0.23, 1.7, 68, 14, 29, 50),
-('highborne_ruins_ancient', 'feralas', '上层精灵废墟古灵', 46, 'elite', 432, 68, 0, 30, 30, 'physical', 0.24, 1.8, 0.08, 1.5, 105, 21, 42, 5),
-('feralas_basilisk', 'feralas', '菲拉斯蜥蜴', 45, 'normal', 182, 55, 0, 26, 26, 'physical', 0.21, 1.6, 0.08, 1.5, 70, 15, 30, 40),
+('feralas_bear', 'feralas', '菲拉斯熊', 40, 'normal', 168, 51, 0, 23, 23, 'physical', 0.18, 1.6, 0.08, 1.5, 60, 12, 25, 100),);
+('feralas_panther', 'feralas', '菲拉斯黑豹', 41, 'normal', 169, 51, 0, 23, 23, 'physical', 0.19, 1.6, 0.08, 1.5, 62, 13, 26, 80),);
+('feralas_tiger', 'feralas', '菲拉斯猛虎', 42, 'normal', 176, 52, 0, 25, 25, 'physical', 0.20, 1.6, 0.08, 1.5, 64, 13, 27, 70),);
+('highborne_ruins_guardian', 'feralas', '上层精灵废墟守卫', 43, 'normal', 166, 22, 49, 23, 26, 'magic', 0.08, 1.5, 0.22, 1.7, 66, 14, 28, 60),);
+('highborne_ruins_mage', 'feralas', '上层精灵废墟法师', 44, 'normal', 173, 23, 52, 25, 27, 'magic', 0.08, 1.5, 0.23, 1.7, 68, 14, 29, 50),);
+('highborne_ruins_ancient', 'feralas', '上层精灵废墟古灵', 46, 'elite', 432, 68, 0, 30, 30, 'physical', 0.24, 1.8, 0.08, 1.5, 105, 21, 42, 5),);
+('feralas_basilisk', 'feralas', '菲拉斯蜥蜴', 45, 'normal', 182, 55, 0, 26, 26, 'physical', 0.21, 1.6, 0.08, 1.5, 70, 15, 30, 40),);
 ('feralas_giant', 'feralas', '菲拉斯巨人', 47, 'elite', 340, 54, 0, 24, 24, 'physical', 0.22, 1.8, 0.05, 1.5, 110, 22, 44, 3);
 
 -- 安戈洛环形山 (48-55级) - HP: 110~200, 攻击: 32~50
 INSERT OR REPLACE INTO monsters (
-id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
-attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
-exp_reward, gold_min, gold_max, spawn_weight
+    id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
+    attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
+    exp_reward, gold_min, gold_max, spawn_weight
 ) VALUES
-('diemetradon', 'ungoro', '双帆龙', 48, 'normal', 189, 57, 0, 26, 26, 'physical', 0.21, 1.6, 0.08, 1.5, 72, 15, 30, 100),
-('pterrordax', 'ungoro', '翼手龙', 49, 'normal', 196, 58, 0, 27, 27, 'physical', 0.22, 1.6, 0.08, 1.5, 74, 15, 31, 80),
-('devilsaur', 'ungoro', '魔暴龙', 50, 'normal', 202, 60, 0, 29, 29, 'physical', 0.23, 1.6, 0.08, 1.5, 76, 16, 32, 70),
-('ungoro_thunderer', 'ungoro', '安戈洛雷霆蜥蜴', 51, 'normal', 209, 61, 0, 30, 30, 'physical', 0.24, 1.6, 0.08, 1.5, 78, 16, 33, 60),
-('ungoro_gorger', 'ungoro', '安戈洛吞噬者', 52, 'normal', 216, 62, 0, 31, 31, 'physical', 0.25, 1.6, 0.08, 1.5, 80, 17, 34, 50),
-('devilsaur_alpha', 'ungoro', '魔暴龙王', 53, 'elite', 486, 75, 0, 34, 34, 'physical', 0.26, 1.8, 0.08, 1.5, 115, 23, 46, 5),
-('ungoro_elemental', 'ungoro', '安戈洛元素', 52, 'normal', 213, 25, 55, 31, 32, 'magic', 0.08, 1.5, 0.24, 1.7, 80, 17, 34, 40),
+('diemetradon', 'ungoro', '双帆龙', 48, 'normal', 189, 57, 0, 26, 26, 'physical', 0.21, 1.6, 0.08, 1.5, 72, 15, 30, 100),);
+('pterrordax', 'ungoro', '翼手龙', 49, 'normal', 196, 58, 0, 27, 27, 'physical', 0.22, 1.6, 0.08, 1.5, 74, 15, 31, 80),);
+('devilsaur', 'ungoro', '魔暴龙', 50, 'normal', 202, 60, 0, 29, 29, 'physical', 0.23, 1.6, 0.08, 1.5, 76, 16, 32, 70),);
+('ungoro_thunderer', 'ungoro', '安戈洛雷霆蜥蜴', 51, 'normal', 209, 61, 0, 30, 30, 'physical', 0.24, 1.6, 0.08, 1.5, 78, 16, 33, 60),);
+('ungoro_gorger', 'ungoro', '安戈洛吞噬者', 52, 'normal', 216, 62, 0, 31, 31, 'physical', 0.25, 1.6, 0.08, 1.5, 80, 17, 34, 50),);
+('devilsaur_alpha', 'ungoro', '魔暴龙王', 53, 'elite', 486, 75, 0, 34, 34, 'physical', 0.26, 1.8, 0.08, 1.5, 115, 23, 46, 5),);
+('ungoro_elemental', 'ungoro', '安戈洛元素', 52, 'normal', 213, 25, 55, 31, 32, 'magic', 0.08, 1.5, 0.24, 1.7, 80, 17, 34, 40),);
 ('ancient_devilsaur', 'ungoro', '古魔暴龙', 54, 'elite', 380, 60, 0, 27, 27, 'physical', 0.24, 1.8, 0.05, 1.5, 120, 24, 48, 3);
 
 -- 费伍德森林 (48-55级) - HP: 110~200, 攻击: 32~50
 INSERT OR REPLACE INTO monsters (
-id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
-attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
-exp_reward, gold_min, gold_max, spawn_weight
+    id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
+    attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
+    exp_reward, gold_min, gold_max, spawn_weight
 ) VALUES
-('felwood_satyr', 'felwood', '费伍德萨特', 48, 'normal', 189, 57, 0, 26, 26, 'physical', 0.21, 1.6, 0.08, 1.5, 72, 15, 30, 100),
-('felwood_felguard', 'felwood', '费伍德恶魔守卫', 49, 'normal', 196, 58, 0, 27, 27, 'physical', 0.22, 1.6, 0.08, 1.5, 74, 15, 31, 80),
-('felwood_doomguard', 'felwood', '费伍德末日守卫', 50, 'normal', 202, 60, 0, 29, 29, 'physical', 0.23, 1.6, 0.08, 1.5, 76, 16, 32, 70),
-('felwood_infernal', 'felwood', '费伍德地狱火', 51, 'normal', 209, 26, 57, 30, 31, 'magic', 0.08, 1.5, 0.25, 1.7, 78, 16, 33, 60),
-('felwood_demon_lord', 'felwood', '费伍德恶魔领主', 52, 'elite', 486, 75, 0, 34, 34, 'physical', 0.26, 1.8, 0.08, 1.5, 115, 23, 46, 5),
-('corrupted_treant', 'felwood', '被腐蚀的古树', 51, 'normal', 207, 61, 0, 29, 29, 'physical', 0.24, 1.6, 0.08, 1.5, 78, 16, 33, 50),
-('felwood_ancient', 'felwood', '费伍德古灵', 53, 'elite', 513, 78, 0, 35, 35, 'physical', 0.27, 1.8, 0.08, 1.5, 120, 24, 48, 3),
+('felwood_satyr', 'felwood', '费伍德萨特', 48, 'normal', 189, 57, 0, 26, 26, 'physical', 0.21, 1.6, 0.08, 1.5, 72, 15, 30, 100),);
+('felwood_felguard', 'felwood', '费伍德恶魔守卫', 49, 'normal', 196, 58, 0, 27, 27, 'physical', 0.22, 1.6, 0.08, 1.5, 74, 15, 31, 80),);
+('felwood_doomguard', 'felwood', '费伍德末日守卫', 50, 'normal', 202, 60, 0, 29, 29, 'physical', 0.23, 1.6, 0.08, 1.5, 76, 16, 32, 70),);
+('felwood_infernal', 'felwood', '费伍德地狱火', 51, 'normal', 209, 26, 57, 30, 31, 'magic', 0.08, 1.5, 0.25, 1.7, 78, 16, 33, 60),);
+('felwood_demon_lord', 'felwood', '费伍德恶魔领主', 52, 'elite', 486, 75, 0, 34, 34, 'physical', 0.26, 1.8, 0.08, 1.5, 115, 23, 46, 5),);
+('corrupted_treant', 'felwood', '被腐蚀的古树', 51, 'normal', 207, 61, 0, 29, 29, 'physical', 0.24, 1.6, 0.08, 1.5, 78, 16, 33, 50),);
+('felwood_ancient', 'felwood', '费伍德古灵', 53, 'elite', 513, 78, 0, 35, 35, 'physical', 0.27, 1.8, 0.08, 1.5, 120, 24, 48, 3),);
 ('felwood_corrupted_bear', 'felwood', '被腐蚀的熊', 50, 'normal', 148, 45, 0, 21, 21, 'physical', 0.19, 1.6, 0.05, 1.5, 76, 16, 32, 40);
 
 -- 冬泉谷 (55-60级) - HP: 130~220, 攻击: 38~55
 INSERT OR REPLACE INTO monsters (
-id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
-attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
-exp_reward, gold_min, gold_max, spawn_weight
+    id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
+    attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
+    exp_reward, gold_min, gold_max, spawn_weight
 ) VALUES
-('winterspring_frostsaber', 'winterspring', '冬泉谷霜刃豹', 55, 'normal', 230, 68, 0, 32, 32, 'physical', 0.25, 1.6, 0.08, 1.5, 84, 17, 35, 100),
-('winterspring_owl', 'winterspring', '冬泉谷猫头鹰', 56, 'normal', 236, 69, 0, 34, 34, 'physical', 0.26, 1.6, 0.08, 1.5, 86, 18, 36, 80),
-('winterspring_furbolg', 'winterspring', '冬泉谷熊怪', 57, 'normal', 243, 70, 0, 35, 35, 'physical', 0.27, 1.6, 0.08, 1.5, 88, 18, 37, 70),
-('blue_dragon_whelp', 'winterspring', '蓝龙幼崽', 58, 'normal', 250, 72, 0, 36, 36, 'physical', 0.28, 1.6, 0.08, 1.5, 90, 19, 38, 60),
-('blue_dragon_scalebane', 'winterspring', '蓝龙鳞片守卫', 59, 'normal', 256, 73, 0, 38, 38, 'physical', 0.29, 1.6, 0.08, 1.5, 92, 19, 39, 50),
-('blue_dragon_guardian', 'winterspring', '蓝龙守护者', 60, 'elite', 540, 84, 0, 39, 39, 'physical', 0.31, 1.8, 0.08, 1.5, 130, 26, 52, 5),
-('winterspring_elemental', 'winterspring', '冬泉谷元素', 58, 'normal', 247, 29, 62, 36, 38, 'magic', 0.08, 1.5, 0.27, 1.7, 90, 19, 38, 40),
+('winterspring_frostsaber', 'winterspring', '冬泉谷霜刃豹', 55, 'normal', 230, 68, 0, 32, 32, 'physical', 0.25, 1.6, 0.08, 1.5, 84, 17, 35, 100),);
+('winterspring_owl', 'winterspring', '冬泉谷猫头鹰', 56, 'normal', 236, 69, 0, 34, 34, 'physical', 0.26, 1.6, 0.08, 1.5, 86, 18, 36, 80),);
+('winterspring_furbolg', 'winterspring', '冬泉谷熊怪', 57, 'normal', 243, 70, 0, 35, 35, 'physical', 0.27, 1.6, 0.08, 1.5, 88, 18, 37, 70),);
+('blue_dragon_whelp', 'winterspring', '蓝龙幼崽', 58, 'normal', 250, 72, 0, 36, 36, 'physical', 0.28, 1.6, 0.08, 1.5, 90, 19, 38, 60),);
+('blue_dragon_scalebane', 'winterspring', '蓝龙鳞片守卫', 59, 'normal', 256, 73, 0, 38, 38, 'physical', 0.29, 1.6, 0.08, 1.5, 92, 19, 39, 50),);
+('blue_dragon_guardian', 'winterspring', '蓝龙守护者', 60, 'elite', 540, 84, 0, 39, 39, 'physical', 0.31, 1.8, 0.08, 1.5, 130, 26, 52, 5),);
+('winterspring_elemental', 'winterspring', '冬泉谷元素', 58, 'normal', 247, 29, 62, 36, 38, 'magic', 0.08, 1.5, 0.27, 1.7, 90, 19, 38, 40),);
 ('blue_dragon_ancient', 'winterspring', '蓝龙古龙', 60, 'boss', 450, 70, 0, 32, 32, 'physical', 0.3, 1.9, 0.05, 1.5, 150, 30, 60, 1);
 
 -- 希利苏斯 (55-60级) - HP: 130~220, 攻击: 38~55
 INSERT OR REPLACE INTO monsters (
-id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
-attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
-exp_reward, gold_min, gold_max, spawn_weight
+    id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
+    attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
+    exp_reward, gold_min, gold_max, spawn_weight
 ) VALUES
-('silithid_worker', 'silithus', '其拉工虫', 55, 'normal', 230, 68, 0, 32, 32, 'physical', 0.25, 1.6, 0.08, 1.5, 84, 17, 35, 100),
-('silithid_warrior', 'silithus', '其拉战士', 56, 'normal', 236, 69, 0, 34, 34, 'physical', 0.26, 1.6, 0.08, 1.5, 86, 18, 36, 80),
-('silithid_royal', 'silithus', '其拉皇家守卫', 57, 'normal', 243, 70, 0, 35, 35, 'physical', 0.27, 1.6, 0.08, 1.5, 88, 18, 37, 70),
-('silithid_mage', 'silithus', '其拉法师', 58, 'normal', 234, 30, 62, 35, 36, 'magic', 0.08, 1.5, 0.27, 1.7, 90, 19, 38, 60),
-('silithid_queen', 'silithus', '其拉女王', 59, 'elite', 567, 88, 0, 40, 40, 'physical', 0.30, 1.8, 0.08, 1.5, 135, 27, 54, 5),
-('anubisath_guardian', 'silithus', '阿努比萨斯守卫', 58, 'normal', 250, 72, 0, 36, 36, 'physical', 0.28, 1.6, 0.08, 1.5, 90, 19, 38, 50),
-('qiraji_warrior', 'silithus', '其拉战士', 59, 'normal', 256, 73, 0, 38, 38, 'physical', 0.29, 1.6, 0.08, 1.5, 92, 19, 39, 40),
+('silithid_worker', 'silithus', '其拉工虫', 55, 'normal', 230, 68, 0, 32, 32, 'physical', 0.25, 1.6, 0.08, 1.5, 84, 17, 35, 100),);
+('silithid_warrior', 'silithus', '其拉战士', 56, 'normal', 236, 69, 0, 34, 34, 'physical', 0.26, 1.6, 0.08, 1.5, 86, 18, 36, 80),);
+('silithid_royal', 'silithus', '其拉皇家守卫', 57, 'normal', 243, 70, 0, 35, 35, 'physical', 0.27, 1.6, 0.08, 1.5, 88, 18, 37, 70),);
+('silithid_mage', 'silithus', '其拉法师', 58, 'normal', 234, 30, 62, 35, 36, 'magic', 0.08, 1.5, 0.27, 1.7, 90, 19, 38, 60),);
+('silithid_queen', 'silithus', '其拉女王', 59, 'elite', 567, 88, 0, 40, 40, 'physical', 0.30, 1.8, 0.08, 1.5, 135, 27, 54, 5),);
+('anubisath_guardian', 'silithus', '阿努比萨斯守卫', 58, 'normal', 250, 72, 0, 36, 36, 'physical', 0.28, 1.6, 0.08, 1.5, 90, 19, 38, 50),);
+('qiraji_warrior', 'silithus', '其拉战士', 59, 'normal', 256, 73, 0, 38, 38, 'physical', 0.29, 1.6, 0.08, 1.5, 92, 19, 39, 40),);
 ('c_thun_minion', 'silithus', '克苏恩仆从', 60, 'boss', 450, 70, 0, 32, 32, 'physical', 0.3, 1.9, 0.05, 1.5, 150, 30, 60, 1);
 
 -- 燃烧平原 (50-60级) - HP: 120~220, 攻击: 35~55
 INSERT OR REPLACE INTO monsters (
-id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
-attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
-exp_reward, gold_min, gold_max, spawn_weight
+    id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
+    attack_type, phys_crit_rate, phys_crit_damage, spell_crit_rate, spell_crit_damage,
+    exp_reward, gold_min, gold_max, spawn_weight
 ) VALUES
-('blackrock_orc', 'burning_steppes', '黑石兽人', 50, 'normal', 202, 60, 0, 29, 29, 'physical', 0.23, 1.6, 0.08, 1.5, 76, 16, 32, 100),
-('blackrock_warrior', 'burning_steppes', '黑石战士', 52, 'normal', 216, 62, 0, 31, 31, 'physical', 0.25, 1.6, 0.08, 1.5, 80, 17, 34, 80),
-('blackrock_warlock', 'burning_steppes', '黑石术士', 53, 'normal', 209, 26, 57, 30, 32, 'magic', 0.08, 1.5, 0.25, 1.7, 82, 17, 35, 70),
-('black_dragon_whelp', 'burning_steppes', '黑龙幼崽', 54, 'normal', 223, 65, 0, 32, 32, 'physical', 0.26, 1.6, 0.08, 1.5, 84, 18, 36, 60),
-('black_dragon_scalebane', 'burning_steppes', '黑龙鳞片守卫', 55, 'normal', 230, 68, 0, 34, 34, 'physical', 0.27, 1.6, 0.08, 1.5, 86, 18, 37, 50),
-('black_dragon_guardian', 'burning_steppes', '黑龙守护者', 56, 'elite', 540, 84, 0, 39, 39, 'physical', 0.31, 1.8, 0.08, 1.5, 130, 26, 52, 5),
-('blackrock_commander', 'burning_steppes', '黑石指挥官', 57, 'elite', 554, 86, 0, 40, 40, 'physical', 0.32, 1.8, 0.08, 1.5, 135, 27, 54, 3),
-('black_dragon_ancient', 'burning_steppes', '黑龙古龙', 58, 'elite', 567, 88, 0, 42, 42, 'physical', 0.33, 1.8, 0.08, 1.5, 140, 28, 56, 3),
+('blackrock_orc', 'burning_steppes', '黑石兽人', 50, 'normal', 202, 60, 0, 29, 29, 'physical', 0.23, 1.6, 0.08, 1.5, 76, 16, 32, 100),);
+('blackrock_warrior', 'burning_steppes', '黑石战士', 52, 'normal', 216, 62, 0, 31, 31, 'physical', 0.25, 1.6, 0.08, 1.5, 80, 17, 34, 80),);
+('blackrock_warlock', 'burning_steppes', '黑石术士', 53, 'normal', 209, 26, 57, 30, 32, 'magic', 0.08, 1.5, 0.25, 1.7, 82, 17, 35, 70),);
+('black_dragon_whelp', 'burning_steppes', '黑龙幼崽', 54, 'normal', 223, 65, 0, 32, 32, 'physical', 0.26, 1.6, 0.08, 1.5, 84, 18, 36, 60),);
+('black_dragon_scalebane', 'burning_steppes', '黑龙鳞片守卫', 55, 'normal', 230, 68, 0, 34, 34, 'physical', 0.27, 1.6, 0.08, 1.5, 86, 18, 37, 50),);
+('black_dragon_guardian', 'burning_steppes', '黑龙守护者', 56, 'elite', 540, 84, 0, 39, 39, 'physical', 0.31, 1.8, 0.08, 1.5, 130, 26, 52, 5),);
+('blackrock_commander', 'burning_steppes', '黑石指挥官', 57, 'elite', 554, 86, 0, 40, 40, 'physical', 0.32, 1.8, 0.08, 1.5, 135, 27, 54, 3),);
+('black_dragon_ancient', 'burning_steppes', '黑龙古龙', 58, 'elite', 567, 88, 0, 42, 42, 'physical', 0.33, 1.8, 0.08, 1.5, 140, 28, 56, 3),);
 ('nefarian', 'burning_steppes', '奈法利安', 60, 'boss', 500, 75, 0, 35, 35, 'physical', 0.35, 2.0, 0.05, 1.5, 200, 40, 80, 1);
 
 -- ═══════════════════════════════════════════════════════════

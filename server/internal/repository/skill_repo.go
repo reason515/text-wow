@@ -3,6 +3,7 @@ package repository
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"math/rand"
 	"time"
 
@@ -86,6 +87,11 @@ func (r *SkillRepository) GetInitialSkills(classID string) ([]*models.Skill, err
 		}
 	}
 	
+	// 如果所有技能都缺失，返回错误
+	if len(skills) == 0 && len(missingSkills) > 0 {
+		return nil, fmt.Errorf("无法获取初始技能列表：缺少 %d 个技能（%v），请检查数据库是否已加载技能数据", 
+			len(missingSkills), missingSkills)
+	}
 
 	return skills, nil
 }

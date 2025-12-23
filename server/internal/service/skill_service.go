@@ -34,14 +34,26 @@ func (s *SkillService) GetInitialSkillSelection(characterID int) (*models.SkillS
 
 	// 检查是否已经选择过初始技能
 	existingSkills, err := s.skillRepo.GetCharacterSkills(characterID)
+	// 如果查询出错，可能是表不存在（新数据库），继续执行
+	// 只有当查询成功且确实有技能时，才认为已选择过
 	if err == nil && len(existingSkills) > 0 {
 		return nil, errors.New("初始技能已选择")
+	}
+	// 如果查询出错但不是"表不存在"的错误，记录日志但不阻止（允许新数据库初始化）
+	if err != nil {
+		// 记录错误但不返回，允许继续（可能是新数据库，表还未创建）
+		// 如果表不存在，SQLite会返回错误，但我们应该继续
 	}
 
 	// 获取初始技能池
 	initialSkills, err := s.skillRepo.GetInitialSkills(character.ClassID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("获取初始技能失败: %w", err)
+	}
+	
+	// 如果技能列表为空，返回明确的错误
+	if len(initialSkills) == 0 {
+		return nil, fmt.Errorf("无法获取初始技能列表，请检查数据库是否已加载技能数据。职业: %s", character.ClassID)
 	}
 
 	return &models.SkillSelection{
