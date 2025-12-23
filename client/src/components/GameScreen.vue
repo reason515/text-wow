@@ -3193,10 +3193,11 @@ function escapeRegex(str: string): string {
 
 /* 敌人信息面板（固定在顶部，横向排列） */
 .enemies-panel {
-  position: relative;
-  z-index: 10;
+  position: sticky;
+  top: 0;
+  z-index: 100;
   border-bottom: 2px solid var(--border-color);
-  background: rgba(0, 0, 0, 0.8);
+  background: rgba(0, 0, 0, 0.95);
   padding: 8px 12px;
   display: flex;
   gap: 12px;
@@ -3211,6 +3212,11 @@ function escapeRegex(str: string): string {
   min-height: 0;
   overflow-y: auto;
   padding: 16px;
+  position: relative;
+  z-index: 1;
+}
+
+.battle-log {
   position: relative;
   z-index: 1;
 }
