@@ -3,6 +3,7 @@ package api
 import (
 	"database/sql"
 	"fmt"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -402,14 +403,14 @@ func (h *Handler) CreateCharacter(c *gin.Context) {
 	}
 
 	// 计算物理和魔法攻击/防御
-	// 物理攻击 = 力量×0.6 + 敏捷×0.2
-	char.PhysicalAttack = int(float64(char.Strength)*0.6 + float64(char.Agility)*0.2)
+	// 物理攻击 = 力量×0.4 + 敏捷×0.2
+	char.PhysicalAttack = int(math.Round(float64(char.Strength)*0.4 + float64(char.Agility)*0.2))
 	// 魔法攻击 = 智力×1.0 + 精神×0.2
-	char.MagicAttack = int(float64(char.Intellect)*1.0 + float64(char.Spirit)*0.2)
-	// 物理防御 = 力量×0.2 + 耐力×0.3
-	char.PhysicalDefense = int(float64(char.Strength)*0.2 + float64(char.Stamina)*0.3)
+	char.MagicAttack = int(math.Round(float64(char.Intellect)*1.0 + float64(char.Spirit)*0.2))
+	// 物理防御 = 力量×0.1 + 耐力×0.3
+	char.PhysicalDefense = int(math.Round(float64(char.Strength)*0.1 + float64(char.Stamina)*0.3))
 	// 魔法防御 = 智力×0.2 + 精神×0.3
-	char.MagicDefense = int(float64(char.Intellect)*0.2 + float64(char.Spirit)*0.3)
+	char.MagicDefense = int(math.Round(float64(char.Intellect)*0.2 + float64(char.Spirit)*0.3))
 
 	// 计算暴击属性
 	// 物理暴击率 = 基础5% + 敏捷/20
@@ -634,10 +635,10 @@ func (h *Handler) AllocateAttributePoints(c *gin.Context) {
 		char.Resource = char.MaxResource
 	}
 
-	char.PhysicalAttack = int(float64(char.Strength)*0.6 + float64(char.Agility)*0.2)
-	char.MagicAttack = int(float64(char.Intellect)*1.0 + float64(char.Spirit)*0.2)
-	char.PhysicalDefense = int(float64(char.Strength)*0.2 + float64(char.Stamina)*0.3)
-	char.MagicDefense = int(float64(char.Intellect)*0.2 + float64(char.Spirit)*0.3)
+	char.PhysicalAttack = int(math.Round(float64(char.Strength)*0.4 + float64(char.Agility)*0.2))
+	char.MagicAttack = int(math.Round(float64(char.Intellect)*1.0 + float64(char.Spirit)*0.2))
+	char.PhysicalDefense = int(math.Round(float64(char.Strength)*0.1 + float64(char.Stamina)*0.3))
+	char.MagicDefense = int(math.Round(float64(char.Intellect)*0.2 + float64(char.Spirit)*0.3))
 	char.PhysCritRate = 0.05 + float64(char.Agility)/20.0/100.0
 	char.PhysCritDamage = 1.5 + float64(char.Strength)*0.3/100.0
 	char.SpellCritRate = 0.05 + float64(char.Spirit)/20.0/100.0
