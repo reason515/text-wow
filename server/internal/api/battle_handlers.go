@@ -164,17 +164,29 @@ func (h *BattleHandler) GetBattleStatus(c *gin.Context) {
 	if len(characters) > 0 {
 		// 先获取当前状态，检查是否已有地图
 		status := h.battleMgr.GetBattleStatus(userID)
+		faction := characters[0].Faction
+		playerLevel := characters[0].Level
+		
+		// 根据角色阵营确定应该使用的默认地图
+		defaultZoneID := "elwynn" // 默认联盟地图
+		if faction == "horde" {
+			defaultZoneID = "durotar" // 部落默认地图
+		}
+		
+		// 如果没有地图，或者当前地图是 elwynn 但角色是部落（需要设置为 durotar）
+		// 或者当前地图是 durotar 但角色是联盟（需要设置为 elwynn）
+		needsUpdate := false
 		if status.CurrentZoneID == "" {
-			// 根据角色阵营设置默认地图
-			faction := characters[0].Faction
-			defaultZoneID := "elwynn" // 默认联盟地图
-			if faction == "horde" {
-				defaultZoneID = "durotar" // 部落默认地图
-			}
-			
+			needsUpdate = true
+		} else if status.CurrentZoneID == "elwynn" && faction == "horde" {
+			needsUpdate = true
+		} else if status.CurrentZoneID == "durotar" && faction == "alliance" {
+			needsUpdate = true
+		}
+		
+		if needsUpdate {
 			// 使用 ChangeZone 方法来设置默认地图
 			// 这会自动处理锁和验证
-			playerLevel := characters[0].Level
 			err := h.battleMgr.ChangeZone(userID, defaultZoneID, playerLevel, faction)
 			// 如果设置失败（比如等级不够），尝试使用更基础的默认地图
 			if err != nil && defaultZoneID != "elwynn" {

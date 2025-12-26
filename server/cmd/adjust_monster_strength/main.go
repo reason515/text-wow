@@ -250,3 +250,5 @@ func applyConfigToMonsters(db *sql.DB) error {
 
 
 
+
+

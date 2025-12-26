@@ -404,11 +404,8 @@ func (sm *SkillManager) ApplySkillEffects(skillState *CharacterSkillState, chara
 	switch skill.ID {
 	case "warrior_charge":
 		// 冲锋：获得怒气，可能眩晕
+		// 注意：怒气获得由 battle_manager.go 统一处理，这里只返回效果值
 		if rageGain, ok := effect["rageGain"].(int); ok {
-			character.Resource += rageGain
-			if character.Resource > character.MaxResource {
-				character.Resource = character.MaxResource
-			}
 			effects["rageGain"] = rageGain
 		}
 		if stunChance, ok := effect["stunChance"].(float64); ok {

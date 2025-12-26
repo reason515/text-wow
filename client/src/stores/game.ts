@@ -47,7 +47,15 @@ export const useGameStore = defineStore('game', () => {
   const currentEnemy = computed(() => battleStatus.value?.current_enemy ?? null)
   const currentEnemies = computed(() => {
     const enemies = battleStatus.value?.current_enemies ?? battleStatus.value?.currentEnemies ?? null
-    return enemies && Array.isArray(enemies) ? enemies : (enemies ? [enemies] : [])
+    // 如果是数组，直接返回；如果是null/undefined，返回空数组；如果是单个对象，包装成数组
+    if (enemies === null || enemies === undefined) {
+      return []
+    }
+    if (Array.isArray(enemies)) {
+      return enemies
+    }
+    // 如果是单个对象，包装成数组
+    return [enemies]
   })
 
   // API 调用
@@ -308,6 +316,25 @@ export const useGameStore = defineStore('game', () => {
         // 更新战斗状态：后端直接返回 BattleTickResult，包含 IsRunning、IsResting 等字段
         // 同时也支持通过 status 对象传递（向后兼容）
         const status = (result as any).status || result
+        
+        // 优先处理 enemies 字段（后端返回的是小写 "enemies"）
+        let enemiesToSet: any = null
+        if ('enemies' in result && result.enemies !== undefined) {
+          enemiesToSet = result.enemies
+          console.log('[DEBUG] Found enemies in result.enemies:', enemiesToSet)
+        } else if (status && 'enemies' in status && status.enemies !== undefined) {
+          enemiesToSet = status.enemies
+          console.log('[DEBUG] Found enemies in status.enemies:', enemiesToSet)
+        } else if (status && 'currentEnemies' in status && status.currentEnemies !== undefined) {
+          enemiesToSet = status.currentEnemies
+          console.log('[DEBUG] Found enemies in status.currentEnemies:', enemiesToSet)
+        } else if (status && 'current_enemies' in status && status.current_enemies !== undefined) {
+          enemiesToSet = status.current_enemies
+          console.log('[DEBUG] Found enemies in status.current_enemies:', enemiesToSet)
+        } else {
+          console.log('[DEBUG] No enemies found in result. result keys:', Object.keys(result || {}), 'status keys:', status ? Object.keys(status) : 'no status')
+        }
+        
         if (status) {
           battleStatus.value = {
             ...battleStatus.value,
@@ -320,9 +347,9 @@ export const useGameStore = defineStore('game', () => {
             currentZoneId: status.currentZoneId ?? status.current_zone ?? battleStatus.value.currentZoneId,
             current_enemy: status.currentMonster ?? status.current_enemy ?? battleStatus.value.current_enemy,
             currentMonster: status.currentMonster ?? status.current_enemy ?? battleStatus.value.currentMonster,
-            // 如果 status 中有 currentEnemies 字段（包括 null），使用它；否则保留旧值
-            current_enemies: status.currentEnemies !== undefined ? (status.currentEnemies ?? null) : (status.current_enemies !== undefined ? (status.current_enemies ?? null) : battleStatus.value.current_enemies),
-            currentEnemies: status.currentEnemies !== undefined ? (status.currentEnemies ?? null) : (status.current_enemies !== undefined ? (status.current_enemies ?? null) : battleStatus.value.currentEnemies),
+            // 使用预先处理的 enemies 值，如果找到了就使用，否则保留旧值
+            current_enemies: enemiesToSet !== undefined ? enemiesToSet : battleStatus.value.current_enemies,
+            currentEnemies: enemiesToSet !== undefined ? enemiesToSet : battleStatus.value.currentEnemies,
             battle_count: status.battleCount ?? status.battle_count ?? battleStatus.value.battle_count,
             battleCount: status.battleCount ?? status.battle_count ?? battleStatus.value.battleCount,
             session_kills: status.sessionKills ?? status.totalKills ?? status.session_kills ?? battleStatus.value.session_kills,
@@ -335,17 +362,10 @@ export const useGameStore = defineStore('game', () => {
           }
         }
         
-        // 如果 result 中有 enemies 字段，也更新（包括 null/undefined，用于清除敌人显示）
-        // 优先使用 result.enemies，如果没有则使用 status.currentEnemies
-        if ('enemies' in result && result.enemies !== undefined) {
-          battleStatus.value.current_enemies = result.enemies ?? null
-          battleStatus.value.currentEnemies = result.enemies ?? null
-        } else if (status && 'currentEnemies' in status && status.currentEnemies !== undefined) {
-          battleStatus.value.current_enemies = status.currentEnemies ?? null
-          battleStatus.value.currentEnemies = status.currentEnemies ?? null
-        } else if (status && 'current_enemies' in status && status.current_enemies !== undefined) {
-          battleStatus.value.current_enemies = status.current_enemies ?? null
-          battleStatus.value.currentEnemies = status.current_enemies ?? null
+        // 如果找到了 enemies 值，确保更新（防止上面的逻辑没有正确设置）
+        if (enemiesToSet !== undefined && enemiesToSet !== null) {
+          battleStatus.value.current_enemies = enemiesToSet
+          battleStatus.value.currentEnemies = enemiesToSet
         }
 
         // 检查是否出现技能选择机会（被动/主动）

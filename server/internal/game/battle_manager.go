@@ -173,14 +173,8 @@ func (m *BattleManager) GetOrCreateSession(userID int) *BattleSession {
 	defer m.mu.Unlock()
 
 	if session, exists := m.sessions[userID]; exists {
-		// 如果会话存在但没有地图，尝试从用户数据加载
-		if session.CurrentZone == nil {
-			// 这里可以尝试从用户表获取，但暂时使用默认地图
-			zone, err := m.gameRepo.GetZoneByID("elwynn")
-			if err == nil {
-				session.CurrentZone = zone
-			}
-		}
+		// 如果会话存在但没有地图，不在这里设置默认地图
+		// 让 GetBattleStatus 根据角色阵营来设置正确的默认地图
 		return session
 	}
 
@@ -191,12 +185,7 @@ func (m *BattleManager) GetOrCreateSession(userID int) *BattleSession {
 		CurrentEnemies:   make([]*models.Monster, 0),
 		CurrentTurnIndex: -1, // 初始化为玩家回合
 		RestSpeed:        1.0,
-	}
-	
-	// 尝试设置默认地图（可以根据用户数据设置，但暂时使用 elwynn）
-	zone, err := m.gameRepo.GetZoneByID("elwynn")
-	if err == nil {
-		session.CurrentZone = zone
+		CurrentZone:       nil, // 不在这里设置默认地图，让 GetBattleStatus 根据角色阵营设置
 	}
 	
 	m.sessions[userID] = session
@@ -1781,7 +1770,7 @@ func (m *BattleManager) spawnEnemies(session *BattleSession, playerLevel int, pl
 
 	// 基于玩家角色数量生成敌人数量（加权随机）
 	// 敌人数量范围：max(1, playerCount-2) 到 playerCount+2
-	// 权重：等于玩家数量的权重最高（3），相差1的权重为2，相差2的权重为1
+	// 权重：等于玩家数量的权重最高（5），相差1的权重为2，相差2的权重为1
 	minEnemyCount := 1
 	if playerCount > 2 {
 		minEnemyCount = playerCount - 2
@@ -1796,8 +1785,8 @@ func (m *BattleManager) spawnEnemies(session *BattleSession, playerLevel int, pl
 	weights := make([]enemyCountWeight, 0)
 	for count := minEnemyCount; count <= maxEnemyCount; count++ {
 		diff := int(math.Abs(float64(count - playerCount)))
-		// 权重：相差0（相等）=3，相差1=2，相差2=1
-		weight := 3 - diff
+		// 权重：相差0（相等）=5（提高概率），相差1=2，相差2=1
+		weight := 5 - diff*2
 		if weight < 1 {
 			weight = 1
 		}
@@ -1811,16 +1800,26 @@ func (m *BattleManager) spawnEnemies(session *BattleSession, playerLevel int, pl
 	}
 
 	// 加权随机选择
-	randomValue := rand.Intn(totalWeight)
-	currentWeight := 0
-	enemyCount := minEnemyCount // 默认值
-	for _, w := range weights {
-		currentWeight += w.weight
-		if currentWeight > randomValue {
-			enemyCount = w.count
-			break
+	var enemyCount int
+	if totalWeight <= 0 {
+		// 如果总权重为0（理论上不应该发生），使用默认值
+		enemyCount = playerCount
+	} else {
+		randomValue := rand.Intn(totalWeight)
+		currentWeight := 0
+		enemyCount = minEnemyCount // 默认值
+		for _, w := range weights {
+			currentWeight += w.weight
+			if currentWeight > randomValue {
+				enemyCount = w.count
+				break
+			}
 		}
 	}
+
+	// 调试日志：记录生成的敌人数量
+	fmt.Printf("[DEBUG] Enemy count generation: playerCount=%d, enemyCount=%d, range=[%d,%d]\n", 
+		playerCount, enemyCount, minEnemyCount, maxEnemyCount)
 	session.CurrentEnemies = make([]*models.Monster, 0, enemyCount)
 
 	var enemyNames []string

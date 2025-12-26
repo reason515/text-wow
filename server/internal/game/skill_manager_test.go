@@ -293,14 +293,12 @@ func TestSkillManager_ApplySkillEffects_Charge(t *testing.T) {
 		},
 	}
 	
-	originalRage := character.Resource
-	
 	// 应用技能效果
 	effects := sm.ApplySkillEffects(skillState, character, nil)
 	
-	// 应该获得怒气
-	assert.Equal(t, originalRage+15, character.Resource)
+	// 应该返回怒气获得效果（实际怒气添加由 battle_manager.go 统一处理）
 	assert.Contains(t, effects, "rageGain")
+	assert.Equal(t, 15, effects["rageGain"])
 	
 	// 可能触发眩晕（概率性）
 	_, hasStun := effects["stun"]
