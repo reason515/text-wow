@@ -513,15 +513,17 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 			// 使用技能管理器选择技能
 			var skillState *CharacterSkillState
 			var strategyDecision *SkillDecision
+			var strategy *models.BattleStrategy
+			var battleCtx *BattleContext
 
 			// 优先使用策略执行器
 			hasStrategy := false
 			if m.strategyExecutor != nil {
-				strategy := m.strategyExecutor.GetActiveStrategy(char.ID)
+				strategy = m.strategyExecutor.GetActiveStrategy(char.ID)
 				if strategy != nil {
 					hasStrategy = true
 					// 构建战斗上下文
-					battleCtx := &BattleContext{
+					battleCtx = &BattleContext{
 						Character:    char,
 						Enemies:      aliveEnemies,
 						Allies:       characters,
@@ -536,6 +538,13 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 
 			// 根据策略决策或默认逻辑选择技能
 			if strategyDecision != nil {
+				// 更新目标（无论是普通攻击还是技能，都应该使用策略选择的目标）
+				if strategyDecision.TargetIndex >= 0 && strategyDecision.TargetIndex < len(aliveEnemies) {
+					targetIndex = strategyDecision.TargetIndex
+					target = aliveEnemies[targetIndex]
+					targetHPPercent = float64(target.HP) / float64(target.MaxHP)
+				}
+				
 				if strategyDecision.IsNormalAttack {
 					// 策略决定使用普通攻击
 					skillState = nil
@@ -546,17 +555,19 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 						// 尝试带 warrior_ 前缀
 						skillState = m.skillManager.GetSkillState(char.ID, "warrior_"+strategyDecision.SkillID)
 					}
-					// 更新目标
-					if strategyDecision.TargetIndex >= 0 && strategyDecision.TargetIndex < len(aliveEnemies) {
-						targetIndex = strategyDecision.TargetIndex
-						target = aliveEnemies[targetIndex]
-						targetHPPercent = float64(target.HP) / float64(target.MaxHP)
-					}
 				}
 			} else if hasStrategy {
 				// 有策略但返回 nil，表示没有可用技能或应该使用普通攻击
 				// 不使用 SelectBestSkill，因为它不检查条件规则限制
 				skillState = nil
+				// 即使策略返回nil，也应该根据策略的目标优先级选择目标
+				if strategy != nil {
+					targetIndex = m.strategyExecutor.SelectTargetByStrategy(strategy, battleCtx, "")
+					if targetIndex >= 0 && targetIndex < len(aliveEnemies) {
+						target = aliveEnemies[targetIndex]
+						targetHPPercent = float64(target.HP) / float64(target.MaxHP)
+					}
+				}
 			} else if m.skillManager != nil {
 				// 没有策略，使用默认逻辑
 				skillState = m.skillManager.SelectBestSkill(char.ID, char.Resource, targetHPPercent, hasMultipleEnemies, m.buffManager)

@@ -83,8 +83,11 @@ func (e *StrategyExecutor) ExecuteStrategy(strategy *models.BattleStrategy, ctx 
 			if urgentDecision != nil {
 				return urgentDecision
 			}
+			// 普通攻击也需要选择目标（根据策略的目标优先级）
+			targetIndex := e.selectTarget(strategy, ctx, "")
 			return &SkillDecision{
 				IsNormalAttack: true,
+				TargetIndex:    targetIndex,
 				Reason:         "资源低于阈值，使用普通攻击积攒资源",
 			}
 		}
@@ -99,8 +102,11 @@ func (e *StrategyExecutor) ExecuteStrategy(strategy *models.BattleStrategy, ctx 
 		if e.evaluateCondition(&rule.Condition, ctx) {
 			// 检查技能是否可用
 			if rule.Action.Type == "normal_attack" {
+				// 普通攻击也需要选择目标（根据策略的目标优先级）
+				targetIndex := e.selectTarget(strategy, ctx, "")
 				return &SkillDecision{
 					IsNormalAttack: true,
+					TargetIndex:    targetIndex,
 					Reason:         "条件规则触发: " + rule.Action.Comment,
 				}
 			}
@@ -373,6 +379,11 @@ func (e *StrategyExecutor) selectTarget(strategy *models.BattleStrategy, ctx *Ba
 
 	// 使用默认目标策略
 	return e.selectTargetByPriority(strategy.TargetPriority, ctx, skillID)
+}
+
+// SelectTargetByStrategy 根据策略选择目标（公共方法，供外部调用）
+func (e *StrategyExecutor) SelectTargetByStrategy(strategy *models.BattleStrategy, ctx *BattleContext, skillID string) int {
+	return e.selectTarget(strategy, ctx, skillID)
 }
 
 // selectTargetByPriority 根据优先级选择目标
