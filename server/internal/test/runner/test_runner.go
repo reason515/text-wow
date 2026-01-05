@@ -289,7 +289,7 @@ func (tr *TestRunner) executeInstruction(instruction string) error {
 		return tr.executeApplyCrit()
 	} else if strings.Contains(instruction, "计算伤害") {
 		return tr.executeCalculateDamage(instruction)
-	} else if strings.Contains(instruction, "使用技能") || strings.Contains(instruction, "角色使用技能") {
+	} else if strings.Contains(instruction, "使用技能") || strings.Contains(instruction, "角色使用技能") || (strings.Contains(instruction, "使用") && strings.Contains(instruction, "技能")) {
 		return tr.executeUseSkill(instruction)
 	} else if strings.Contains(instruction, "创建一个") && strings.Contains(instruction, "技能") {
 		return tr.createSkill(instruction)
@@ -1926,10 +1926,13 @@ func (tr *TestRunner) handleAttackSkill(char *models.Character, skill *models.Sk
 		}
 	}
 	
+	fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: isAOE=%v, monsters count=%d\n", isAOE, len(tr.context.Monsters))
 	if isAOE {
 		// AOE技能：对所有怪物造成伤害
+		fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: ENTERING AOE branch, processing %d monsters\n", len(tr.context.Monsters))
 		monsterIndex := 1
 		for key, monster := range tr.context.Monsters {
+			fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: processing monster[%s], index=%d\n", key, monsterIndex)
 			if monster != nil {
 				// 记录初始HP
 				initialHP := monster.HP
@@ -1970,8 +1973,10 @@ func (tr *TestRunner) handleAttackSkill(char *models.Character, skill *models.Sk
 				
 				// 设置伤害值到上下文
 				damageKey := fmt.Sprintf("monster_%d.hp_damage", monsterIndex)
+				fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: setting %s=%d\n", damageKey, hpDamage)
 				tr.assertion.SetContext(damageKey, hpDamage)
 				tr.context.Variables[damageKey] = hpDamage
+				fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: set %s in Variables and assertion context\n", damageKey)
 				tr.context.Monsters[key] = monster
 				monsterIndex++
 			}
