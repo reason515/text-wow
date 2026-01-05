@@ -1373,6 +1373,7 @@ func (tr *TestRunner) createSkill(instruction string) error {
 			skill.Type = "attack"
 		}
 		tr.context.Variables["skill_is_aoe"] = true
+		fmt.Fprintf(os.Stderr, "[DEBUG] createSkill: detected AOE skill, set skill_is_aoe=true\n")
 	}
 	
 	// 如果技能类型仍未设置，默认为攻击技能
@@ -1854,7 +1855,10 @@ func (tr *TestRunner) handleAttackSkill(char *models.Character, skill *models.Sk
 	if aoeVal, exists := tr.context.Variables["skill_is_aoe"]; exists {
 		if aoe, ok := aoeVal.(bool); ok {
 			isAOE = aoe
+			fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: isAOE=%v from Variables\n", isAOE)
 		}
+	} else {
+		fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: skill_is_aoe NOT in Variables\n")
 	}
 	
 	// 获取伤害倍率（强制从 Variables 获取，因为传入的 skill.ScalingRatio 可能不可靠）
