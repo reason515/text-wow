@@ -1,0 +1,154 @@
+# 战斗系统 - 队伍战斗测试
+test_suite: "战斗系统 - 队伍战斗"
+description: "测试多角色队伍战斗，包括队伍协同、仇恨系统、队伍策略等"
+
+tests:
+  - name: "3人队伍基础战斗测试"
+    description: "测试3人队伍（战士、牧师、法师）的基础战斗流程"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个3人队伍：1号位战士(坦克)，2号位牧师(治疗)，3号位法师(DPS)"
+      - "战士：HP=50，攻击力=15，防御力=20"
+      - "牧师：HP=30，法术攻击力=10，治疗力=15"
+      - "法师：HP=25，法术攻击力=20"
+      - "创建一个精英怪物，HP=100，攻击力=12"
+      - "初始化战斗系统"
+    steps:
+      - action: "开始战斗"
+        expected: "战斗状态为进行中，所有角色进入战斗"
+        timeout: 5
+      - action: "执行一个回合"
+        expected: "所有角色按速度顺序行动"
+        assertions:
+          - "战士应该优先攻击怪物"
+          - "牧师应该检查队友血量，必要时治疗"
+          - "法师应该攻击怪物"
+      - action: "怪物攻击"
+        expected: "怪物应该优先攻击仇恨最高的角色（战士）"
+        assertions:
+          - "战士应该受到伤害"
+          - "战斗日志应该包含受击信息"
+      - action: "继续战斗直到怪物死亡"
+        expected: "战斗结束，队伍获胜"
+        max_rounds: 50
+    assertions:
+      - type: "greater_than"
+        target: "team_alive_count"
+        expected: "0"
+        message: "至少有一个角色存活"
+      - type: "equals"
+        target: "monster.hp"
+        expected: "0"
+        message: "怪物HP应该等于0"
+      - type: "greater_than"
+        target: "team_total_exp"
+        expected: "0"
+        message: "队伍应该获得经验值"
+
+  - name: "队伍仇恨系统测试"
+    description: "测试队伍中的仇恨系统，怪物应该优先攻击仇恨最高的角色"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个2人队伍：战士(高仇恨)，法师(低仇恨)"
+      - "创建一个怪物，HP=50"
+      - "初始化战斗系统"
+    steps:
+      - action: "战士使用高仇恨技能攻击怪物"
+        expected: "战士的仇恨值大幅增加"
+      - action: "法师使用低仇恨技能攻击怪物"
+        expected: "法师的仇恨值小幅增加"
+      - action: "怪物选择攻击目标"
+        expected: "怪物应该攻击仇恨最高的战士"
+        assertions:
+          - "战士应该受到攻击"
+          - "法师不应该受到攻击"
+    assertions:
+      - type: "greater_than"
+        target: "warrior.threat"
+        expected: "mage.threat"
+        message: "战士的仇恨应该高于法师"
+
+  - name: "队伍治疗协同测试"
+    description: "测试队伍中的治疗协同，牧师应该优先治疗低血量队友"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个3人队伍：战士、牧师、法师"
+      - "战士：HP=10/50（低血量）"
+      - "牧师：HP=30/30（满血）"
+      - "法师：HP=20/25（中等血量）"
+      - "创建一个怪物"
+      - "初始化战斗系统"
+    steps:
+      - action: "执行一个回合"
+        expected: "牧师应该优先治疗低血量的战士"
+        assertions:
+          - "牧师应该使用治疗技能"
+          - "战士应该受到治疗"
+          - "战士的HP应该增加"
+    assertions:
+      - type: "greater_than"
+        target: "warrior.hp"
+        expected: "10"
+        message: "战士的HP应该增加"
+
+  - name: "5人满编队伍战斗测试"
+    description: "测试5人满编队伍的战斗流程"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "创建一个5人队伍：战士(坦克)、圣骑士(副坦克)、牧师(治疗)、法师(DPS)、盗贼(DPS)"
+      - "创建一个Boss怪物，HP=200，攻击力=20"
+      - "初始化战斗系统"
+    steps:
+      - action: "开始战斗"
+        expected: "所有5个角色进入战斗"
+      - action: "执行多个回合"
+        expected: "队伍协同作战，击败Boss"
+        max_rounds: 100
+    assertions:
+      - type: "equals"
+        target: "monster.hp"
+        expected: "0"
+        message: "Boss应该被击败"
+      - type: "greater_than"
+        target: "team_total_exp"
+        expected: "0"
+        message: "队伍应该获得经验值"
+
+  - name: "队伍成员死亡处理测试"
+    description: "测试队伍成员死亡后的处理"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "创建一个3人队伍：战士、牧师、法师"
+      - "战士：HP=1（濒死）"
+      - "创建一个怪物，攻击力=10"
+      - "初始化战斗系统"
+    steps:
+      - action: "怪物攻击战士"
+        expected: "战士受到致命伤害，HP降至0"
+      - action: "检查队伍状态"
+        expected: "战士死亡，但队伍战斗继续"
+        assertions:
+          - "战士的is_dead应该为true"
+          - "牧师和法师应该继续战斗"
+    assertions:
+      - type: "equals"
+        target: "warrior.hp"
+        expected: "0"
+        message: "战士HP应该为0"
+      - type: "equals"
+        target: "warrior.is_dead"
+        expected: "true"
+        message: "战士应该标记为死亡"
+
+
+
+
+
+
+
+

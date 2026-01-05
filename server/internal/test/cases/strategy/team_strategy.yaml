@@ -1,0 +1,186 @@
+# 策略系统 - 队伍策略测试
+test_suite: "策略系统 - 队伍策略"
+description: "测试队伍策略系统，包括角色间配合、协同技能、队伍策略配置等"
+
+tests:
+  - name: "队伍角色分工测试"
+    description: "测试队伍中不同角色的策略分工"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个3人队伍：战士（坦克）、牧师（治疗）、法师（DPS）"
+      - "配置队伍策略：战士优先使用高仇恨技能，牧师优先治疗低血量队友，法师优先攻击敌人"
+    steps:
+      - action: "执行一个回合"
+        expected: "每个角色按照自己的策略行动"
+        assertions:
+          - "战士应该使用高仇恨技能"
+          - "牧师应该检查队友血量，必要时治疗"
+          - "法师应该攻击敌人"
+    assertions:
+      - type: "equals"
+        target: "warrior.selected_skill.type"
+        expected: "high_threat"
+        message: "战士应该使用高仇恨技能"
+      - type: "contains"
+        target: "priest.action"
+        expected: "[heal, attack]"
+        message: "牧师应该治疗或攻击"
+
+  - name: "队伍协同技能测试"
+    description: "测试队伍中的协同技能（如战士嘲讽+法师AOE）"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个3人队伍：战士、法师"
+      - "创建3个敌人"
+      - "配置协同策略：战士先使用嘲讽聚集敌人，法师再使用AOE技能"
+    steps:
+      - action: "战士使用嘲讽技能"
+        expected: "所有敌人攻击目标转向战士"
+      - action: "法师使用AOE技能"
+        expected: "AOE技能命中所有敌人"
+    assertions:
+      - type: "equals"
+        target: "all_enemies.target"
+        expected: "warrior.id"
+        message: "所有敌人应该攻击战士"
+      - type: "greater_than"
+        target: "aoe_damage_dealt"
+        expected: "0"
+        message: "AOE技能应该造成伤害"
+
+  - name: "队伍治疗优先级测试"
+    description: "测试队伍中治疗的优先级（优先治疗低血量队友）"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个3人队伍：战士（HP=10/50），牧师，法师（HP=40/50）"
+      - "配置策略：牧师优先治疗HP最低的队友"
+    steps:
+      - action: "牧师执行策略"
+        expected: "牧师应该优先治疗战士（HP最低）"
+    assertions:
+      - type: "equals"
+        target: "priest.heal_target"
+        expected: "warrior.id"
+        message: "牧师应该治疗战士（HP最低）"
+
+  - name: "队伍仇恨管理测试"
+    description: "测试队伍中的仇恨管理策略"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个3人队伍：战士（高仇恨），法师（低仇恨）"
+      - "配置策略：战士保持高仇恨，法师使用低仇恨技能"
+    steps:
+      - action: "执行多个回合"
+        expected: "战士仇恨应该高于法师，怪物优先攻击战士"
+    assertions:
+      - type: "greater_than"
+        target: "warrior.threat"
+        expected: "mage.threat"
+        message: "战士仇恨应该高于法师"
+      - type: "equals"
+        target: "monster.target"
+        expected: "warrior.id"
+        message: "怪物应该优先攻击战士"
+
+  - name: "队伍Buff共享测试"
+    description: "测试队伍中的Buff共享策略"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "创建一个3人队伍：战士、牧师、法师"
+      - "配置策略：牧师优先给队伍施加攻击力Buff"
+    steps:
+      - action: "牧师使用群体Buff技能"
+        expected: "所有队友获得攻击力Buff"
+    assertions:
+      - type: "equals"
+        target: "warrior.has_buff_attack"
+        expected: "true"
+        message: "战士应该获得攻击力Buff"
+      - type: "equals"
+        target: "mage.has_buff_attack"
+        expected: "true"
+        message: "法师应该获得攻击力Buff"
+
+  - name: "队伍目标选择测试"
+    description: "测试队伍中的目标选择策略（集火同一目标）"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个3人队伍：战士、法师"
+      - "创建2个敌人：敌人A（HP=10），敌人B（HP=100）"
+      - "配置策略：优先攻击HP最低的敌人（集火）"
+    steps:
+      - action: "执行一个回合"
+        expected: "所有角色应该攻击敌人A（HP最低）"
+    assertions:
+      - type: "equals"
+        target: "warrior.target"
+        expected: "enemy_a.id"
+        message: "战士应该攻击敌人A"
+      - type: "equals"
+        target: "mage.target"
+        expected: "enemy_a.id"
+        message: "法师应该攻击敌人A"
+
+  - name: "队伍策略切换测试"
+    description: "测试根据战斗情况切换队伍策略"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "创建一个3人队伍"
+      - "配置策略：正常情况使用攻击策略，紧急情况（有队友HP<20%）切换到防御策略"
+    steps:
+      - action: "战斗开始，所有队友HP>50%"
+        expected: "使用攻击策略"
+      - action: "战士HP降至15%"
+        expected: "切换到防御策略，优先治疗和保护"
+    assertions:
+      - type: "equals"
+        target: "team_strategy_mode"
+        expected: "defensive"
+        message: "应该切换到防御策略"
+
+  - name: "队伍角色死亡处理测试"
+    description: "测试队伍成员死亡后的策略调整"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个3人队伍：战士、牧师、法师"
+      - "战士HP=0（死亡）"
+    steps:
+      - action: "执行策略"
+        expected: "策略应该调整，不再考虑战士，优先保护存活角色"
+    assertions:
+      - type: "not_contains"
+        target: "team_strategy.targets"
+        expected: "warrior.id"
+        message: "策略不应该考虑已死亡的战士"
+
+  - name: "队伍资源管理测试"
+    description: "测试队伍中的资源管理策略（MP分配）"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "创建一个3人队伍：战士、牧师（MP=20/100）、法师（MP=80/100）"
+      - "配置策略：MP充足的法师优先使用高消耗技能，MP不足的牧师优先使用低消耗技能"
+    steps:
+      - action: "执行策略"
+        expected: "法师使用高消耗技能，牧师使用低消耗技能"
+    assertions:
+      - type: "greater_than"
+        target: "mage.skill_mp_cost"
+        expected: "priest.skill_mp_cost"
+        message: "法师技能消耗应该高于牧师"
+
+
+
+
+
+
+
+

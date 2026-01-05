@@ -1,0 +1,114 @@
+# 配置管理系统测试
+test_suite: "配置管理系统"
+description: "测试配置加载、热更新和版本管理功能"
+
+tests:
+  - name: "配置管理器初始化测试"
+    description: "测试配置管理器的基本初始化"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "初始化配置管理器"
+    steps:
+      - action: "检查配置管理器是否已初始化"
+        expected: "配置管理器应该已初始化"
+    assertions:
+      - type: "equals"
+        target: "config_manager_initialized"
+        expected: "true"
+        message: "配置管理器应该已初始化"
+
+  - name: "配置加载测试"
+    description: "测试配置加载功能"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "初始化配置管理器"
+    steps:
+      - action: "加载怪物配置"
+        expected: "应该成功加载怪物配置"
+      - action: "加载技能配置"
+        expected: "应该成功加载技能配置"
+      - action: "加载物品配置"
+        expected: "应该成功加载物品配置"
+    assertions:
+      - type: "equals"
+        target: "monster_config_loaded"
+        expected: "true"
+        message: "怪物配置应该已加载"
+      - type: "equals"
+        target: "skill_config_loaded"
+        expected: "true"
+        message: "技能配置应该已加载"
+      - type: "equals"
+        target: "item_config_loaded"
+        expected: "true"
+        message: "物品配置应该已加载"
+
+  - name: "配置查询测试"
+    description: "测试配置查询接口"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "初始化配置管理器"
+      - "加载怪物配置"
+    steps:
+      - action: "查询怪物配置"
+        expected: "应该返回怪物配置数据"
+    assertions:
+      - type: "equals"
+        target: "monster_config_found"
+        expected: "true"
+        message: "应该能找到怪物配置"
+
+  - name: "配置热更新测试"
+    description: "测试配置热更新功能"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "初始化配置管理器"
+      - "加载怪物配置"
+    steps:
+      - action: "获取当前配置版本"
+        expected: "应该返回当前配置版本号"
+      - action: "重新加载配置（热更新）"
+        expected: "应该成功重新加载配置"
+      - action: "检查配置版本是否更新"
+        expected: "配置版本应该已更新"
+    assertions:
+      - type: "greater_than_or_equal"
+        target: "config_version_after_reload"
+        expected: "config_version_before_reload"
+        message: "重新加载后配置版本应该大于等于之前的版本"
+
+  - name: "配置变更监听测试"
+    description: "测试配置变更监听器功能"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "初始化配置管理器"
+      - "注册配置变更监听器"
+    steps:
+      - action: "触发配置变更"
+        expected: "监听器应该收到变更通知"
+    assertions:
+      - type: "equals"
+        target: "config_change_notified"
+        expected: "true"
+        message: "配置变更应该被通知"
+
+  - name: "无效配置类型测试"
+    description: "测试加载无效配置类型时的错误处理"
+    category: "unit"
+    priority: "medium"
+    setup:
+      - "初始化配置管理器"
+    steps:
+      - action: "尝试加载无效配置类型"
+        expected: "应该返回错误"
+    assertions:
+      - type: "equals"
+        target: "config_load_error"
+        expected: "true"
+        message: "加载无效配置类型应该返回错误"
+

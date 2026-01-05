@@ -1,0 +1,194 @@
+# 战斗系统 - 回合顺序测试
+test_suite: "战斗系统 - 回合顺序"
+description: "测试速度排序的回合系统，包括速度计算、回合顺序、多角色/多怪物回合"
+
+tests:
+  - name: "速度排序基础测试"
+    description: "测试按速度从高到低排序回合顺序"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个角色，敏捷=100"
+      - "创建一个怪物，速度=80"
+    steps:
+      - action: "构建回合顺序"
+        expected: "角色应该排在怪物前面（速度更高）"
+    assertions:
+      - type: "equals"
+        target: "turn_order[0].type"
+        expected: "character"
+        message: "速度高的角色应该先行动"
+      - type: "greater_than"
+        target: "turn_order[0].speed"
+        expected: "turn_order[1].speed"
+        message: "回合顺序应该按速度从高到低"
+
+  - name: "多角色速度排序测试"
+    description: "测试多个角色按速度排序"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建3个角色：角色1（敏捷=30，速度=60），角色2（敏捷=50，速度=100），角色3（敏捷=40，速度=80）"
+    steps:
+      - action: "构建回合顺序"
+        expected: "角色应该按速度排序：角色2 > 角色3 > 角色1"
+    assertions:
+      - type: "equals"
+        target: "turn_order[0].character.id"
+        expected: "character_2"
+        message: "速度最高的角色2应该先行动"
+      - type: "equals"
+        target: "turn_order[1].character.id"
+        expected: "character_3"
+        message: "角色3应该第二个行动"
+      - type: "equals"
+        target: "turn_order[2].character.id"
+        expected: "character_1"
+        message: "角色1应该最后行动"
+
+  - name: "多怪物速度排序测试"
+    description: "测试多个怪物按速度排序"
+    category: "unit"
+    priority: "medium"
+    setup:
+      - "创建3个怪物：怪物1（速度=40），怪物2（速度=80），怪物3（速度=60）"
+    steps:
+      - action: "构建回合顺序"
+        expected: "怪物应该按速度排序：怪物2 > 怪物3 > 怪物1"
+    assertions:
+      - type: "equals"
+        target: "turn_order[0].monster.id"
+        expected: "monster_2"
+        message: "速度最高的怪物2应该先行动"
+      - type: "equals"
+        target: "turn_order[1].monster.id"
+        expected: "monster_3"
+        message: "怪物3应该第二个行动"
+      - type: "equals"
+        target: "turn_order[2].monster.id"
+        expected: "monster_1"
+        message: "怪物1应该最后行动"
+
+  - name: "混合速度排序测试"
+    description: "测试角色和怪物混合按速度排序"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色，敏捷=80"
+      - "创建2个怪物：怪物1（速度=100），怪物2（速度=60）"
+    steps:
+      - action: "构建回合顺序"
+        expected: "应该按速度排序：怪物1 > 角色 > 怪物2"
+    assertions:
+      - type: "equals"
+        target: "turn_order[0].type"
+        expected: "monster"
+        message: "速度最高的怪物1应该先行动"
+      - type: "equals"
+        target: "turn_order[1].type"
+        expected: "character"
+        message: "角色应该第二个行动"
+      - type: "equals"
+        target: "turn_order[2].type"
+        expected: "monster"
+        message: "怪物2应该最后行动"
+
+  - name: "速度相同时随机排序测试"
+    description: "测试速度相同时的随机排序"
+    category: "unit"
+    priority: "medium"
+    setup:
+      - "创建2个角色：角色1（敏捷=50），角色2（敏捷=50）"
+      - "创建2个怪物：怪物1（速度=50），怪物2（速度=50）"
+    steps:
+      - action: "构建回合顺序（多次测试）"
+        expected: "速度相同时应该随机排序"
+    assertions:
+      - type: "equals"
+        target: "turn_order_length"
+        expected: "4"
+        message: "应该有4个参与者"
+
+  - name: "回合轮转测试"
+    description: "测试回合轮转机制（所有参与者行动完毕后开始新的一轮）"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色，敏捷=100"
+      - "创建一个怪物，速度=80"
+      - "构建回合顺序"
+    steps:
+      - action: "执行第1回合（角色行动）"
+        expected: "角色行动"
+      - action: "执行第2回合（怪物行动）"
+        expected: "怪物行动"
+      - action: "执行第3回合"
+        expected: "应该开始新的一轮，角色再次行动"
+    assertions:
+      - type: "equals"
+        target: "current_round"
+        expected: "2"
+        message: "应该进入第2轮"
+      - type: "equals"
+        target: "current_turn_participant.type"
+        expected: "character"
+        message: "新的一轮应该从角色开始"
+
+  - name: "死亡参与者跳过测试"
+    description: "测试死亡的角色/怪物应该从回合队列中移除"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建2个角色：角色1（敏捷=100），角色2（敏捷=80）"
+      - "创建1个怪物，速度=90"
+    steps:
+      - action: "构建回合顺序"
+        expected: "应该有3个参与者"
+      - action: "角色1死亡（HP=0）"
+        expected: "角色1应该从回合队列中移除"
+      - action: "重新构建回合顺序"
+        expected: "应该只有2个参与者（角色2和怪物）"
+    assertions:
+      - type: "equals"
+        target: "turn_order_length_after_death"
+        expected: "2"
+        message: "死亡后应该只有2个参与者"
+      - type: "not_contains"
+        target: "turn_order_participants"
+        expected: "character_1"
+        message: "死亡的角色1不应该在回合队列中"
+
+  - name: "回合顺序动态更新测试"
+    description: "测试战斗中速度变化时回合顺序的更新（注意：需要测试运行器支持Buff后重新计算速度）"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "创建2个角色：角色1（敏捷=50），角色2（敏捷=100）"
+      - "构建回合顺序"
+    steps:
+      - action: "给角色1添加加速Buff（敏捷+100）"
+        expected: "角色1敏捷应该增加"
+      - action: "重新构建回合顺序"
+        expected: "回合顺序应该更新（如果Buff生效）"
+    assertions:
+      - type: "equals"
+        target: "turn_order_length"
+        expected: "2"
+        message: "应该有2个参与者"
+      - type: "greater_than"
+        target: "turn_order[0].speed"
+        expected: "0"
+        message: "第一个参与者应该有速度值"
+
+  - name: "回合顺序空队列测试"
+    description: "测试所有参与者死亡后回合顺序的处理（注意：需要测试运行器支持完整的战斗流程和死亡处理）"
+    category: "documentation"
+    priority: "medium"
+    setup:
+      - "回合顺序空队列功能需要在实际游戏系统中测试"
+    steps:
+      - action: "这些功能需要通过Go单元测试进行验证"
+        expected: "参考 server/internal/game/battle_manager_test.go 中的 TestTurnOrder_* 测试"
+    assertions: []
+
+

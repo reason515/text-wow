@@ -1,0 +1,117 @@
+# 战斗统计系统 - 策略优化测试
+test_suite: "战斗统计系统 - 策略优化"
+description: "测试基于战斗统计数据的策略优化建议功能"
+
+tests:
+  - name: "技能使用效率分析测试"
+    description: "测试分析技能使用效率，提供优化建议"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建战斗统计数据：技能A伤害=100，消耗=50MP；技能B伤害=80，消耗=20MP"
+    steps:
+      - action: "分析技能使用效率"
+        expected: "系统应该建议优先使用技能B（伤害/MP更高）"
+    assertions:
+      - type: "equals"
+        target: "optimization_suggestion.priority_skill"
+        expected: "skill_b"
+        message: "应该建议优先使用技能B"
+
+  - name: "暴击率优化建议测试"
+    description: "测试基于暴击率数据提供优化建议"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建战斗统计数据：暴击率=5%（较低）"
+    steps:
+      - action: "分析暴击率"
+        expected: "系统应该建议提升暴击率（通过装备或技能）"
+    assertions:
+      - type: "contains"
+        target: "optimization_suggestion.content"
+        expected: "提升暴击率"
+        message: "应该建议提升暴击率"
+
+  - name: "治疗时机优化建议测试"
+    description: "测试基于治疗数据提供治疗时机优化建议"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "创建战斗统计数据：多次在HP>80%时使用治疗技能"
+    steps:
+      - action: "分析治疗时机"
+        expected: "系统应该建议在HP<50%时再使用治疗技能"
+    assertions:
+      - type: "contains"
+        target: "optimization_suggestion.content"
+        expected: "治疗时机"
+        message: "应该建议优化治疗时机"
+
+  - name: "技能组合优化建议测试"
+    description: "测试基于技能使用数据提供技能组合建议"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "创建战斗统计数据：技能A和技能B经常一起使用，效果很好"
+    steps:
+      - action: "分析技能组合"
+        expected: "系统应该建议将技能A和技能B组合使用"
+    assertions:
+      - type: "contains"
+        target: "optimization_suggestion.content"
+        expected: "技能组合"
+        message: "应该建议技能组合"
+
+  - name: "资源管理优化建议测试"
+    description: "测试基于资源使用数据提供资源管理建议"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "创建战斗统计数据：多次在MP<20%时使用高消耗技能，导致MP不足"
+    steps:
+      - action: "分析资源管理"
+        expected: "系统应该建议在MP充足时使用高消耗技能，MP不足时使用低消耗技能"
+    assertions:
+      - type: "contains"
+        target: "optimization_suggestion.content"
+        expected: "资源管理"
+        message: "应该建议优化资源管理"
+
+  - name: "目标选择优化建议测试"
+    description: "测试基于目标选择数据提供优化建议"
+    category: "integration"
+    priority: "low"
+    setup:
+      - "创建战斗统计数据：经常攻击HP最高的敌人，战斗效率低"
+    steps:
+      - action: "分析目标选择"
+        expected: "系统应该建议优先攻击HP最低的敌人（集火）"
+    assertions:
+      - type: "contains"
+        target: "optimization_suggestion.content"
+        expected: "目标选择"
+        message: "应该建议优化目标选择"
+
+  - name: "装备搭配优化建议测试"
+    description: "测试基于战斗数据提供装备搭配建议"
+    category: "integration"
+    priority: "low"
+    setup:
+      - "创建战斗统计数据：物理伤害占比90%，但角色有高魔法攻击装备"
+    steps:
+      - action: "分析装备搭配"
+        expected: "系统应该建议使用物理攻击装备，而不是魔法攻击装备"
+    assertions:
+      - type: "contains"
+        target: "optimization_suggestion.content"
+        expected: "装备搭配"
+        message: "应该建议优化装备搭配"
+
+
+
+
+
+
+
+

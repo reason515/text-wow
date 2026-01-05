@@ -1,0 +1,54 @@
+# 地图系统 - 区域管理测试
+test_suite: "地图系统 - 区域管理"
+description: "测试区域加载、缓存、查询等功能"
+
+tests:
+  - name: "区域加载测试"
+    description: "测试从数据库加载区域并缓存"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "初始化地图管理器"
+    steps:
+      - action: "加载区域 elwynn"
+        expected: "区域应该成功加载并缓存"
+    assertions:
+      - type: "not_equals"
+        target: "zone"
+        expected: "nil"
+        message: "区域应该成功加载"
+
+  - name: "区域查询测试"
+    description: "测试根据等级和阵营查询可用区域"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "初始化地图管理器"
+    steps:
+      - action: "查询等级10、阵营alliance的可用区域"
+        expected: "应该返回符合条件的区域列表"
+    assertions:
+      - type: "greater_than"
+        target: "available_zones_count"
+        expected: "0"
+        message: "应该至少有一个可用区域"
+
+  - name: "区域解锁检查测试"
+    description: "测试区域解锁状态检查"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个用户"
+      - "初始化地图管理器"
+    steps:
+      - action: "检查区域 elwynn 的解锁状态"
+        expected: "应该返回解锁状态"
+    assertions:
+      - type: "equals"
+        target: "zone_unlocked"
+        expected: "true"
+        message: "默认区域应该已解锁"
+
+
+
+

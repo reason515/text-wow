@@ -1,0 +1,158 @@
+# 策略系统 - 条件规则测试
+test_suite: "策略系统 - 条件规则"
+description: "测试策略系统中的条件规则，包括HP条件、MP条件、Buff条件、敌人条件等"
+
+tests:
+  - name: "HP条件规则测试"
+    description: "测试基于HP百分比的条件判断"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色，HP=50/100（50%）"
+      - "配置策略：如果HP<60%，使用治疗技能"
+    steps:
+      - action: "执行策略判断"
+        expected: "策略应该选择治疗技能"
+    assertions:
+      - type: "equals"
+        target: "selected_skill.type"
+        expected: "heal"
+        message: "应该选择治疗技能"
+
+  - name: "MP条件规则测试"
+    description: "测试基于MP百分比的条件判断"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色，MP=20/100（20%）"
+      - "配置策略：如果MP<30%，使用基础攻击"
+    steps:
+      - action: "执行策略判断"
+        expected: "策略应该选择基础攻击（节省MP）"
+    assertions:
+      - type: "equals"
+        target: "selected_skill.type"
+        expected: "basic_attack"
+        message: "应该选择基础攻击"
+
+  - name: "敌人HP条件测试"
+    description: "测试基于敌人HP的条件判断"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色"
+      - "创建一个敌人，HP=10/100（10%）"
+      - "配置策略：如果敌人HP<20%，使用斩杀技能"
+    steps:
+      - action: "执行策略判断"
+        expected: "策略应该选择斩杀技能"
+    assertions:
+      - type: "equals"
+        target: "selected_skill.type"
+        expected: "execute"
+        message: "应该选择斩杀技能"
+
+  - name: "Buff条件测试"
+    description: "测试基于Buff状态的条件判断"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色，没有攻击力Buff"
+      - "配置策略：如果没有攻击力Buff，使用战斗怒吼"
+    steps:
+      - action: "执行策略判断"
+        expected: "策略应该选择战斗怒吼技能"
+    assertions:
+      - type: "equals"
+        target: "selected_skill.type"
+        expected: "battle_shout"
+        message: "应该选择战斗怒吼技能"
+
+  - name: "Debuff条件测试"
+    description: "测试基于Debuff状态的条件判断"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色，受到减速Debuff"
+      - "配置策略：如果受到减速Debuff，使用净化技能"
+    steps:
+      - action: "执行策略判断"
+        expected: "策略应该选择净化技能"
+    assertions:
+      - type: "equals"
+        target: "selected_skill.type"
+        expected: "dispel"
+        message: "应该选择净化技能"
+
+  - name: "敌人数量条件测试"
+    description: "测试基于敌人数量的条件判断"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "创建一个角色"
+      - "创建3个敌人"
+      - "配置策略：如果敌人数量>=3，使用AOE技能"
+    steps:
+      - action: "执行策略判断"
+        expected: "策略应该选择AOE技能"
+    assertions:
+      - type: "equals"
+        target: "selected_skill.type"
+        expected: "aoe"
+        message: "应该选择AOE技能"
+
+  - name: "复合条件测试"
+    description: "测试多个条件组合的判断"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色，HP=40/100，MP=50/100"
+      - "配置策略：如果HP<50%且MP>30%，使用治疗技能"
+    steps:
+      - action: "执行策略判断"
+        expected: "策略应该选择治疗技能（满足所有条件）"
+    assertions:
+      - type: "equals"
+        target: "selected_skill.type"
+        expected: "heal"
+        message: "应该选择治疗技能"
+
+  - name: "条件优先级测试"
+    description: "测试多个条件规则的优先级"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色，HP=30/100，MP=20/100"
+      - "配置策略：规则1（优先级高）：如果HP<40%，使用治疗；规则2（优先级低）：如果MP<30%，使用基础攻击"
+    steps:
+      - action: "执行策略判断"
+        expected: "策略应该选择规则1（治疗），因为优先级更高"
+    assertions:
+      - type: "equals"
+        target: "selected_skill.type"
+        expected: "heal"
+        message: "应该选择治疗技能（高优先级规则）"
+
+  - name: "条件不满足测试"
+    description: "测试所有条件都不满足时的默认行为"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "创建一个角色，HP=80/100，MP=80/100"
+      - "配置策略：如果HP<50%，使用治疗；否则使用攻击技能"
+    steps:
+      - action: "执行策略判断"
+        expected: "策略应该选择默认攻击技能"
+    assertions:
+      - type: "equals"
+        target: "selected_skill.type"
+        expected: "attack"
+        message: "应该选择默认攻击技能"
+
+
+
+
+
+
+
+

@@ -188,27 +188,49 @@ type ZoneExploration struct {
 
 // Monster 怪物
 type Monster struct {
-	ID              string  `json:"id"`
-	ZoneID          string  `json:"zoneId"`
-	Name            string  `json:"name"`
-	Level           int     `json:"level"`
-	Type            string  `json:"type"` // normal/elite/boss
-	HP              int     `json:"hp"`
-	MaxHP           int     `json:"maxHp"`
-	PhysicalAttack  int     `json:"physicalAttack"`
-	MagicAttack     int     `json:"magicAttack"`
-	PhysicalDefense int     `json:"physicalDefense"`
-	MagicDefense    int     `json:"magicDefense"`
-	AttackType      string  `json:"attackType"`      // physical/magic
-	PhysCritRate    float64 `json:"physCritRate"`    // 物理暴击率
-	PhysCritDamage  float64 `json:"physCritDamage"`  // 物理暴击伤害
-	SpellCritRate   float64 `json:"spellCritRate"`   // 法术暴击率
-	SpellCritDamage float64 `json:"spellCritDamage"` // 法术暴击伤害
-	DodgeRate       float64 `json:"dodgeRate"`       // 闪避率
-	ExpReward       int     `json:"expReward"`
-	GoldMin         int     `json:"goldMin"`
-	GoldMax         int     `json:"goldMax"`
-	SpawnWeight     int     `json:"spawnWeight"`
+	ID              string   `json:"id"`
+	ZoneID          string   `json:"zoneId"`
+	Name            string   `json:"name"`
+	Level           int      `json:"level"`
+	Type            string   `json:"type"` // normal/elite/boss/special
+	HP              int      `json:"hp"`
+	MaxHP           int      `json:"maxHp"`
+	MP              int      `json:"mp"`
+	MaxMP           int      `json:"maxMp"`
+	PhysicalAttack  int      `json:"physicalAttack"`
+	MagicAttack     int      `json:"magicAttack"`
+	PhysicalDefense int      `json:"physicalDefense"`
+	MagicDefense    int      `json:"magicDefense"`
+	AttackType      string   `json:"attackType"`      // physical/magic
+	PhysCritRate    float64  `json:"physCritRate"`    // 物理暴击率
+	PhysCritDamage  float64  `json:"physCritDamage"`  // 物理暴击伤害
+	SpellCritRate   float64  `json:"spellCritRate"`   // 法术暴击率
+	SpellCritDamage float64  `json:"spellCritDamage"` // 法术暴击伤害
+	DodgeRate       float64  `json:"dodgeRate"`       // 闪避率
+	Speed           int      `json:"speed"`           // 行动速度
+	ExpReward       int      `json:"expReward"`
+	GoldMin         int      `json:"goldMin"`
+	GoldMax         int      `json:"goldMax"`
+	SpawnWeight     int      `json:"spawnWeight"`
+	
+	// AI和技能配置
+	AIType          string   `json:"aiType,omitempty"`          // aggressive/defensive/balanced/special
+	AIBehavior      string   `json:"aiBehavior,omitempty"`      // JSON格式的AI行为配置
+	Skills          []string `json:"skills,omitempty"`          // 技能ID列表
+	MonsterSkills   []*MonsterSkill `json:"monsterSkills,omitempty"` // 怪物技能详情
+}
+
+// MonsterSkill 怪物技能配置
+type MonsterSkill struct {
+	ID            int    `json:"id"`
+	MonsterID     string `json:"monsterId"`
+	SkillID       string `json:"skillId"`
+	SkillType     string `json:"skillType"`     // attack/defense/control/heal/special
+	Priority      int    `json:"priority"`      // 优先级
+	Cooldown      int    `json:"cooldown"`      // 冷却时间
+	CooldownLeft  int    `json:"cooldownLeft"`  // 剩余冷却时间
+	UseCondition  string `json:"useCondition,omitempty"` // JSON格式，使用条件
+	Skill         *Skill `json:"skill,omitempty"` // 关联的技能详情
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -560,6 +582,8 @@ type CharacterSkill struct {
 	CharacterID int    `json:"characterId"`
 	SkillID     string `json:"skillId"`
 	SkillLevel  int    `json:"skillLevel"`
+	SkillExp    int    `json:"skillExp"`    // 技能经验
+	ExpToNext   int    `json:"expToNext"`  // 升级所需经验
 	Slot        *int   `json:"slot,omitempty"`
 	IsAuto      bool   `json:"isAuto"`
 	Skill       *Skill `json:"skill,omitempty"` // 关联的技能详情
@@ -693,6 +717,33 @@ type StrategyUpdateRequest struct {
 	ResourceThreshold    *int                `json:"resourceThreshold,omitempty"`
 	ReservedSkills       []ReservedSkill     `json:"reservedSkills,omitempty"`
 	AutoTargetSettings   *AutoTargetSettings `json:"autoTargetSettings,omitempty"`
+}
+
+// ═══════════════════════════════════════════════════════════
+// 装备相关
+// ═══════════════════════════════════════════════════════════
+
+// EquipmentInstance 装备实例 - 玩家获得的每件装备
+type EquipmentInstance struct {
+	ID              int        `json:"id"`
+	ItemID          string     `json:"itemId"`          // 基础物品ID
+	OwnerID         int        `json:"ownerId"`         // 拥有者用户ID
+	CharacterID     *int       `json:"characterId"`       // 装备者角色ID (NULL=背包中)
+	Slot            string     `json:"slot"`            // 装备槽位
+	Quality         string     `json:"quality"`          // common/uncommon/rare/epic/legendary/mythic
+	EvolutionStage  int        `json:"evolutionStage"`   // 进化阶段 1-5
+	EvolutionPath   *string    `json:"evolutionPath"`    // 进化路线
+	PrefixID        *string    `json:"prefixId"`        // 前缀词缀ID
+	PrefixValue     *float64   `json:"prefixValue"`      // 前缀数值
+	SuffixID        *string    `json:"suffixId"`        // 后缀词缀ID
+	SuffixValue     *float64   `json:"suffixValue"`      // 后缀数值
+	BonusAffix1     *string    `json:"bonusAffix1"`     // 额外词缀1 (紫色+)
+	BonusAffix1Value *float64  `json:"bonusAffix1Value"`
+	BonusAffix2     *string    `json:"bonusAffix2"`     // 额外词缀2 (橙色+)
+	BonusAffix2Value *float64  `json:"bonusAffix2Value"`
+	LegendaryEffectID *string  `json:"legendaryEffectId"` // 传说效果ID
+	AcquiredAt      time.Time  `json:"acquiredAt"`
+	IsLocked        bool       `json:"isLocked"`         // 是否锁定
 }
 
 // ═══════════════════════════════════════════════════════════

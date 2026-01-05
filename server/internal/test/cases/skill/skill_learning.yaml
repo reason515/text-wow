@@ -1,0 +1,164 @@
+# 技能系统 - 技能学习测试
+test_suite: "技能系统 - 技能学习"
+description: "测试技能学习功能，包括技能解锁、学习条件、技能升级等"
+
+tests:
+  - name: "基础技能学习测试"
+    description: "测试角色学习新技能的基本流程"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个1级战士角色"
+      - "准备一个可学习的技能：冲锋（Charge）"
+    steps:
+      - action: "角色学习技能：冲锋"
+        expected: "技能学习成功，角色获得该技能"
+        assertions:
+          - "角色技能列表应该包含冲锋"
+          - "技能等级应该为1"
+    assertions:
+      - type: "contains"
+        target: "character.skills"
+        expected: "charge"
+        message: "角色技能列表应该包含冲锋"
+      - type: "equals"
+        target: "character.skill_charge.level"
+        expected: "1"
+        message: "冲锋技能等级应该为1"
+
+  - name: "等级要求测试"
+    description: "测试技能学习的等级要求"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个5级战士角色"
+      - "准备一个需要10级才能学习的技能"
+    steps:
+      - action: "角色尝试学习技能"
+        expected: "技能学习失败，提示等级不足"
+    assertions:
+      - type: "equals"
+        target: "skill_learned"
+        expected: "false"
+        message: "技能应该学习失败"
+      - type: "contains"
+        target: "error_message"
+        expected: "等级不足"
+        message: "错误消息应该提示等级不足"
+
+  - name: "职业要求测试"
+    description: "测试技能学习的职业要求"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个法师角色"
+      - "准备一个只有战士才能学习的技能"
+    steps:
+      - action: "法师尝试学习战士技能"
+        expected: "技能学习失败，提示职业不匹配"
+    assertions:
+      - type: "equals"
+        target: "skill_learned"
+        expected: "false"
+        message: "技能应该学习失败"
+      - type: "contains"
+        target: "error_message"
+        expected: "职业不匹配"
+        message: "错误消息应该提示职业不匹配"
+
+  - name: "技能升级测试"
+    description: "测试已学习技能的升级"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个战士角色，已学习冲锋技能（等级1）"
+      - "角色拥有足够的技能点"
+    steps:
+      - action: "角色升级冲锋技能到等级2"
+        expected: "技能升级成功，技能等级提升"
+        assertions:
+          - "技能等级应该从1提升到2"
+          - "技能效果应该增强"
+    assertions:
+      - type: "equals"
+        target: "character.skill_charge.level"
+        expected: "2"
+        message: "冲锋技能等级应该为2"
+      - type: "greater_than"
+        target: "character.skill_charge.damage_multiplier"
+        expected: "skill_level_1_damage_multiplier"
+        message: "技能伤害倍率应该提升"
+
+  - name: "技能点消耗测试"
+    description: "测试学习技能时技能点的消耗"
+    category: "unit"
+    priority: "medium"
+    setup:
+      - "创建一个角色，技能点=5"
+      - "准备一个消耗3点技能点的技能"
+    steps:
+      - action: "角色学习技能"
+        expected: "技能学习成功，技能点减少3点"
+    assertions:
+      - type: "equals"
+        target: "character.skill_points"
+        expected: "2"
+        message: "学习技能后技能点应该为2"
+
+  - name: "技能点不足测试"
+    description: "测试技能点不足时无法学习技能"
+    category: "unit"
+    priority: "medium"
+    setup:
+      - "创建一个角色，技能点=2"
+      - "准备一个消耗3点技能点的技能"
+    steps:
+      - action: "角色尝试学习技能"
+        expected: "技能学习失败，提示技能点不足"
+    assertions:
+      - type: "equals"
+        target: "skill_learned"
+        expected: "false"
+        message: "技能应该学习失败"
+      - type: "equals"
+        target: "character.skill_points"
+        expected: "2"
+        message: "技能点应该保持不变"
+
+  - name: "重复学习测试"
+    description: "测试重复学习已掌握的技能"
+    category: "unit"
+    priority: "low"
+    setup:
+      - "创建一个角色，已学习冲锋技能（等级1）"
+    steps:
+      - action: "角色再次尝试学习冲锋技能"
+        expected: "学习失败或提示技能已掌握"
+    assertions:
+      - type: "contains"
+        target: "error_message"
+        expected: "已掌握"
+        message: "应该提示技能已掌握"
+
+  - name: "初始技能测试"
+    description: "测试角色创建时获得的初始技能"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "创建一个1级战士角色"
+    steps:
+      - action: "检查角色的初始技能"
+        expected: "角色应该拥有职业的初始技能"
+    assertions:
+      - type: "greater_than"
+        target: "character.initial_skills_count"
+        expected: "0"
+        message: "角色应该拥有至少一个初始技能"
+
+
+
+
+
+
+
+

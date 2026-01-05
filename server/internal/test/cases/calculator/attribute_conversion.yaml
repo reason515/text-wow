@@ -1,0 +1,82 @@
+# 数值计算系统 - 属性转换测试
+test_suite: "数值计算系统 - 属性转换"
+description: "测试属性转换公式，包括物理攻击、法术攻击、生命值、法力值、暴击率、闪避率等"
+
+tests:
+  - name: "物理攻击力计算测试"
+    description: "测试物理攻击力计算公式，验证力量×0.4 + 敏捷×0.2"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个角色，力量=20，敏捷=10"
+    steps:
+      - action: "计算物理攻击力"
+        expected: "物理攻击力 = 20×0.4 + 10×0.2 = 10"
+    assertions:
+      - type: "equals"
+        target: "physical_attack"
+        expected: "10"
+        message: "物理攻击力应该等于10"
+
+  - name: "法术攻击力计算测试"
+    description: "测试法术攻击力计算公式，验证智力×1.0 + 精神×0.2"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个角色，智力=15，精神=10"
+    steps:
+      - action: "计算法术攻击力"
+        expected: "法术攻击力 = 15×1.0 + 10×0.2 = 17"
+    assertions:
+      - type: "equals"
+        target: "magic_attack"
+        expected: "17"
+        message: "法术攻击力应该等于17"
+
+  - name: "生命值计算测试"
+    description: "测试生命值计算公式，验证职业基础HP + 耐力×2"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个战士角色，基础HP=35，耐力=15"
+    steps:
+      - action: "计算最大生命值"
+        expected: "最大HP = 35 + 15×2 = 65"
+    assertions:
+      - type: "equals"
+        target: "max_hp"
+        expected: "65"
+        message: "最大生命值应该等于65"
+
+  - name: "物理暴击率计算测试"
+    description: "测试物理暴击率计算公式，验证5% + 敏捷/20"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个角色，敏捷=20"
+    steps:
+      - action: "计算物理暴击率"
+        expected: "物理暴击率 = 5% + 20/20 = 6%"
+    assertions:
+      - type: "approximately"
+        target: "phys_crit_rate"
+        expected: "0.06"
+        tolerance: 0.001
+        message: "物理暴击率应该约等于6%"
+
+  - name: "闪避率计算测试"
+    description: "测试闪避率计算公式，验证5% + 敏捷/20"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个角色，敏捷=30"
+    steps:
+      - action: "计算闪避率"
+        expected: "闪避率 = 5% + 30/20 = 6.5%"
+    assertions:
+      - type: "approximately"
+        target: "dodge_rate"
+        expected: "0.065"
+        tolerance: 0.001
+        message: "闪避率应该约等于6.5%"
+

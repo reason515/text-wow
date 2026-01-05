@@ -1,0 +1,158 @@
+# 装备系统 - 稀有装备掉落测试
+test_suite: "装备系统 - 稀有装备掉落"
+description: "测试稀有装备的掉落机制，包括掉落率、品质分布、保底机制等"
+
+tests:
+  - name: "普通怪物掉落测试"
+    description: "测试普通怪物主要掉落白色和绿色装备"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色"
+      - "连续击败100个普通怪物"
+    steps:
+      - action: "统计掉落装备品质分布"
+        expected: "主要掉落白色和绿色装备，少量蓝色装备"
+    assertions:
+      - type: "greater_than"
+        target: "white_equipment_count"
+        expected: "green_equipment_count"
+        message: "白色装备应该多于绿色装备"
+      - type: "less_than"
+        target: "blue_equipment_count"
+        expected: "green_equipment_count"
+        message: "蓝色装备应该少于绿色装备"
+
+  - name: "精英怪物掉落测试"
+    description: "测试精英怪物主要掉落蓝色和紫色装备"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色"
+      - "连续击败50个精英怪物"
+    steps:
+      - action: "统计掉落装备品质分布"
+        expected: "主要掉落蓝色和紫色装备，少量橙色装备"
+    assertions:
+      - type: "greater_than"
+        target: "blue_equipment_count"
+        expected: "0"
+        message: "应该掉落蓝色装备"
+      - type: "greater_than"
+        target: "purple_equipment_count"
+        expected: "0"
+        message: "应该掉落紫色装备"
+
+  - name: "Boss怪物掉落测试"
+    description: "测试Boss怪物主要掉落紫色和橙色装备"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色"
+      - "连续击败10个Boss怪物"
+    steps:
+      - action: "统计掉落装备品质分布"
+        expected: "主要掉落紫色和橙色装备，可能掉落独特装备"
+    assertions:
+      - type: "greater_than"
+        target: "purple_equipment_count"
+        expected: "0"
+        message: "应该掉落紫色装备"
+      - type: "greater_than"
+        target: "orange_equipment_count"
+        expected: "0"
+        message: "应该掉落橙色装备"
+
+  - name: "掉落率随等级提升测试"
+    description: "测试掉落率随角色等级提升"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "创建一个1级角色"
+      - "创建一个30级角色"
+    steps:
+      - action: "1级角色击败100个怪物"
+        expected: "主要掉落白色和绿色装备"
+      - action: "30级角色击败100个怪物"
+        expected: "掉落更高品质装备的概率提升"
+    assertions:
+      - type: "greater_than"
+        target: "level_30_blue_drop_rate"
+        expected: "level_1_blue_drop_rate"
+        message: "30级角色的蓝色装备掉落率应该更高"
+
+  - name: "保底机制测试"
+    description: "测试连续无掉落后的保底机制"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色"
+      - "设置保底触发次数=40"
+    steps:
+      - action: "连续击败40个怪物，无装备掉落"
+        expected: "第40次应该触发保底，至少掉落蓝色装备"
+    assertions:
+      - type: "equals"
+        target: "pity_triggered"
+        expected: "true"
+        message: "保底应该触发"
+      - type: "greater_than_or_equal"
+        target: "guaranteed_equipment.quality"
+        expected: "rare"
+        message: "保底装备品质应该至少为蓝色"
+
+  - name: "奇迹掉落测试"
+    description: "测试低概率的奇迹掉落（低级区域掉落高级装备）"
+    category: "integration"
+    priority: "low"
+    setup:
+      - "创建一个1级角色"
+      - "在1级区域战斗"
+    steps:
+      - action: "连续击败大量怪物"
+        expected: "极低概率掉落橙色或独特装备"
+    assertions:
+      - type: "greater_than_or_equal"
+        target: "miracle_drop_count"
+        expected: "0"
+        message: "可能触发奇迹掉落（概率极低）"
+
+  - name: "掉落品质权重测试"
+    description: "测试不同品质装备的掉落权重"
+    category: "unit"
+    priority: "medium"
+    setup:
+      - "创建一个角色"
+      - "击败一个精英怪物"
+    steps:
+      - action: "检查掉落品质"
+        expected: "掉落品质应该符合权重分布"
+    assertions:
+      - type: "range"
+        target: "dropped_equipment.quality"
+        expected: "[common, epic]"
+        message: "掉落品质应该在common到epic之间"
+
+  - name: "装备等级匹配测试"
+    description: "测试掉落装备的等级应该匹配角色等级"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个30级角色"
+      - "击败一个30级怪物"
+    steps:
+      - action: "怪物掉落装备"
+        expected: "装备等级应该在28-32范围内"
+    assertions:
+      - type: "range"
+        target: "equipment.level_required"
+        expected: "[28, 32]"
+        message: "装备等级应该在角色等级±2范围内"
+
+
+
+
+
+
+
+

@@ -1,0 +1,137 @@
+# 战斗统计系统 - 统计分析测试
+test_suite: "战斗统计系统 - 统计分析"
+description: "测试战斗统计系统的数据分析功能，包括DPS计算、HPS计算、效率分析等"
+
+tests:
+  - name: "DPS计算测试"
+    description: "测试每秒伤害（DPS）的计算"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建战斗统计数据：总伤害=1000，战斗时长=20秒"
+    steps:
+      - action: "计算DPS"
+        expected: "DPS=1000/20=50"
+    assertions:
+      - type: "equals"
+        target: "battle_stats.dps"
+        expected: "50"
+        message: "DPS应该为50"
+
+  - name: "HPS计算测试"
+    description: "测试每秒治疗（HPS）的计算"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建战斗统计数据：总治疗=600，战斗时长=15秒"
+    steps:
+      - action: "计算HPS"
+        expected: "HPS=600/15=40"
+    assertions:
+      - type: "equals"
+        target: "battle_stats.hps"
+        expected: "40"
+        message: "HPS应该为40"
+
+  - name: "伤害分布分析测试"
+    description: "测试伤害分布的统计分析"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建战斗统计数据：物理伤害=800，魔法伤害=200"
+    steps:
+      - action: "分析伤害分布"
+        expected: "物理伤害占比80%，魔法伤害占比20%"
+    assertions:
+      - type: "equals"
+        target: "battle_stats.physical_damage_ratio"
+        expected: "0.8"
+        message: "物理伤害占比应该为80%"
+      - type: "equals"
+        target: "battle_stats.magic_damage_ratio"
+        expected: "0.2"
+        message: "魔法伤害占比应该为20%"
+
+  - name: "技能伤害占比测试"
+    description: "测试不同技能的伤害占比"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建战斗统计数据：技能A伤害=600，技能B伤害=300，普通攻击伤害=100"
+    steps:
+      - action: "分析技能伤害占比"
+        expected: "技能A占比60%，技能B占比30%，普通攻击占比10%"
+    assertions:
+      - type: "equals"
+        target: "battle_stats.skill_damage_ratio.skill_a"
+        expected: "0.6"
+        message: "技能A伤害占比应该为60%"
+
+  - name: "暴击率统计测试"
+    description: "测试暴击率的统计分析"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建战斗统计数据：总攻击次数=100，暴击次数=15"
+    steps:
+      - action: "计算暴击率"
+        expected: "暴击率=15/100=15%"
+    assertions:
+      - type: "equals"
+        target: "battle_stats.crit_rate"
+        expected: "0.15"
+        message: "暴击率应该为15%"
+
+  - name: "平均伤害计算测试"
+    description: "测试平均伤害的计算"
+    category: "unit"
+    priority: "medium"
+    setup:
+      - "创建战斗统计数据：总伤害=1000，攻击次数=50"
+    steps:
+      - action: "计算平均伤害"
+        expected: "平均伤害=1000/50=20"
+    assertions:
+      - type: "equals"
+        target: "battle_stats.average_damage"
+        expected: "20"
+        message: "平均伤害应该为20"
+
+  - name: "效率分析测试"
+    description: "测试战斗效率的分析（伤害/时间）"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "创建战斗统计数据：总伤害=2000，战斗时长=30秒"
+    steps:
+      - action: "分析战斗效率"
+        expected: "效率=2000/30≈66.7"
+    assertions:
+      - type: "approximately"
+        target: "battle_stats.efficiency"
+        expected: "66.7"
+        tolerance: 1.0
+        message: "战斗效率应该约为66.7"
+
+  - name: "承伤分析测试"
+    description: "测试承伤数据的分析"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建战斗统计数据：总承伤=500，受击次数=25"
+    steps:
+      - action: "分析承伤数据"
+        expected: "平均每次受击伤害=500/25=20"
+    assertions:
+      - type: "equals"
+        target: "battle_stats.average_damage_taken"
+        expected: "20"
+        message: "平均每次受击伤害应该为20"
+
+
+
+
+
+
+
+

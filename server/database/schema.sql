@@ -208,6 +208,25 @@ CREATE TABLE IF NOT EXISTS effects (
 
 CREATE INDEX IF NOT EXISTS idx_effects_type ON effects(type);
 
+-- ═══════════════════════════════════════════════════════════
+-- 配置版本管理表
+-- ═══════════════════════════════════════════════════════════
+
+-- 配置版本表 - 用于配置版本管理和热更新
+CREATE TABLE IF NOT EXISTS config_versions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    config_type VARCHAR(32) NOT NULL,  -- monster/skill/item/economy/zone
+    version INTEGER NOT NULL,
+    config_data TEXT NOT NULL,         -- JSON格式的配置数据
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_by VARCHAR(32),
+    description TEXT,
+    UNIQUE(config_type, version)
+);
+
+CREATE INDEX IF NOT EXISTS idx_config_versions_type ON config_versions(config_type);
+CREATE INDEX IF NOT EXISTS idx_config_versions_version ON config_versions(config_type, version DESC);
+
 -- 物品配置表
 CREATE TABLE IF NOT EXISTS items (
     id VARCHAR(32) PRIMARY KEY,
@@ -268,7 +287,6 @@ CREATE TABLE IF NOT EXISTS equipment_instance (
     character_id INTEGER,                  -- NULL表示在背包中
     slot VARCHAR(16),
     quality VARCHAR(16) NOT NULL DEFAULT 'common',
-    enhance_level INTEGER DEFAULT 0,       -- 强化等级 0-25
     evolution_stage INTEGER DEFAULT 1,     -- 进化阶段 1-5
     evolution_path VARCHAR(32),            -- 进化路线
     prefix_id VARCHAR(32),                 -- 前缀词缀ID
@@ -349,6 +367,9 @@ CREATE TABLE IF NOT EXISTS monsters (
     spell_crit_rate REAL DEFAULT 0.05,            -- 法术暴击率
     spell_crit_damage REAL DEFAULT 1.5,           -- 法术暴击伤害
     dodge_rate REAL DEFAULT 0.05,             -- 闪避率 (基础5%)
+    speed INTEGER DEFAULT 10,                 -- 速度值 (用于回合排序)
+    ai_type VARCHAR(16) DEFAULT 'balanced',   -- AI类型: balanced/aggressive/defensive/healer
+    ai_behavior TEXT,                         -- AI行为配置 (JSON格式)
     exp_reward INTEGER NOT NULL,
     gold_min INTEGER DEFAULT 0,
     gold_max INTEGER DEFAULT 0,
@@ -384,6 +405,8 @@ CREATE TABLE IF NOT EXISTS character_skills (
     character_id INTEGER NOT NULL,
     skill_id VARCHAR(32) NOT NULL,
     skill_level INTEGER DEFAULT 1,
+    skill_exp INTEGER DEFAULT 0,
+    exp_to_next INTEGER DEFAULT 100,
     slot INTEGER,
     is_auto INTEGER DEFAULT 1,
     FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE,
@@ -761,7 +784,6 @@ CREATE TABLE IF NOT EXISTS equipment_instance (
     character_id INTEGER,                  -- 装备者角色ID (NULL=背包中)
     slot VARCHAR(16),                      -- 装备槽位
     quality VARCHAR(16) NOT NULL DEFAULT 'common', -- common/uncommon/rare/epic/legendary/mythic
-    enhance_level INTEGER DEFAULT 0,       -- 强化等级 0-25
     evolution_stage INTEGER DEFAULT 1,     -- 进化阶段 1-5
     evolution_path VARCHAR(32),            -- 进化路线: fire/frost/lightning/holy/shadow/nature/physical
     prefix_id VARCHAR(32),                 -- 前缀词缀ID

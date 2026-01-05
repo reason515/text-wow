@@ -1,0 +1,129 @@
+# 经济系统 - 金币系统测试
+test_suite: "经济系统 - 金币系统"
+description: "测试经济系统的核心功能，包括金币获取、消耗、商店等"
+
+tests:
+  - name: "战斗获得金币测试"
+    description: "测试战斗胜利后获得金币"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色，金币=100"
+      - "创建一个怪物，金币掉落=10-20"
+    steps:
+      - action: "角色击败怪物"
+        expected: "角色获得10-20金币"
+    assertions:
+      - type: "range"
+        target: "character.gold"
+        expected: "[110, 120]"
+        message: "角色金币应该在110-120之间"
+
+  - name: "金币消耗测试"
+    description: "测试消耗金币购买物品"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个角色，金币=100"
+      - "创建一个物品，价格=30"
+    steps:
+      - action: "角色购买物品"
+        expected: "角色金币减少30，剩余70"
+    assertions:
+      - type: "equals"
+        target: "character.gold"
+        expected: "70"
+        message: "购买后金币应该为70"
+
+  - name: "金币不足测试"
+    description: "测试金币不足时无法购买"
+    category: "unit"
+    priority: "medium"
+    setup:
+      - "创建一个角色，金币=20"
+      - "创建一个物品，价格=50"
+    steps:
+      - action: "角色尝试购买物品"
+        expected: "购买失败，提示金币不足"
+    assertions:
+      - type: "equals"
+        target: "purchase_success"
+        expected: "false"
+        message: "购买应该失败"
+      - type: "equals"
+        target: "character.gold"
+        expected: "20"
+        message: "角色金币应该仍为20（未消耗）"
+
+  - name: "装备强化消耗测试"
+    description: "测试装备强化时的金币消耗"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色，金币=1000"
+      - "创建一个装备，强化费用=100"
+    steps:
+      - action: "强化装备（+1）"
+        expected: "消耗100金币，剩余900"
+      - action: "强化装备（+2）"
+        expected: "消耗150金币，剩余750"
+    assertions:
+      - type: "equals"
+        target: "character.gold_after_enhance_1"
+        expected: "900"
+        message: "强化+1后金币应该为900"
+      - type: "equals"
+        target: "character.gold_after_enhance_2"
+        expected: "750"
+        message: "强化+2后金币应该为750"
+
+  - name: "商店购买测试"
+    description: "测试从商店购买物品"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色，金币=500"
+      - "初始化商店，包含多个物品"
+    steps:
+      - action: "查看商店物品列表"
+        expected: "显示所有可购买的物品"
+      - action: "购买物品A（价格=50）"
+        expected: "购买成功，金币减少50"
+      - action: "购买物品B（价格=100）"
+        expected: "购买成功，金币减少100"
+    assertions:
+      - type: "equals"
+        target: "character.gold"
+        expected: "350"
+        message: "购买后金币应该为350"
+      - type: "equals"
+        target: "character.inventory_count"
+        expected: "2"
+        message: "角色应该拥有2个物品"
+
+  - name: "金币上限测试"
+    description: "测试金币是否有上限（如果有）"
+    category: "unit"
+    priority: "low"
+    setup:
+      - "创建一个角色，金币=999999"
+    steps:
+      - action: "角色获得1000金币"
+        expected: "金币增加1000"
+    assertions:
+      - type: "greater_than"
+        target: "character.gold"
+        expected: "999999"
+        message: "金币应该可以超过999999（如果没有上限）"
+
+
+
+
+
+
+
+
+
+
+
+

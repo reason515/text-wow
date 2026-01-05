@@ -1,0 +1,119 @@
+# 怪物系统 - 怪物生成测试
+test_suite: "怪物系统 - 怪物生成"
+description: "测试怪物生成逻辑，包括配置加载、属性计算、类型系数"
+
+tests:
+  - name: "普通怪物生成测试"
+    description: "测试普通怪物的生成和属性计算"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "初始化怪物管理器"
+      - "加载怪物配置"
+    steps:
+      - action: "生成一个普通怪物"
+        expected: "应该成功生成怪物实例"
+    assertions:
+      - type: "equals"
+        target: "monster_generated"
+        expected: "true"
+        message: "应该成功生成怪物"
+      - type: "greater_than"
+        target: "monster.hp"
+        expected: "0"
+        message: "怪物HP应该大于0"
+
+  - name: "精英怪物属性系数测试"
+    description: "测试精英怪物的属性系数（HP×1.8，攻击×1.5，防御×1.3）"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "初始化怪物管理器"
+      - "加载精英怪物配置"
+    steps:
+      - action: "生成一个精英怪物"
+        expected: "精英怪物的属性应该应用了系数"
+    assertions:
+      - type: "greater_than"
+        target: "monster.hp"
+        expected: "base_hp"
+        message: "精英怪物HP应该大于基础HP"
+      - type: "greater_than"
+        target: "monster.physical_attack"
+        expected: "base_physical_attack"
+        message: "精英怪物攻击应该大于基础攻击"
+
+  - name: "Boss怪物属性系数测试"
+    description: "测试Boss怪物的属性系数（HP×4.0，攻击×2.5，防御×2.0）"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "初始化怪物管理器"
+      - "加载Boss怪物配置"
+    steps:
+      - action: "生成一个Boss怪物"
+        expected: "Boss怪物的属性应该应用了系数"
+    assertions:
+      - type: "greater_than"
+        target: "monster.hp"
+        expected: "base_hp"
+        message: "Boss怪物HP应该远大于基础HP"
+      - type: "greater_than"
+        target: "monster.physical_attack"
+        expected: "base_physical_attack"
+        message: "Boss怪物攻击应该远大于基础攻击"
+
+  - name: "等级系数测试"
+    description: "测试怪物等级系数（每级增长约5%）"
+    category: "unit"
+    priority: "medium"
+    setup:
+      - "初始化怪物管理器"
+      - "加载怪物配置"
+    steps:
+      - action: "生成一个高等级怪物"
+        expected: "高等级怪物的属性应该更高"
+    assertions:
+      - type: "greater_than"
+        target: "high_level_monster.hp"
+        expected: "low_level_monster.hp"
+        message: "高等级怪物HP应该高于低等级怪物"
+
+  - name: "怪物配置加载测试"
+    description: "测试怪物配置的加载和缓存"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "初始化怪物管理器"
+    steps:
+      - action: "加载怪物配置"
+        expected: "应该成功加载怪物配置"
+      - action: "再次加载相同怪物配置"
+        expected: "应该从缓存获取配置"
+    assertions:
+      - type: "equals"
+        target: "monster_config_loaded"
+        expected: "true"
+        message: "怪物配置应该已加载"
+      - type: "equals"
+        target: "monster_config_cached"
+        expected: "true"
+        message: "第二次加载应该使用缓存"
+
+  - name: "怪物配置热更新测试"
+    description: "测试怪物配置的热更新功能"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "初始化怪物管理器"
+      - "加载怪物配置"
+    steps:
+      - action: "获取当前怪物配置版本"
+        expected: "应该返回当前配置版本"
+      - action: "重新加载怪物配置（热更新）"
+        expected: "应该成功重新加载配置"
+    assertions:
+      - type: "equals"
+        target: "monster_config_reloaded"
+        expected: "true"
+        message: "怪物配置应该已重新加载"

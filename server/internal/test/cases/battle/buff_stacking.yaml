@@ -1,0 +1,114 @@
+# 战斗系统 - Buff/Debuff叠加测试
+test_suite: "战斗系统 - Buff/Debuff叠加"
+description: "测试多个Buff/Debuff同时存在和叠加的情况"
+
+tests:
+  - name: "多个Buff同时存在测试"
+    description: "测试角色同时拥有多个不同类型的Buff"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色，攻击力=20，防御力=10"
+      - "给角色添加攻击力+50%的Buff（持续3回合）"
+      - "给角色添加防御力+30%的Buff（持续3回合）"
+      - "创建一个怪物，防御力=10"
+      - "初始化战斗系统"
+    steps:
+      - action: "开始战斗"
+        expected: "战斗状态为进行中"
+      - action: "角色攻击怪物"
+        expected: "攻击力Buff生效，造成更高伤害"
+    assertions:
+      - type: "greater_than"
+        target: "damage_dealt"
+        expected: "20"
+        message: "有攻击力Buff时伤害应该更高"
+      - type: "equals"
+        target: "buff_count"
+        expected: "2"
+        message: "角色应该拥有2个Buff"
+
+  - name: "相同类型Buff刷新测试"
+    description: "测试相同类型的Buff应该刷新而不是叠加"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "创建一个角色"
+      - "给角色添加攻击力+50%的Buff（持续2回合）"
+      - "给角色添加攻击力+50%的Buff（持续3回合）"
+      - "初始化战斗系统"
+    steps:
+      - action: "开始战斗"
+        expected: "战斗状态为进行中"
+      - action: "执行第1回合"
+        expected: "攻击力Buff生效，持续时间为3回合（刷新）"
+      - action: "执行第2回合"
+        expected: "攻击力Buff仍然生效"
+      - action: "执行第3回合"
+        expected: "攻击力Buff仍然生效"
+      - action: "执行第4回合"
+        expected: "攻击力Buff消失"
+    assertions:
+      - type: "equals"
+        target: "buff_duration_round_1"
+        expected: "3"
+        message: "第1回合后Buff持续时间应该为3（刷新后的值）"
+      - type: "equals"
+        target: "buff_duration_round_4"
+        expected: "0"
+        message: "第4回合后Buff应该消失"
+
+  - name: "Buff和Debuff同时存在测试"
+    description: "测试角色同时拥有Buff和Debuff"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色，攻击力=20"
+      - "给角色添加攻击力+50%的Buff"
+      - "给角色添加攻击力-30%的Debuff"
+      - "创建一个怪物，防御力=10"
+      - "初始化战斗系统"
+    steps:
+      - action: "开始战斗"
+        expected: "战斗状态为进行中"
+      - action: "角色攻击怪物"
+        expected: "Buff和Debuff效果叠加计算"
+    assertions:
+      - type: "greater_than"
+        target: "damage_dealt"
+        expected: "0"
+        message: "应该造成伤害（Buff和Debuff抵消后仍有加成）"
+
+  - name: "多个Debuff叠加测试"
+    description: "测试怪物同时拥有多个Debuff"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "创建一个角色，攻击力=20"
+      - "创建一个怪物，防御力=20"
+      - "给怪物添加防御力-50%的Debuff"
+      - "给怪物添加攻击力-30%的Debuff"
+      - "初始化战斗系统"
+    steps:
+      - action: "开始战斗"
+        expected: "战斗状态为进行中"
+      - action: "角色攻击怪物"
+        expected: "怪物受到更高伤害（防御力Debuff生效）"
+    assertions:
+      - type: "greater_than"
+        target: "damage_dealt"
+        expected: "15"
+        message: "有防御力Debuff时伤害应该更高"
+      - type: "equals"
+        target: "monster_debuff_count"
+        expected: "2"
+        message: "怪物应该拥有2个Debuff"
+
+
+
+
+
+
+
+
+

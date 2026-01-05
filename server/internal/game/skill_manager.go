@@ -223,11 +223,86 @@ func (sm *SkillManager) UseSkill(characterID int, skillID string) (*CharacterSki
 			} else {
 				state.CooldownLeft = state.Skill.Cooldown
 			}
+			
+			// 增加技能经验（每次使用获得5-10点经验，根据技能类型调整）
+			expGain := sm.calculateSkillExpGain(state.Skill)
+			sm.addSkillExperience(characterID, skillID, expGain)
+			
 			return state, nil
 		}
 	}
 
 	return nil, fmt.Errorf("skill not found")
+}
+
+// calculateSkillExpGain 计算技能经验获得
+func (sm *SkillManager) calculateSkillExpGain(skill *models.Skill) int {
+	// 基础经验：每次使用获得5-10点经验
+	baseExp := 5
+	
+	// 根据技能类型调整经验获得
+	switch skill.Type {
+	case "attack":
+		baseExp = 8 // 攻击技能获得更多经验
+	case "heal":
+		baseExp = 7 // 治疗技能
+	case "buff", "debuff":
+		baseExp = 6 // Buff/Debuff技能
+	case "control":
+		baseExp = 7 // 控制技能
+	default:
+		baseExp = 5
+	}
+	
+	return baseExp
+}
+
+// addSkillExperience 增加技能经验并检查升级
+func (sm *SkillManager) addSkillExperience(characterID int, skillID string, expGain int) {
+	// 获取角色技能数据
+	characterSkills, err := sm.skillRepo.GetCharacterSkills(characterID)
+	if err != nil {
+		return
+	}
+	
+	var targetSkill *models.CharacterSkill
+	for _, cs := range characterSkills {
+		if cs.SkillID == skillID {
+			targetSkill = cs
+			break
+		}
+	}
+	
+	if targetSkill == nil {
+		return
+	}
+	
+	// 增加经验
+	targetSkill.SkillExp += expGain
+	
+	// 检查升级（最多升5级）
+	maxLevel := 5
+	for targetSkill.SkillLevel < maxLevel && targetSkill.SkillExp >= targetSkill.ExpToNext {
+		targetSkill.SkillExp -= targetSkill.ExpToNext
+		targetSkill.SkillLevel++
+		// 升级所需经验递增：100, 150, 200, 250, 300
+		targetSkill.ExpToNext = 100 + (targetSkill.SkillLevel-1)*50
+	}
+	
+	// 更新数据库
+	sm.skillRepo.UpdateSkillExperience(characterID, skillID, targetSkill.SkillExp, targetSkill.ExpToNext, targetSkill.SkillLevel)
+	
+	// 更新内存中的技能状态（重新计算效果）
+	if skillStates, exists := sm.characterSkills[characterID]; exists {
+		for _, state := range skillStates {
+			if state.SkillID == skillID {
+				state.SkillLevel = targetSkill.SkillLevel
+				// 重新计算技能效果
+				state.Effect = sm.skillService.CalculateSkillEffect(state.Skill, targetSkill.SkillLevel)
+				break
+			}
+		}
+	}
 }
 
 // GetSkillState 获取特定技能的状态（不检查冷却和资源）

@@ -343,11 +343,15 @@ func (r *CharacterRepository) UpdateAfterDeath(id int, hp, resource, totalDeaths
 	return err
 }
 
-// helper function
+// helper functions
 func boolToInt(b bool) int {
 	if b {
 		return 1
 	}
 	return 0
+}
+
+func intToBool(i int) bool {
+	return i != 0
 }
 

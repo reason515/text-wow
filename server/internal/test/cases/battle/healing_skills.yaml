@@ -1,0 +1,166 @@
+# 战斗系统 - 治疗技能测试
+test_suite: "战斗系统 - 治疗技能"
+description: "测试战斗中的治疗技能和效果"
+
+tests:
+  - name: "基础治疗技能测试"
+    description: "测试使用治疗技能恢复HP"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个牧师角色，HP=50/100，法力=100/100"
+      - "创建一个治疗技能，恢复50点HP，消耗30点法力"
+      - "初始化战斗系统"
+    steps:
+      - action: "角色使用治疗技能对自己治疗"
+        expected: "角色HP恢复50点，达到100（不超过最大值）"
+    assertions:
+      - type: "equals"
+        target: "character.hp"
+        expected: "100"
+        message: "治疗后HP应该为100（不超过最大值）"
+      - type: "equals"
+        target: "character.resource"
+        expected: "70"
+        message: "使用治疗技能后法力应该为70"
+      - type: "equals"
+        target: "healing_dealt"
+        expected: "50"
+        message: "治疗量应该为50"
+
+  - name: "治疗技能不超过最大值测试"
+    description: "测试治疗不会超过最大HP"
+    category: "unit"
+    priority: "medium"
+    setup:
+      - "创建一个角色，HP=90/100，法力=100/100"
+      - "创建一个治疗技能，恢复50点HP"
+      - "初始化战斗系统"
+    steps:
+      - action: "角色使用治疗技能"
+        expected: "角色HP恢复10点，达到100（不超过最大值）"
+    assertions:
+      - type: "equals"
+        target: "character.hp"
+        expected: "100"
+        message: "治疗后HP应该为100，不超过最大值"
+      - type: "equals"
+        target: "healing_dealt"
+        expected: "10"
+        message: "实际治疗量应该为10（溢出部分不计）"
+      - type: "equals"
+        target: "overhealing"
+        expected: "40"
+        message: "过量治疗应该为40"
+
+  - name: "治疗加成计算测试"
+    description: "测试治疗加成对治疗量的影响"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个角色，HP=50/100"
+      - "创建一个治疗技能，基础治疗=50，治疗加成=20%"
+    steps:
+      - action: "角色使用治疗技能"
+        expected: "基础治疗=50，加成后治疗=60"
+    assertions:
+      - type: "equals"
+        target: "final_healing"
+        expected: "60"
+        message: "治疗加成后应该为60（50×1.2）"
+      - type: "equals"
+        target: "character.hp"
+        expected: "100"
+        message: "治疗后HP应该为100"
+
+  - name: "治疗过量处理测试"
+    description: "测试治疗过量时的处理（实际治疗和过量治疗）"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个角色，HP=95/100"
+      - "创建一个治疗技能，基础治疗=20，治疗加成=50%"
+    steps:
+      - action: "角色使用治疗技能"
+        expected: "最终治疗=30，实际治疗=5，过量治疗=25"
+    assertions:
+      - type: "equals"
+        target: "final_healing"
+        expected: "30"
+        message: "最终治疗量应该为30"
+      - type: "equals"
+        target: "actual_healing"
+        expected: "5"
+        message: "实际治疗量应该为5（只能恢复到100HP）"
+      - type: "equals"
+        target: "overhealing"
+        expected: "25"
+        message: "过量治疗应该为25"
+      - type: "equals"
+        target: "character.hp"
+        expected: "100"
+        message: "治疗后HP应该为100"
+
+  - name: "队伍治疗技能测试"
+    description: "测试治疗技能对队伍成员的治疗"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个3人队伍：战士(HP=50/100)、牧师(HP=100/100)、法师(HP=30/100)"
+      - "创建一个治疗技能，恢复40点HP"
+      - "初始化战斗系统"
+    steps:
+      - action: "开始战斗"
+        expected: "战斗状态为进行中"
+      - action: "牧师使用治疗技能治疗法师"
+        expected: "法师HP恢复40点，达到70"
+    assertions:
+      - type: "equals"
+        target: "character_3.hp"
+        expected: "70"
+        message: "法师HP应该为70"
+      - type: "equals"
+        target: "healing_dealt"
+        expected: "40"
+        message: "治疗量应该为40"
+
+  - name: "战斗中持续治疗测试"
+    description: "测试战斗中使用HOT（持续治疗）技能"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "创建一个角色，HP=50/100"
+      - "创建一个持续3回合，每回合恢复15点HP的HOT技能"
+      - "初始化战斗系统"
+    steps:
+      - action: "开始战斗"
+        expected: "战斗状态为进行中"
+      - action: "角色使用HOT技能"
+        expected: "角色获得持续治疗效果"
+      - action: "执行第1回合"
+        expected: "角色恢复15点HP，HP=65"
+      - action: "执行第2回合"
+        expected: "角色恢复15点HP，HP=80"
+      - action: "执行第3回合"
+        expected: "角色恢复15点HP，HP=95"
+      - action: "执行第4回合"
+        expected: "HOT消失，不再恢复HP"
+    assertions:
+      - type: "equals"
+        target: "character.hp_round_1"
+        expected: "65"
+        message: "第1回合后HP应该为65"
+      - type: "equals"
+        target: "character.hp_round_3"
+        expected: "95"
+        message: "第3回合后HP应该为95"
+      - type: "equals"
+        target: "character.hp_round_4"
+        expected: "95"
+        message: "第4回合后HP应该仍为95（HOT已消失）"
+
+
+
+
+
+

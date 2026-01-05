@@ -362,6 +362,14 @@ body, body *, input, button, select, textarea {
 .log-type-heal { color: #44ff44; }
 .log-type-loot { color: var(--text-gold); }
 .log-type-exp { color: var(--text-cyan); }
+.log-type-dot { color: #ff6666; } /* 持续伤害 - 红色 */
+.log-type-hot { color: #00ff00; } /* 持续治疗 - 绿色 */
+.log-type-buff { color: #88ff88; } /* Buff效果 - 浅绿色 */
+.log-type-debuff { color: #ff8888; } /* Debuff效果 - 浅红色 */
+.log-type-combat { color: var(--text-yellow); } /* 战斗信息 - 黄色 */
+.log-type-dodge { color: var(--text-cyan); } /* 闪避 - 青色 */
+.log-type-crit { color: #ff6b6b; } /* 暴击 - 粉红色 */
+.log-type-system { color: var(--text-primary); } /* 系统信息 - 绿色 */
 .log-type-levelup { 
   color: var(--text-gold); 
   text-shadow: 0 0 10px var(--text-gold);

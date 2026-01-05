@@ -1,0 +1,103 @@
+# 技能系统 - Buff叠加规则测试
+test_suite: "技能系统 - Buff叠加规则"
+description: "测试Buff/Debuff的基本功能，包括持续时间、数值效果等"
+
+tests:
+  - name: "Buff持续时间测试"
+    description: "测试Buff的持续时间倒计时"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色，攻击力=20"
+      - "给角色添加攻击力+30%的Buff（持续3回合）"
+    steps:
+      - action: "执行第1回合"
+        expected: "Buff剩余2回合，攻击力加成仍然有效"
+      - action: "执行第2回合"
+        expected: "Buff剩余1回合，攻击力加成仍然有效"
+      - action: "执行第3回合"
+        expected: "Buff消失"
+    assertions:
+      - type: "greater_than"
+        target: "buff_duration_round_1"
+        expected: "0"
+        message: "第1回合后Buff持续时间应该大于0"
+      - type: "greater_than"
+        target: "buff_duration_round_2"
+        expected: "0"
+        message: "第2回合后Buff持续时间应该大于0"
+      - type: "equals"
+        target: "character.buff_attack_modifier"
+        expected: "0.3"
+        message: "Buff攻击力加成应该为30%"
+
+  - name: "Buff攻击力加成测试"
+    description: "测试Buff对攻击力的加成效果"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色，攻击力=20"
+      - "给角色添加攻击力+20%的Buff（持续2回合）"
+    steps:
+      - action: "执行第1回合"
+        expected: "Buff生效，攻击力提升20%"
+      - action: "执行第2回合"
+        expected: "Buff仍然生效"
+      - action: "执行第3回合"
+        expected: "Buff消失"
+    assertions:
+      - type: "equals"
+        target: "character.buff_attack_modifier"
+        expected: "0.2"
+        message: "Buff攻击力加成应该为20%"
+      - type: "greater_than"
+        target: "physical_attack"
+        expected: "20"
+        message: "有Buff时实际攻击力应该大于20"
+
+  - name: "Buff替换测试"
+    description: "测试新Buff替换旧Buff"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色，攻击力=20"
+      - "给角色添加攻击力+25%的Buff（持续2回合）"
+      - "给角色添加攻击力+40%的Buff（持续3回合）"
+    steps:
+      - action: "执行第1回合"
+        expected: "新Buff生效，攻击力提升40%"
+      - action: "执行第3回合"
+        expected: "Buff仍然有效"
+      - action: "执行第4回合"
+        expected: "Buff消失"
+    assertions:
+      - type: "equals"
+        target: "character.buff_attack_modifier"
+        expected: "0.4"
+        message: "Buff攻击力加成应该为40%（新Buff的值）"
+      - type: "greater_than"
+        target: "physical_attack"
+        expected: "20"
+        message: "有Buff时实际攻击力应该大于20"
+
+  - name: "Buff攻击力加成效果测试"
+    description: "测试Buff对攻击力的实际加成效果"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "创建一个角色，攻击力=20"
+      - "创建一个怪物，防御力=10"
+      - "给角色添加攻击力+30%的Buff（持续2回合）"
+    steps:
+      - action: "角色对怪物进行物理攻击"
+        expected: "Buff生效，造成更高伤害"
+    assertions:
+      - type: "greater_than"
+        target: "damage_dealt"
+        expected: "18"
+        message: "有Buff时伤害应该更高（基础伤害约18，有Buff应该更高）"
+      - type: "equals"
+        target: "character.buff_attack_modifier"
+        expected: "0.3"
+        message: "Buff攻击力加成应该为30%"
+

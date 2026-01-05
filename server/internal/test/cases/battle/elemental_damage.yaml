@@ -1,0 +1,128 @@
+# 战斗系统 - 元素伤害测试
+test_suite: "战斗系统 - 元素伤害"
+description: "测试各种元素伤害类型（火焰、冰霜、暗影、神圣、自然）的计算和应用"
+
+tests:
+  - name: "火焰伤害计算测试"
+    description: "测试火焰伤害的计算（使用魔法防御）"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个角色，法术攻击力=30"
+      - "创建一个怪物，魔法防御力=20"
+    steps:
+      - action: "角色对怪物使用火焰伤害技能"
+        expected: "计算火焰伤害：基础伤害=30，魔法防御减伤=20，最终伤害=10"
+    assertions:
+      - type: "equals"
+        target: "fire_damage_dealt"
+        expected: "10"
+        message: "火焰伤害应该等于10（30-20）"
+      - type: "equals"
+        target: "damage_type"
+        expected: "fire"
+        message: "伤害类型应该是fire"
+
+  - name: "冰霜伤害计算测试"
+    description: "测试冰霜伤害的计算（使用魔法防御）"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个角色，法术攻击力=30"
+      - "创建一个怪物，魔法防御力=20"
+    steps:
+      - action: "角色对怪物使用冰霜伤害技能"
+        expected: "计算冰霜伤害：基础伤害=30，魔法防御减伤=20，最终伤害=10"
+    assertions:
+      - type: "equals"
+        target: "frost_damage_dealt"
+        expected: "10"
+        message: "冰霜伤害应该等于10（30-20）"
+      - type: "equals"
+        target: "damage_type"
+        expected: "frost"
+        message: "伤害类型应该是frost"
+
+  - name: "暗影伤害计算测试"
+    description: "测试暗影伤害的计算（使用魔法防御）"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个角色，法术攻击力=30"
+      - "创建一个怪物，魔法防御力=20"
+    steps:
+      - action: "角色对怪物使用暗影伤害技能"
+        expected: "计算暗影伤害：基础伤害=30，魔法防御减伤=20，最终伤害=10"
+    assertions:
+      - type: "equals"
+        target: "shadow_damage_dealt"
+        expected: "10"
+        message: "暗影伤害应该等于10（30-20）"
+      - type: "equals"
+        target: "damage_type"
+        expected: "shadow"
+        message: "伤害类型应该是shadow"
+
+  - name: "神圣伤害计算测试"
+    description: "测试神圣伤害的计算（使用魔法防御）"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个角色，法术攻击力=30"
+      - "创建一个怪物，魔法防御力=20"
+    steps:
+      - action: "角色对怪物使用神圣伤害技能"
+        expected: "计算神圣伤害：基础伤害=30，魔法防御减伤=20，最终伤害=10"
+    assertions:
+      - type: "equals"
+        target: "holy_damage_dealt"
+        expected: "10"
+        message: "神圣伤害应该等于10（30-20）"
+      - type: "equals"
+        target: "damage_type"
+        expected: "holy"
+        message: "伤害类型应该是holy"
+
+  - name: "自然伤害计算测试"
+    description: "测试自然伤害的计算（使用魔法防御）"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个角色，法术攻击力=30"
+      - "创建一个怪物，魔法防御力=20"
+    steps:
+      - action: "角色对怪物使用自然伤害技能"
+        expected: "计算自然伤害：基础伤害=30，魔法防御减伤=20，最终伤害=10"
+    assertions:
+      - type: "equals"
+        target: "nature_damage_dealt"
+        expected: "10"
+        message: "自然伤害应该等于10（30-20）"
+      - type: "equals"
+        target: "damage_type"
+        expected: "nature"
+        message: "伤害类型应该是nature"
+
+  - name: "元素伤害统计测试"
+    description: "测试元素伤害的统计记录"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "创建一个角色"
+      - "创建一个怪物"
+    steps:
+      - action: "角色对怪物造成100点火焰伤害"
+        expected: "应该记录到火焰伤害统计"
+      - action: "角色对怪物造成50点冰霜伤害"
+        expected: "应该记录到冰霜伤害统计"
+    assertions:
+      - type: "equals"
+        target: "character_stats.fire_damage"
+        expected: "100"
+        message: "火焰伤害应该被记录"
+      - type: "equals"
+        target: "character_stats.frost_damage"
+        expected: "50"
+        message: "冰霜伤害应该被记录"
+
+

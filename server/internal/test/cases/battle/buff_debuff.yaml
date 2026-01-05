@@ -1,0 +1,139 @@
+# 战斗系统 - Buff/Debuff测试
+test_suite: "战斗系统 - Buff/Debuff"
+description: "测试战斗中的Buff和Debuff效果"
+
+tests:
+  - name: "攻击力Buff测试"
+    description: "测试攻击力Buff对伤害的影响"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个攻击力=20的角色"
+      - "创建一个防御力=10的怪物"
+      - "给角色添加攻击力+50%的Buff"
+    steps:
+      - action: "角色对怪物进行攻击"
+        expected: "基础攻击力=20，Buff后攻击力=30，最终伤害≈27"
+    assertions:
+      - type: "approximately"
+        target: "damage_dealt"
+        expected: "27"
+        tolerance: 2.0
+        message: "Buff后的伤害应该约等于27"
+
+  - name: "防御力Debuff测试"
+    description: "测试防御力Debuff对受伤害的影响"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个攻击力=20的角色"
+      - "创建一个防御力=20的怪物"
+      - "给怪物添加防御力-50%的Debuff"
+    steps:
+      - action: "角色对怪物进行攻击"
+        expected: "怪物防御力=10，最终伤害≈18"
+    assertions:
+      - type: "approximately"
+        target: "damage_dealt"
+        expected: "18"
+        tolerance: 2.0
+        message: "Debuff后的伤害应该约等于18"
+
+  - name: "Buff持续时间测试"
+    description: "测试Buff的持续时间机制"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "创建一个角色"
+      - "给角色添加持续3回合的攻击力+50%的Buff"
+    steps:
+      - action: "执行第1回合"
+        expected: "Buff应该生效"
+      - action: "执行第2回合"
+        expected: "Buff应该仍然生效"
+      - action: "执行第3回合"
+        expected: "Buff应该仍然生效"
+      - action: "执行第4回合"
+        expected: "Buff应该消失"
+    assertions:
+      - type: "equals"
+        target: "buff_duration_round_1"
+        expected: "3"
+        message: "第1回合Buff持续时间应该为3"
+      - type: "equals"
+        target: "buff_duration_round_4"
+        expected: "0"
+        message: "第4回合Buff应该消失"
+
+  - name: "DOT伤害测试"
+    description: "测试持续伤害（DOT）效果"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色"
+      - "创建一个怪物，HP=100"
+      - "给怪物添加持续3回合，每回合10点伤害的DOT"
+    steps:
+      - action: "执行第1回合"
+        expected: "怪物受到10点DOT伤害，HP=90"
+      - action: "执行第2回合"
+        expected: "怪物受到10点DOT伤害，HP=80"
+      - action: "执行第3回合"
+        expected: "怪物受到10点DOT伤害，HP=70"
+      - action: "执行第4回合"
+        expected: "DOT消失，怪物不再受到DOT伤害"
+    assertions:
+      - type: "equals"
+        target: "monster.hp_round_1"
+        expected: "90"
+        message: "第1回合后怪物HP应该为90"
+      - type: "equals"
+        target: "monster.hp_round_3"
+        expected: "70"
+        message: "第3回合后怪物HP应该为70"
+      - type: "equals"
+        target: "monster.hp_round_4"
+        expected: "70"
+        message: "第4回合后怪物HP应该仍为70（DOT已消失）"
+
+  - name: "HOT治疗测试"
+    description: "测试持续治疗（HOT）效果"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色，HP=50/100"
+      - "给角色添加持续3回合，每回合15点治疗的HOT"
+    steps:
+      - action: "执行第1回合"
+        expected: "角色受到15点HOT治疗，HP=65"
+      - action: "执行第2回合"
+        expected: "角色受到15点HOT治疗，HP=80"
+      - action: "执行第3回合"
+        expected: "角色受到15点HOT治疗，HP=95（不超过最大HP）"
+      - action: "执行第4回合"
+        expected: "HOT消失，角色不再受到HOT治疗"
+    assertions:
+      - type: "equals"
+        target: "character.hp_round_1"
+        expected: "65"
+        message: "第1回合后角色HP应该为65"
+      - type: "equals"
+        target: "character.hp_round_3"
+        expected: "95"
+        message: "第3回合后角色HP应该为95（不超过最大HP）"
+      - type: "equals"
+        target: "character.hp_round_4"
+        expected: "95"
+        message: "第4回合后角色HP应该仍为95（HOT已消失）"
+
+
+
+
+
+
+
+
+
+
+
+

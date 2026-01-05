@@ -183,7 +183,7 @@ func (r *SkillRepository) GetRandomActiveSkills(classID string, count int, exclu
 // GetCharacterSkills 获取角色的所有主动技能
 func (r *SkillRepository) GetCharacterSkills(characterID int) ([]*models.CharacterSkill, error) {
 	rows, err := database.DB.Query(`
-		SELECT cs.id, cs.character_id, cs.skill_id, cs.skill_level, cs.slot, cs.is_auto
+		SELECT cs.id, cs.character_id, cs.skill_id, cs.skill_level, COALESCE(cs.skill_exp, 0), COALESCE(cs.exp_to_next, 100), cs.slot, cs.is_auto
 		FROM character_skills cs
 		WHERE cs.character_id = ?`, characterID,
 	)
@@ -197,9 +197,11 @@ func (r *SkillRepository) GetCharacterSkills(characterID int) ([]*models.Charact
 		cs := &models.CharacterSkill{}
 		var slot sql.NullInt64
 		var isAuto int
+		var skillExp sql.NullInt64
+		var expToNext sql.NullInt64
 
 		err := rows.Scan(
-			&cs.ID, &cs.CharacterID, &cs.SkillID, &cs.SkillLevel, &slot, &isAuto,
+			&cs.ID, &cs.CharacterID, &cs.SkillID, &cs.SkillLevel, &skillExp, &expToNext, &slot, &isAuto,
 		)
 		if err != nil {
 			continue
@@ -210,6 +212,18 @@ func (r *SkillRepository) GetCharacterSkills(characterID int) ([]*models.Charact
 			cs.Slot = &s
 		}
 		cs.IsAuto = isAuto == 1
+		
+		// 处理技能经验（如果字段存在）
+		if skillExp.Valid {
+			cs.SkillExp = int(skillExp.Int64)
+		} else {
+			cs.SkillExp = 0
+		}
+		if expToNext.Valid {
+			cs.ExpToNext = int(expToNext.Int64)
+		} else {
+			cs.ExpToNext = 100
+		}
 
 		// 加载技能详情
 		skill, err := r.GetSkillByID(cs.SkillID)
@@ -226,8 +240,19 @@ func (r *SkillRepository) GetCharacterSkills(characterID int) ([]*models.Charact
 // AddCharacterSkill 添加角色技能
 func (r *SkillRepository) AddCharacterSkill(characterID int, skillID string, level int) error {
 	_, err := database.DB.Exec(`
-		INSERT OR REPLACE INTO character_skills (character_id, skill_id, skill_level)
-		VALUES (?, ?, ?)`, characterID, skillID, level,
+		INSERT OR REPLACE INTO character_skills (character_id, skill_id, skill_level, skill_exp, exp_to_next)
+		VALUES (?, ?, ?, 0, 100)`, characterID, skillID, level,
+	)
+	return err
+}
+
+// UpdateSkillExperience 更新技能经验
+func (r *SkillRepository) UpdateSkillExperience(characterID int, skillID string, skillExp, expToNext, skillLevel int) error {
+	_, err := database.DB.Exec(`
+		UPDATE character_skills 
+		SET skill_exp = ?, exp_to_next = ?, skill_level = ?
+		WHERE character_id = ? AND skill_id = ?`,
+		skillExp, expToNext, skillLevel, characterID, skillID,
 	)
 	return err
 }

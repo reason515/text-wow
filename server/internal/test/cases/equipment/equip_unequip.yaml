@@ -1,0 +1,181 @@
+# 装备系统 - 装备穿戴测试
+test_suite: "装备系统 - 装备穿戴"
+description: "测试装备的穿戴和卸下功能，包括属性加成、槽位管理、装备要求等"
+
+tests:
+  - name: "基础装备穿戴测试"
+    description: "测试角色穿戴装备的基本流程"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个10级战士角色"
+      - "获得一件10级武器，攻击力+10"
+    steps:
+      - action: "角色穿戴武器"
+        expected: "武器成功装备到主手槽位"
+        assertions:
+          - "角色的攻击力应该增加10点"
+          - "武器的character_id应该等于角色ID"
+      - action: "检查角色属性"
+        expected: "角色的物理攻击力应该提升"
+    assertions:
+      - type: "greater_than"
+        target: "character.physical_attack"
+        expected: "base_physical_attack"
+        message: "物理攻击力应该提升"
+
+  - name: "装备替换测试"
+    description: "测试穿戴新装备时自动替换旧装备"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色，已装备一件武器（攻击力+5）"
+      - "获得一件新武器（攻击力+15）"
+    steps:
+      - action: "角色穿戴新武器"
+        expected: "新武器替换旧武器，旧武器回到背包"
+        assertions:
+          - "旧武器的character_id应该为NULL"
+          - "新武器的character_id应该等于角色ID"
+          - "角色的攻击力应该更新为新武器的加成"
+    assertions:
+      - type: "equals"
+        target: "old_weapon.character_id"
+        expected: "null"
+        message: "旧武器应该回到背包"
+      - type: "equals"
+        target: "new_weapon.character_id"
+        expected: "character.id"
+        message: "新武器应该装备到角色"
+
+  - name: "装备卸下测试"
+    description: "测试卸下装备的功能"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色，已装备一件武器（攻击力+10）"
+    steps:
+      - action: "角色卸下武器"
+        expected: "武器卸下成功，回到背包"
+        assertions:
+          - "武器的character_id应该为NULL"
+          - "角色的攻击力应该减少10点"
+    assertions:
+      - type: "equals"
+        target: "weapon.character_id"
+        expected: "null"
+        message: "武器应该回到背包"
+      - type: "less_than"
+        target: "character.physical_attack"
+        expected: "previous_physical_attack"
+        message: "物理攻击力应该降低"
+
+  - name: "等级要求测试"
+    description: "测试装备的等级要求限制"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个5级角色"
+      - "获得一件需要10级才能装备的武器"
+    steps:
+      - action: "角色尝试穿戴武器"
+        expected: "装备失败，提示等级不足"
+    assertions:
+      - type: "equals"
+        target: "equip_success"
+        expected: "false"
+        message: "装备应该失败"
+      - type: "contains"
+        target: "error_message"
+        expected: "等级不足"
+        message: "错误消息应该提示等级不足"
+
+  - name: "职业要求测试"
+    description: "测试装备的职业要求限制"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个法师角色"
+      - "获得一件只有战士才能装备的武器"
+    steps:
+      - action: "法师尝试穿戴战士武器"
+        expected: "装备失败，提示职业不匹配"
+    assertions:
+      - type: "equals"
+        target: "equip_success"
+        expected: "false"
+        message: "装备应该失败"
+      - type: "contains"
+        target: "error_message"
+        expected: "职业不匹配"
+        message: "错误消息应该提示职业不匹配"
+
+  - name: "属性要求测试"
+    description: "测试装备的属性要求限制"
+    category: "unit"
+    priority: "medium"
+    setup:
+      - "创建一个角色，力量=10"
+      - "获得一件需要力量15才能装备的护甲"
+    steps:
+      - action: "角色尝试穿戴护甲"
+        expected: "装备失败，提示属性不足"
+    assertions:
+      - type: "equals"
+        target: "equip_success"
+        expected: "false"
+        message: "装备应该失败"
+      - type: "contains"
+        target: "error_message"
+        expected: "属性不足"
+        message: "错误消息应该提示属性不足"
+
+  - name: "多件装备属性叠加测试"
+    description: "测试穿戴多件装备时属性叠加"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色"
+      - "获得一件武器（攻击力+10）"
+      - "获得一件护甲（防御力+15）"
+      - "获得一件饰品（力量+5）"
+    steps:
+      - action: "角色依次穿戴所有装备"
+        expected: "所有装备成功装备，属性叠加"
+    assertions:
+      - type: "greater_than"
+        target: "character.physical_attack"
+        expected: "base_physical_attack"
+        message: "物理攻击力应该提升"
+      - type: "greater_than"
+        target: "character.physical_defense"
+        expected: "base_physical_defense"
+        message: "物理防御力应该提升"
+      - type: "greater_than"
+        target: "character.strength"
+        expected: "base_strength"
+        message: "力量应该提升"
+
+  - name: "装备槽位冲突测试"
+    description: "测试同一槽位只能装备一件装备"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "创建一个角色，已装备一件主手武器"
+      - "获得另一件主手武器"
+    steps:
+      - action: "角色尝试穿戴新武器"
+        expected: "新武器替换旧武器"
+    assertions:
+      - type: "equals"
+        target: "equipped_main_hand_count"
+        expected: "1"
+        message: "主手槽位应该只有一件装备"
+
+
+
+
+
+
+
+

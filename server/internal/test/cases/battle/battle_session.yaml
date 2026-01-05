@@ -1,0 +1,49 @@
+# 战斗系统 - 战斗会话管理测试
+test_suite: "战斗系统 - 战斗会话管理"
+description: "测试战斗会话的创建、管理、状态转换等。注意：部分会话管理功能需要实际游戏系统支持，测试运行器目前不完全支持所有会话管理功能。实际测试需要通过Go单元测试进行验证。"
+
+tests:
+  - name: "会话管理功能说明"
+    description: "会话管理功能需要在实际游戏系统中测试。参考 server/internal/game/battle_manager_test.go 中的相关测试。"
+    category: "documentation"
+    priority: "high"
+    setup:
+      - "会话管理功能包括：会话创建、状态转换、数据持久化、战斗日志、多场战斗累计等"
+    steps:
+      - action: "这些功能需要通过Go单元测试进行验证"
+        expected: "参考 server/internal/game/battle_manager_test.go"
+    assertions: []
+
+  - name: "战斗状态管理测试"
+    description: "测试战斗状态的初始化和管理"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "初始化战斗系统"
+    steps:
+      - action: "开始战斗"
+        expected: "战斗状态应该变为in_progress"
+    assertions:
+      - type: "equals"
+        target: "battle_state"
+        expected: "in_progress"
+        message: "开始战斗后状态应该为in_progress"
+
+  - name: "战斗日志记录测试"
+    description: "测试战斗日志的记录功能"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "创建一个角色和一个怪物"
+      - "初始化战斗系统"
+    steps:
+      - action: "开始战斗"
+        expected: "应该初始化战斗日志系统"
+      - action: "角色攻击怪物"
+        expected: "应该记录攻击日志"
+    assertions:
+      - type: "equals"
+        target: "battle_state"
+        expected: "in_progress"
+        message: "战斗应该处于进行中状态"
+

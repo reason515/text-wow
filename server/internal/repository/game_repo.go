@@ -178,14 +178,55 @@ func (r *GameRepository) GetZoneByID(id string) (*models.Zone, error) {
 	return zone, nil
 }
 
+// GetMonsterSkills 获取怪物的技能列表
+func (r *GameRepository) GetMonsterSkills(monsterID string) ([]*models.MonsterSkill, error) {
+	rows, err := database.DB.Query(`
+		SELECT id, monster_id, skill_id, skill_type, priority, cooldown, use_condition
+		FROM monster_skills
+		WHERE monster_id = ?
+		ORDER BY priority DESC`, monsterID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var skills []*models.MonsterSkill
+	for rows.Next() {
+		skill := &models.MonsterSkill{}
+		var useCondition sql.NullString
+		err := rows.Scan(
+			&skill.ID, &skill.MonsterID, &skill.SkillID, &skill.SkillType,
+			&skill.Priority, &skill.Cooldown, &useCondition,
+		)
+		if err != nil {
+			return nil, err
+		}
+		if useCondition.Valid {
+			skill.UseCondition = useCondition.String
+		}
+		skill.CooldownLeft = 0
+		
+		// 加载技能详情
+		skillDetail, err := r.GetSkillByID(skill.SkillID)
+		if err == nil && skillDetail != nil {
+			skill.Skill = skillDetail
+		}
+		
+		skills = append(skills, skill)
+	}
+
+	return skills, nil
+}
+
 // GetMonstersByZone 获取区域内的怪物
 func (r *GameRepository) GetMonstersByZone(zoneID string) ([]models.Monster, error) {
 	rows, err := database.DB.Query(`
-		SELECT id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense,
+		SELECT id, zone_id, name, level, type, hp, COALESCE(mp, 0), physical_attack, magic_attack, physical_defense, magic_defense,
 		       COALESCE(attack_type, 'physical'),
 		       COALESCE(phys_crit_rate, 0.05), COALESCE(phys_crit_damage, 1.5),
 		       COALESCE(spell_crit_rate, 0.05), COALESCE(spell_crit_damage, 1.5),
-		       COALESCE(dodge_rate, 0.05), exp_reward, gold_min, gold_max, spawn_weight
+		       COALESCE(dodge_rate, 0.05), COALESCE(speed, 10), exp_reward, gold_min, gold_max, spawn_weight,
+		       COALESCE(ai_type, 'balanced'), COALESCE(ai_behavior, '')
 		FROM monsters WHERE zone_id = ? ORDER BY level`, zoneID)
 	if err != nil {
 		return nil, err
@@ -195,10 +236,13 @@ func (r *GameRepository) GetMonstersByZone(zoneID string) ([]models.Monster, err
 	var monsters []models.Monster
 	for rows.Next() {
 		m := models.Monster{}
+		var aiType sql.NullString
+		var aiBehavior sql.NullString
 		err := rows.Scan(
-			&m.ID, &m.ZoneID, &m.Name, &m.Level, &m.Type, &m.HP, &m.PhysicalAttack, &m.MagicAttack, &m.PhysicalDefense, &m.MagicDefense,
+			&m.ID, &m.ZoneID, &m.Name, &m.Level, &m.Type, &m.HP, &m.MP, &m.PhysicalAttack, &m.MagicAttack, &m.PhysicalDefense, &m.MagicDefense,
 			&m.AttackType, &m.PhysCritRate, &m.PhysCritDamage, &m.SpellCritRate, &m.SpellCritDamage, &m.DodgeRate,
-			&m.ExpReward, &m.GoldMin, &m.GoldMax, &m.SpawnWeight,
+			&m.Speed, &m.ExpReward, &m.GoldMin, &m.GoldMax, &m.SpawnWeight,
+			&aiType, &aiBehavior,
 		)
 		if err != nil {
 			return nil, err
@@ -207,8 +251,214 @@ func (r *GameRepository) GetMonstersByZone(zoneID string) ([]models.Monster, err
 			m.AttackType = "physical"
 		}
 		m.MaxHP = m.HP
+		m.MaxMP = m.MP
+		if aiType.Valid {
+			m.AIType = aiType.String
+		} else {
+			m.AIType = "balanced"
+		}
+		if aiBehavior.Valid {
+			m.AIBehavior = aiBehavior.String
+		}
+		
+		// 加载怪物技能
+		skills, err := r.GetMonsterSkills(m.ID)
+		if err == nil {
+			m.MonsterSkills = skills
+		}
+		
 		monsters = append(monsters, m)
 	}
 
 	return monsters, nil
+}
+
+// GetMonsterByID 根据ID获取怪物
+func (r *GameRepository) GetMonsterByID(monsterID string) (*models.Monster, error) {
+	m := &models.Monster{}
+	var aiType sql.NullString
+	var aiBehavior sql.NullString
+	
+	err := database.DB.QueryRow(`
+		SELECT id, zone_id, name, level, type, hp, COALESCE(mp, 0), physical_attack, magic_attack, physical_defense, magic_defense,
+		       COALESCE(attack_type, 'physical'),
+		       COALESCE(phys_crit_rate, 0.05), COALESCE(phys_crit_damage, 1.5),
+		       COALESCE(spell_crit_rate, 0.05), COALESCE(spell_crit_damage, 1.5),
+		       COALESCE(dodge_rate, 0.05), COALESCE(speed, 10), exp_reward, gold_min, gold_max, spawn_weight,
+		       COALESCE(ai_type, 'balanced'), COALESCE(ai_behavior, '')
+		FROM monsters WHERE id = ?`, monsterID,
+	).Scan(
+		&m.ID, &m.ZoneID, &m.Name, &m.Level, &m.Type, &m.HP, &m.MP, &m.PhysicalAttack, &m.MagicAttack, &m.PhysicalDefense, &m.MagicDefense,
+		&m.AttackType, &m.PhysCritRate, &m.PhysCritDamage, &m.SpellCritRate, &m.SpellCritDamage, &m.DodgeRate,
+		&m.Speed, &m.ExpReward, &m.GoldMin, &m.GoldMax, &m.SpawnWeight,
+		&aiType, &aiBehavior,
+	)
+	if err != nil {
+		return nil, err
+	}
+	
+	if m.AttackType == "" {
+		m.AttackType = "physical"
+	}
+	m.MaxHP = m.HP
+	m.MaxMP = m.MP
+	if aiType.Valid {
+		m.AIType = aiType.String
+	} else {
+		m.AIType = "balanced"
+	}
+	if aiBehavior.Valid {
+		m.AIBehavior = aiBehavior.String
+	}
+	
+	// 加载怪物技能
+	skills, err := r.GetMonsterSkills(m.ID)
+	if err == nil {
+		m.MonsterSkills = skills
+	}
+	
+	return m, nil
+}
+
+// GetItemByID 根据ID获取物品
+func (r *GameRepository) GetItemByID(itemID string) (map[string]interface{}, error) {
+	var id, name, itemType, quality, slot string
+	var description, subtype, classRequired sql.NullString
+	var levelRequired, stackable, maxStack, sellPrice, buyPrice int
+	var strength, agility, intellect, stamina, spirit int
+	var attack, defense, hpBonus, mpBonus int
+	var critRate float64
+	var effectType sql.NullString
+	var effectValue sql.NullInt64
+	
+	err := database.DB.QueryRow(`
+		SELECT id, name, COALESCE(description, ''), type, COALESCE(subtype, ''), quality,
+		       level_required, class_required, slot, stackable, max_stack,
+		       sell_price, buy_price, strength, agility, intellect, stamina, spirit,
+		       attack, defense, hp_bonus, mp_bonus, crit_rate, effect_type, effect_value
+		FROM items WHERE id = ?`, itemID,
+	).Scan(
+		&id, &name, &description, &itemType, &subtype, &quality,
+		&levelRequired, &classRequired, &slot, &stackable, &maxStack,
+		&sellPrice, &buyPrice, &strength, &agility, &intellect, &stamina, &spirit,
+		&attack, &defense, &hpBonus, &mpBonus, &critRate, &effectType, &effectValue,
+	)
+	if err != nil {
+		return nil, err
+	}
+	
+	item := map[string]interface{}{
+		"id":            id,
+		"name":          name,
+		"type":          itemType,
+		"quality":      quality,
+		"level_required": levelRequired,
+		"slot":          slot,
+		"stackable":    stackable,
+		"max_stack":    maxStack,
+		"sell_price":   sellPrice,
+		"buy_price":    buyPrice,
+		"strength":     strength,
+		"agility":      agility,
+		"intellect":    intellect,
+		"stamina":      stamina,
+		"spirit":       spirit,
+		"attack":       attack,
+		"defense":      defense,
+		"hp_bonus":     hpBonus,
+		"mp_bonus":     mpBonus,
+		"crit_rate":    critRate,
+	}
+	
+	if description.Valid {
+		item["description"] = description.String
+	}
+	if subtype.Valid {
+		item["subtype"] = subtype.String
+	}
+	if classRequired.Valid {
+		item["class_required"] = classRequired.String
+	}
+	if effectType.Valid {
+		item["effect_type"] = effectType.String
+	}
+	if effectValue.Valid {
+		item["effect_value"] = effectValue.Int64
+	}
+	
+	return item, nil
+}
+
+// GetSkillByID 根据ID获取技能
+func (r *GameRepository) GetSkillByID(skillID string) (*models.Skill, error) {
+	skill := &models.Skill{}
+	var description sql.NullString
+	var damageType sql.NullString
+	var scalingStat sql.NullString
+	var tags sql.NullString
+	
+	err := database.DB.QueryRow(`
+		SELECT id, name, COALESCE(description, ''), class_id, type, target_type,
+		       COALESCE(damage_type, ''), base_value, COALESCE(scaling_stat, ''),
+		       scaling_ratio, resource_cost, cooldown, level_required,
+		       threat_modifier, threat_type, tags
+		FROM skills WHERE id = ?`, skillID,
+	).Scan(
+		&skill.ID, &skill.Name, &description, &skill.ClassID, &skill.Type, &skill.TargetType,
+		&damageType, &skill.BaseValue, &scalingStat,
+		&skill.ScalingRatio, &skill.ResourceCost, &skill.Cooldown, &skill.LevelRequired,
+		&skill.ThreatModifier, &skill.ThreatType, &tags,
+	)
+	if err != nil {
+		return nil, err
+	}
+	
+	if description.Valid {
+		skill.Description = description.String
+	}
+	if damageType.Valid {
+		skill.DamageType = damageType.String
+	}
+	if scalingStat.Valid {
+		skill.ScalingStat = scalingStat.String
+	}
+	if tags.Valid {
+		skill.Tags = tags.String
+	}
+	
+	return skill, nil
+}
+
+// MonsterDrop 怪物掉落项
+type MonsterDrop struct {
+	ItemID     string
+	DropRate   float64
+	MinQuantity int
+	MaxQuantity int
+}
+
+// GetMonsterDrops 获取怪物的掉落表
+func (r *GameRepository) GetMonsterDrops(monsterID string) ([]MonsterDrop, error) {
+	rows, err := database.DB.Query(`
+		SELECT item_id, drop_rate, min_quantity, max_quantity
+		FROM monster_drops
+		WHERE monster_id = ?
+		ORDER BY drop_rate DESC
+	`, monsterID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var drops []MonsterDrop
+	for rows.Next() {
+		var drop MonsterDrop
+		err := rows.Scan(&drop.ItemID, &drop.DropRate, &drop.MinQuantity, &drop.MaxQuantity)
+		if err != nil {
+			return nil, err
+		}
+		drops = append(drops, drop)
+	}
+
+	return drops, nil
 }

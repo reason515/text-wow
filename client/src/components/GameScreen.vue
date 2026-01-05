@@ -634,12 +634,38 @@ function getCombatStatTooltip(statKey: string): string {
         '闪避可以躲避物理和魔法攻击'
       ].join('\n')
     }
+    case 'elementalResistance': {
+      const char = selectedCharacter.value
+      if (!char) return ''
+      const magicDef = stats.magicDefense
+      return [
+        '元素抗性',
+        '当前使用魔法防御来减少元素伤害',
+        `魔法防御: ${magicDef}`,
+        '',
+        '防御减伤公式：',
+        '伤害 = 攻击 - 魔法防御',
+        '最低伤害：1点',
+        '',
+        '元素伤害类型：',
+        '- 火焰 (Fire)',
+        '- 冰霜 (Frost)',
+        '- 暗影 (Shadow)',
+        '- 神圣 (Holy)',
+        '- 自然 (Nature)',
+        '',
+        '注意：',
+        '- 防御使用减法公式（直接减少伤害值）',
+        '- 元素抗性（未来实现）将使用百分比减伤',
+        '- 元素抗性会在魔法防御之后应用'
+      ].join('\n')
+    }
     default:
       return ''
   }
 }
 
-type PrimaryStatKey = 'strength' | 'agility' | 'intellect' | 'stamina' | 'spirit'
+type PrimaryStatKey = 'strength' | 'agility' | 'intellect' | 'stamina' | 'spirit' | 'speed'
 
 // 主属性 tooltip：说明该属性对派生数值的影响
 function getPrimaryStatTooltip(statKey: PrimaryStatKey): string {
@@ -668,11 +694,13 @@ function getPrimaryStatTooltip(statKey: PrimaryStatKey): string {
       const physAtk = (agi * 0.2).toFixed(1)
       const critRate = ((char.physCritRate ?? (0.05 + agi / 20)) * 100).toFixed(1)
       const dodge = ((char.dodgeRate ?? (0.05 + agi / 20)) * 100).toFixed(1)
+      const speed = agi // 速度 = 敏捷
       return [
         '敏捷',
         `- 每点提供 0.2 物理攻击 (当前贡献: +${physAtk})`,
         `- 物理暴击率 = 5% + 敏捷/20 (当前: ${critRate}%)`,
-        `- 闪避率 = 5% + 敏捷/20 (当前: ${dodge}%)`
+        `- 闪避率 = 5% + 敏捷/20 (当前: ${dodge}%)`,
+        `- 速度 = 敏捷 (当前速度: ${speed})`
       ].join('\n')
     }
     case 'intellect': {
@@ -703,6 +731,17 @@ function getPrimaryStatTooltip(statKey: PrimaryStatKey): string {
         `- 每点提供 0.2 魔法攻击 (当前贡献: +${magicAtk})`,
         `- 每点提供 0.3 魔法防御 (当前贡献: +${magicDef})`,
         `- 法术暴击率 = 5% + 精神/20 (当前: ${spellCritRate}%)`
+      ].join('\n')
+    }
+    case 'speed': {
+      const agi = char.agility || 0
+      return [
+        '速度',
+        `速度 = 敏捷`,
+        `当前敏捷: ${agi}`,
+        `当前速度: ${agi}`,
+        `速度决定战斗中的行动顺序`,
+        `速度相同时随机确定出手顺序`
       ].join('\n')
     }
     default:
@@ -2007,6 +2046,15 @@ function escapeRegex(str: string): string {
               :disabled="!selectedCharacter.unspentPoints || allocating"
             >+</button>
           </div>
+          <!-- 速度显示（速度 = 敏捷） -->
+          <div
+            class="character-detail-stat"
+            @mouseenter="handleAttrTooltip($event, 'speed')"
+            @mouseleave="hideAttrTooltip"
+          >
+            <span class="character-detail-stat-label">速度</span>
+            <span class="character-detail-stat-value">{{ selectedCharacter.agility || 0 }}</span>
+          </div>
         </div>
 
         <!-- 战斗统计 -->
@@ -2082,6 +2130,15 @@ function escapeRegex(str: string): string {
           >
             <span class="character-detail-combat-stat-label">闪避率</span>
             <span class="character-detail-combat-stat-value">{{ (displayedStats.dodgeRate * 100).toFixed(1) }}%</span>
+          </div>
+          <!-- 元素抗性（说明性） -->
+          <div
+            class="character-detail-combat-stat"
+            @mouseenter="handleCombatTooltip($event, getCombatStatTooltip('elementalResistance'))"
+            @mouseleave="hideCombatTooltip"
+          >
+            <span class="character-detail-combat-stat-label">元素抗性</span>
+            <span class="character-detail-combat-stat-value">使用魔法防御</span>
           </div>
         </div>
 

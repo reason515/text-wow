@@ -1,0 +1,203 @@
+# 装备系统 - 装备交易测试
+test_suite: "装备系统 - 装备交易"
+description: "测试装备交易系统，包括拍卖行、直接交易、交易手续费等"
+
+tests:
+  - name: "拍卖行上架测试"
+    description: "测试将装备上架到拍卖行"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个玩家A，拥有1000金币"
+      - "玩家A获得一件橙色装备"
+    steps:
+      - action: "玩家A将装备上架拍卖行，价格500金币"
+        expected: "装备成功上架，扣除上架费（价格的5%）"
+        assertions:
+          - "上架费应该为25金币（500×5%）"
+          - "玩家A金币应该减少25金币"
+          - "装备应该在拍卖行中显示"
+    assertions:
+      - type: "equals"
+        target: "listing.status"
+        expected: "active"
+        message: "上架状态应该为active"
+      - type: "equals"
+        target: "player_a.gold"
+        expected: "975"
+        message: "玩家A金币应该为975（1000-25）"
+
+  - name: "拍卖行购买测试"
+    description: "测试从拍卖行购买装备"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "玩家A上架一件装备，价格500金币"
+      - "创建玩家B，拥有1000金币"
+    steps:
+      - action: "玩家B购买装备"
+        expected: "交易成功，玩家B获得装备，玩家A获得金币（扣除手续费）"
+        assertions:
+          - "玩家B金币应该减少500金币"
+          - "玩家B应该获得装备"
+          - "玩家A应该获得475金币（500-25手续费）"
+    assertions:
+      - type: "equals"
+        target: "player_b.gold"
+        expected: "500"
+        message: "玩家B金币应该为500（1000-500）"
+      - type: "equals"
+        target: "equipment.owner_id"
+        expected: "player_b.id"
+        message: "装备所有权应该转移给玩家B"
+      - type: "equals"
+        target: "listing.status"
+        expected: "sold"
+        message: "上架状态应该为sold"
+
+  - name: "交易手续费测试"
+    description: "测试交易手续费的计算"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "准备一个交易，价格=1000金币"
+    steps:
+      - action: "计算交易手续费"
+        expected: "手续费=1000×5%=50金币"
+    assertions:
+      - type: "equals"
+        target: "transaction_fee"
+        expected: "50"
+        message: "交易手续费应该为50金币"
+      - type: "equals"
+        target: "seller_received_gold"
+        expected: "950"
+        message: "卖家应该收到950金币（1000-50）"
+
+  - name: "上架费最低限制测试"
+    description: "测试上架费的最低限制（至少10金币）"
+    category: "unit"
+    priority: "medium"
+    setup:
+      - "准备一个交易，价格=100金币"
+    steps:
+      - action: "计算上架费"
+        expected: "上架费=100×5%=5，但最低为10金币"
+    assertions:
+      - type: "equals"
+        target: "listing_fee"
+        expected: "10"
+        message: "上架费应该为10金币（最低限制）"
+
+  - name: "直接交易测试"
+    description: "测试两个玩家之间的直接交易"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建玩家A，拥有一件装备"
+      - "创建玩家B，拥有500金币"
+    steps:
+      - action: "玩家A向玩家B发起交易，价格500金币"
+        expected: "交易报价创建成功"
+      - action: "玩家B接受交易"
+        expected: "交易完成，装备转移，金币转移"
+    assertions:
+      - type: "equals"
+        target: "trade_offer.status"
+        expected: "accepted"
+        message: "交易状态应该为accepted"
+      - type: "equals"
+        target: "equipment.owner_id"
+        expected: "player_b.id"
+        message: "装备所有权应该转移给玩家B"
+
+  - name: "交易拒绝测试"
+    description: "测试拒绝交易报价"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "创建玩家A，拥有一件装备"
+      - "创建玩家B"
+    steps:
+      - action: "玩家A向玩家B发起交易"
+        expected: "交易报价创建成功"
+      - action: "玩家B拒绝交易"
+        expected: "交易状态变为rejected，装备不转移"
+    assertions:
+      - type: "equals"
+        target: "trade_offer.status"
+        expected: "rejected"
+        message: "交易状态应该为rejected"
+      - type: "equals"
+        target: "equipment.owner_id"
+        expected: "player_a.id"
+        message: "装备所有权应该保持不变"
+
+  - name: "取消上架测试"
+    description: "测试取消拍卖行上架"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "玩家A上架一件装备"
+    steps:
+      - action: "玩家A取消上架"
+        expected: "上架状态变为cancelled，装备归还"
+        assertions:
+          - "上架费不退还"
+          - "装备应该回到玩家A的背包"
+    assertions:
+      - type: "equals"
+        target: "listing.status"
+        expected: "cancelled"
+        message: "上架状态应该为cancelled"
+      - type: "equals"
+        target: "equipment.character_id"
+        expected: "null"
+        message: "装备应该未装备"
+
+  - name: "已装备装备交易限制测试"
+    description: "测试已装备的装备不能交易"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建玩家A，装备了一件武器"
+    steps:
+      - action: "玩家A尝试上架已装备的武器"
+        expected: "上架失败，提示需要先卸下装备"
+    assertions:
+      - type: "equals"
+        target: "list_success"
+        expected: "false"
+        message: "上架应该失败"
+      - type: "contains"
+        target: "error_message"
+        expected: "已装备"
+        message: "错误消息应该提示装备已装备"
+
+  - name: "金币不足购买测试"
+    description: "测试金币不足时无法购买装备"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "玩家A上架一件装备，价格1000金币"
+      - "创建玩家B，拥有500金币"
+    steps:
+      - action: "玩家B尝试购买装备"
+        expected: "购买失败，提示金币不足"
+    assertions:
+      - type: "equals"
+        target: "buy_success"
+        expected: "false"
+        message: "购买应该失败"
+      - type: "contains"
+        target: "error_message"
+        expected: "金币不足"
+        message: "错误消息应该提示金币不足"
+
+
+
+
+
+
+
+

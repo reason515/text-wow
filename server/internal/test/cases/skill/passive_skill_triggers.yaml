@@ -1,0 +1,19 @@
+# 技能系统 - 被动技能触发测试
+test_suite: "技能系统 - 被动技能触发"
+description: "注意：被动技能触发功能需要实际游戏系统支持，测试运行器目前不支持被动技能触发测试。这些测试用例作为文档说明，实际测试需要通过Go单元测试进行。"
+
+tests:
+  - name: "被动技能功能说明"
+    description: "被动技能触发功能需要在实际游戏系统中测试"
+    category: "documentation"
+    priority: "low"
+    setup:
+      - "被动技能触发功能包括：on_hit、on_crit、on_kill、on_damage_taken、on_skill_use等"
+    steps:
+      - action: "这些功能需要通过Go单元测试进行验证"
+        expected: "参考 server/internal/game/passive_trigger_test.go"
+    assertions:
+      - type: "contains"
+        target: "test_location"
+        expected: "passive_trigger_test"
+        message: "被动技能触发测试位于Go单元测试文件中"

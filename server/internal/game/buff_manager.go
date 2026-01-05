@@ -25,6 +25,11 @@ type BuffInstance struct {
 	StatAffected string // 影响的属性
 	DamageType  string // DOT伤害类型
 	CreatedAt   time.Time
+	// DOT/HOT相关字段
+	IsDOT       bool    // 是否为持续伤害
+	IsHOT       bool    // 是否为持续治疗
+	Interval    int    // 触发间隔（回合数，0表示每回合触发）
+	LastTick    int    // 上次触发的回合数
 }
 
 // NewBuffManager 创建Buff管理器
@@ -37,6 +42,11 @@ func NewBuffManager() *BuffManager {
 
 // ApplyBuff 应用Buff/Debuff
 func (bm *BuffManager) ApplyBuff(characterID int, effectID, name, effectType string, isBuff bool, duration int, value float64, statAffected, damageType string) {
+	bm.ApplyBuffWithDOT(characterID, effectID, name, effectType, isBuff, duration, value, statAffected, damageType, false, false, 0)
+}
+
+// ApplyBuffWithDOT 应用Buff/Debuff（支持DOT/HOT）
+func (bm *BuffManager) ApplyBuffWithDOT(characterID int, effectID, name, effectType string, isBuff bool, duration int, value float64, statAffected, damageType string, isDOT, isHOT bool, interval int) {
 	bm.mu.Lock()
 	defer bm.mu.Unlock()
 
@@ -44,10 +54,29 @@ func (bm *BuffManager) ApplyBuff(characterID int, effectID, name, effectType str
 		bm.characterBuffs[characterID] = make(map[string]*BuffInstance)
 	}
 
-	// 如果已存在相同类型的buff，刷新持续时间（不叠加）
+	// 如果已存在相同类型的buff，根据叠加规则处理
 	if existing, exists := bm.characterBuffs[characterID][effectID]; exists {
-		if existing.Duration < duration {
+		// 根据叠加规则处理
+		stackingRule := bm.getStackingRule(effectID)
+		switch stackingRule {
+		case "refresh":
+			// 刷新持续时间（不叠加）
+			if existing.Duration < duration {
+				existing.Duration = duration
+			}
+		case "stack":
+			// 叠加：增加层数或刷新持续时间
 			existing.Duration = duration
+			existing.Value += value // 叠加数值
+		case "replace":
+			// 替换：完全替换
+			existing.Duration = duration
+			existing.Value = value
+		default:
+			// 默认：刷新持续时间
+			if existing.Duration < duration {
+				existing.Duration = duration
+			}
 		}
 		return
 	}
@@ -62,11 +91,20 @@ func (bm *BuffManager) ApplyBuff(characterID int, effectID, name, effectType str
 		StatAffected: statAffected,
 		DamageType:   damageType,
 		CreatedAt:    time.Now(),
+		IsDOT:        isDOT,
+		IsHOT:        isHOT,
+		Interval:     interval,
+		LastTick:     0,
 	}
 }
 
 // ApplyEnemyDebuff 应用Debuff到敌人
 func (bm *BuffManager) ApplyEnemyDebuff(enemyID string, effectID, name, effectType string, duration int, value float64, statAffected, damageType string) {
+	bm.ApplyEnemyDebuffWithDOT(enemyID, effectID, name, effectType, duration, value, statAffected, damageType, false, 0)
+}
+
+// ApplyEnemyDebuffWithDOT 应用Debuff到敌人（支持DOT）
+func (bm *BuffManager) ApplyEnemyDebuffWithDOT(enemyID string, effectID, name, effectType string, duration int, value float64, statAffected, damageType string, isDOT bool, interval int) {
 	bm.mu.Lock()
 	defer bm.mu.Unlock()
 
@@ -74,10 +112,29 @@ func (bm *BuffManager) ApplyEnemyDebuff(enemyID string, effectID, name, effectTy
 		bm.enemyBuffs[enemyID] = make(map[string]*BuffInstance)
 	}
 
-	// 如果已存在相同类型的debuff，刷新持续时间（不叠加）
+	// 如果已存在相同类型的debuff，根据叠加规则处理
 	if existing, exists := bm.enemyBuffs[enemyID][effectID]; exists {
-		if existing.Duration < duration {
+		// 根据叠加规则处理
+		stackingRule := bm.getStackingRule(effectID)
+		switch stackingRule {
+		case "refresh":
+			// 刷新持续时间（不叠加）
+			if existing.Duration < duration {
+				existing.Duration = duration
+			}
+		case "stack":
+			// 叠加：增加层数或刷新持续时间
 			existing.Duration = duration
+			existing.Value += value // 叠加数值
+		case "replace":
+			// 替换：完全替换
+			existing.Duration = duration
+			existing.Value = value
+		default:
+			// 默认：刷新持续时间
+			if existing.Duration < duration {
+				existing.Duration = duration
+			}
 		}
 		return
 	}
@@ -92,6 +149,10 @@ func (bm *BuffManager) ApplyEnemyDebuff(enemyID string, effectID, name, effectTy
 		StatAffected: statAffected,
 		DamageType:   damageType,
 		CreatedAt:    time.Now(),
+		IsDOT:        isDOT,
+		IsHOT:        false, // 敌人不会有HOT
+		Interval:     interval,
+		LastTick:     0,
 	}
 }
 
@@ -306,5 +367,104 @@ func (bm *BuffManager) CalculateDamageTakenWithBuffs(baseDamage int, characterID
 	}
 
 	return baseDamage
+}
+
+// getStackingRule 获取Buff的叠加规则
+func (bm *BuffManager) getStackingRule(effectID string) string {
+	// 定义叠加规则
+	// "refresh": 刷新持续时间（不叠加）
+	// "stack": 叠加（增加层数或数值）
+	// "replace": 替换（完全替换）
+	stackingRules := map[string]string{
+		"battle_shout":      "refresh", // 战斗怒吼：刷新
+		"shield_block":     "refresh", // 盾牌格挡：刷新
+		"recklessness_crit": "refresh", // 鲁莽：刷新
+		"berserker_rage":   "refresh", // 狂暴之怒：刷新
+		"avatar":            "refresh", // 天神下凡：刷新
+		"shield_wall":       "refresh", // 盾墙：刷新
+		"unbreakable_barrier": "refresh", // 不破壁垒：刷新
+		"shield_reflection": "refresh", // 盾牌反射：刷新
+		"retaliation":       "refresh", // 反击：刷新
+		// DOT/HOT效果可以叠加
+		"dot_poison":        "stack",   // 毒药DOT：叠加
+		"dot_bleed":         "stack",   // 流血DOT：叠加
+		"hot_regen":         "stack",   // 恢复HOT：叠加
+	}
+	
+	if rule, exists := stackingRules[effectID]; exists {
+		return rule
+	}
+	return "refresh" // 默认刷新
+}
+
+// ProcessDOTEffects 处理DOT效果（每回合调用）
+// 返回: (damageMap, healingMap) damageMap: map[characterID]damage, healingMap: map[characterID]healing
+func (bm *BuffManager) ProcessDOTEffects(characterID int, currentRound int) (int, int) {
+	bm.mu.Lock()
+	defer bm.mu.Unlock()
+
+	damage := 0
+	healing := 0
+
+	if buffs, exists := bm.characterBuffs[characterID]; exists {
+		for _, buff := range buffs {
+			// 检查是否应该触发（根据间隔）
+			shouldTick := false
+			if buff.Interval == 0 {
+				// 每回合触发
+				shouldTick = true
+			} else {
+				// 根据间隔触发
+				if buff.LastTick == 0 || (currentRound-buff.LastTick) >= buff.Interval {
+					shouldTick = true
+					buff.LastTick = currentRound
+				}
+			}
+
+			if shouldTick {
+				if buff.IsDOT {
+					// DOT：造成伤害
+					damage += int(buff.Value)
+				} else if buff.IsHOT {
+					// HOT：恢复生命值
+					healing += int(buff.Value)
+				}
+			}
+		}
+	}
+
+	return damage, healing
+}
+
+// ProcessEnemyDOTEffects 处理敌人的DOT效果（每回合调用）
+func (bm *BuffManager) ProcessEnemyDOTEffects(enemyID string, currentRound int) int {
+	bm.mu.Lock()
+	defer bm.mu.Unlock()
+
+	damage := 0
+
+	if debuffs, exists := bm.enemyBuffs[enemyID]; exists {
+		for _, debuff := range debuffs {
+			// 检查是否应该触发（根据间隔）
+			shouldTick := false
+			if debuff.Interval == 0 {
+				// 每回合触发
+				shouldTick = true
+			} else {
+				// 根据间隔触发
+				if debuff.LastTick == 0 || (currentRound-debuff.LastTick) >= debuff.Interval {
+					shouldTick = true
+					debuff.LastTick = currentRound
+				}
+			}
+
+			if shouldTick && debuff.IsDOT {
+				// DOT：造成伤害
+				damage += int(debuff.Value)
+			}
+		}
+	}
+
+	return damage
 }
 

@@ -1,0 +1,19 @@
+# 技能系统 - 技能升级测试
+test_suite: "技能系统 - 技能升级"
+description: "注意：技能升级功能需要实际游戏系统支持，测试运行器目前不支持技能升级测试。这些测试用例作为文档说明，实际测试需要通过Go单元测试进行。"
+
+tests:
+  - name: "技能升级功能说明"
+    description: "技能升级功能需要在实际游戏系统中测试"
+    category: "documentation"
+    priority: "low"
+    setup:
+      - "技能升级功能包括：经验获取、等级提升、数值成长等"
+    steps:
+      - action: "这些功能需要通过Go单元测试进行验证"
+        expected: "参考 server/internal/game/skill_leveling_test.go"
+    assertions:
+      - type: "contains"
+        target: "test_location"
+        expected: "skill_leveling_test"
+        message: "技能升级测试位于Go单元测试文件中"

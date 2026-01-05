@@ -1,0 +1,106 @@
+# 战斗系统 - 资源系统测试
+test_suite: "战斗系统 - 资源系统"
+description: "测试战斗中的资源消耗和恢复机制"
+
+tests:
+  - name: "怒气消耗和恢复测试"
+    description: "测试战士怒气在战斗中的消耗和恢复"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个战士角色，怒气=100/100"
+      - "创建一个消耗30点怒气的技能"
+      - "创建一个怪物，HP=100"
+      - "初始化战斗系统"
+    steps:
+      - action: "开始战斗"
+        expected: "战斗状态为进行中"
+      - action: "角色使用技能"
+        expected: "怒气减少30点，剩余70点"
+      - action: "执行一个回合"
+        expected: "怒气可能恢复（根据战斗机制）"
+    assertions:
+      - type: "less_than_or_equal"
+        target: "character.resource"
+        expected: "100"
+        message: "怒气不应该超过最大值"
+      - type: "greater_than_or_equal"
+        target: "character.resource"
+        expected: "0"
+        message: "怒气不应该为负数"
+
+  - name: "法力消耗测试"
+    description: "测试法师法力在战斗中的消耗"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个法师角色，法力=100/100"
+      - "创建一个消耗40点法力的技能"
+      - "创建一个怪物，HP=100"
+      - "初始化战斗系统"
+    steps:
+      - action: "开始战斗"
+        expected: "战斗状态为进行中"
+      - action: "角色使用技能"
+        expected: "法力减少40点，剩余60点"
+      - action: "角色再次使用技能"
+        expected: "法力减少40点，剩余20点"
+      - action: "角色第三次使用技能"
+        expected: "法力不足，无法使用技能"
+    assertions:
+      - type: "equals"
+        target: "character.resource"
+        expected: "20"
+        message: "使用2次技能后法力应该为20"
+      - type: "equals"
+        target: "skill_use_failed"
+        expected: "true"
+        message: "第三次使用技能应该失败（法力不足）"
+
+  - name: "资源自动恢复测试"
+    description: "测试战斗中资源的自动恢复机制"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "创建一个角色，怒气=50/100"
+      - "创建一个怪物，HP=100"
+      - "初始化战斗系统"
+    steps:
+      - action: "开始战斗"
+        expected: "战斗状态为进行中"
+      - action: "执行一个回合"
+        expected: "怒气可能恢复"
+      - action: "执行一个回合"
+        expected: "怒气继续恢复"
+    assertions:
+      - type: "greater_than_or_equal"
+        target: "character.resource_round_2"
+        expected: "50"
+        message: "第2回合后怒气应该大于等于初始值（如果自动恢复）"
+
+  - name: "资源上限测试"
+    description: "测试资源不会超过最大值"
+    category: "unit"
+    priority: "low"
+    setup:
+      - "创建一个角色，怒气=100/100"
+      - "初始化战斗系统"
+    steps:
+      - action: "开始战斗"
+        expected: "战斗状态为进行中"
+      - action: "执行多个回合"
+        expected: "怒气不应该超过100"
+    assertions:
+      - type: "less_than_or_equal"
+        target: "character.resource"
+        expected: "100"
+        message: "怒气不应该超过最大值100"
+
+
+
+
+
+
+
+
+

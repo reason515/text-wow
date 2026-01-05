@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -19,11 +20,20 @@ type BattleManager struct {
 	gameRepo            *repository.GameRepository
 	charRepo            *repository.CharacterRepository
 	explorationRepo     *repository.ExplorationRepository // 探索度仓库
+	inventoryRepo       *repository.InventoryRepository  // 背包仓库
 	skillManager        *SkillManager
 	buffManager         *BuffManager
 	passiveSkillManager *PassiveSkillManager
 	strategyExecutor    *StrategyExecutor
 	battleStatsRepo     *repository.BattleStatsRepository // 战斗统计仓库
+
+	// 新增系统集成
+	calculator        *Calculator        // 数值计算系统
+	monsterManager    *MonsterManager    // 怪物管理系统
+	teamManager       *TeamManager       // 队伍管理系统
+	zoneManager       *ZoneManager       // 地图管理系统
+	equipmentManager  *EquipmentManager // 装备管理系统
+	battleStatsCollector *BattleStatsCollector // 战斗统计收集器
 
 	// 用户自定义统计会话管理
 	statsSessions   map[int]*StatsSession // key: userID, 用户自定义的统计会话
@@ -67,6 +77,22 @@ type BattleSession struct {
 	CurrentBattleRound int                                    // 本场战斗回合数
 	CharacterStats     map[int]*CharacterBattleStatsCollector // 角色战斗统计收集器
 	SkillBreakdown     map[int]map[string]*SkillUsageStats    // 角色->技能ID->技能使用统计
+	
+	// 威胁值系统
+	ThreatTable        map[string]map[int]int                // 怪物ID -> 角色ID -> 威胁值
+	
+	// 速度排序回合系统
+	TurnOrder          []*TurnParticipant                    // 回合顺序队列（按速度排序）
+	CurrentTurnOrderIndex int                                // 当前回合队列索引
+}
+
+// TurnParticipant 回合参与者
+type TurnParticipant struct {
+	Type        string              // "character" 或 "monster"
+	Character   *models.Character   // 如果是角色
+	Monster     *models.Monster     // 如果是怪物
+	Speed       int                 // 速度值
+	Index       int                 // 原始索引（用于角色或怪物数组）
 }
 
 // CharacterBattleStatsCollector 角色战斗统计收集器（内存中收集，战斗结束时保存）
@@ -146,11 +172,18 @@ func NewBattleManager() *BattleManager {
 		gameRepo:            repository.NewGameRepository(),
 		charRepo:            repository.NewCharacterRepository(),
 		explorationRepo:     repository.NewExplorationRepository(),
+		inventoryRepo:       repository.NewInventoryRepository(),
 		skillManager:        NewSkillManager(),
 		buffManager:         NewBuffManager(),
 		passiveSkillManager: NewPassiveSkillManager(),
 		strategyExecutor:    NewStrategyExecutor(),
 		battleStatsRepo:     repository.NewBattleStatsRepository(),
+		calculator:          NewCalculator(),
+		monsterManager:      NewMonsterManager(),
+		teamManager:         NewTeamManager(),
+		zoneManager:         NewZoneManager(),
+		equipmentManager:    NewEquipmentManager(),
+		battleStatsCollector: NewBattleStatsCollector(),
 		statsSessions:       make(map[int]*StatsSession),
 	}
 }
@@ -186,6 +219,11 @@ func (m *BattleManager) GetOrCreateSession(userID int) *BattleSession {
 		CurrentTurnIndex: -1, // 初始化为玩家回合
 		RestSpeed:        1.0,
 		CurrentZone:       nil, // 不在这里设置默认地图，让 GetBattleStatus 根据角色阵营设置
+		ThreatTable:      make(map[string]map[int]int), // 初始化威胁值表
+		CharacterStats:   make(map[int]*CharacterBattleStatsCollector),
+		SkillBreakdown:   make(map[int]map[string]*SkillUsageStats),
+		TurnOrder:        make([]*TurnParticipant, 0), // 初始化回合队列
+		CurrentTurnOrderIndex: -1, // 初始化为-1，表示需要重新排序
 	}
 	
 	m.sessions[userID] = session
@@ -464,6 +502,26 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 		}
 		logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
 
+		// 构建回合顺序队列（按速度排序）
+		m.buildTurnOrder(session, characters, session.CurrentEnemies)
+		
+		// 初始化战斗回合数和开始时间
+		session.CurrentBattleRound = 1
+		session.BattleStartTime = time.Now()
+
+		// 添加战斗开始日志
+		enemyNames := make([]string, 0, len(session.CurrentEnemies))
+		for _, enemy := range session.CurrentEnemies {
+			if enemy != nil {
+				enemyNames = append(enemyNames, enemy.Name)
+			}
+		}
+		if len(enemyNames) > 0 {
+			enemyList := strings.Join(enemyNames, "、")
+			m.addLog(session, "system", fmt.Sprintf("━━━ 遭遇敌人：%s ━━━", enemyList), "#ffaa00")
+			logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
+		}
+
 		// 标记刚遭遇敌人，需要等待1个tick再开始战斗
 		session.JustEncountered = true
 
@@ -501,7 +559,127 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 		}, nil
 	}
 
-	// 回合制逻辑：CurrentTurnIndex == -1 表示玩家回合，>=0 表示敌人索引
+	// 确保TurnOrder已初始化
+	if session.TurnOrder == nil || len(session.TurnOrder) == 0 || session.CurrentTurnOrderIndex < 0 {
+		m.buildTurnOrder(session, characters, session.CurrentEnemies)
+	}
+
+	// 使用速度排序的回合系统
+	currentParticipant := m.getCurrentTurnParticipant(session)
+	if currentParticipant == nil {
+		// 如果没有参与者，重新构建队列
+		m.buildTurnOrder(session, characters, session.CurrentEnemies)
+		currentParticipant = m.getCurrentTurnParticipant(session)
+		if currentParticipant == nil {
+			// 仍然没有参与者，可能是所有角色和敌人都死亡了
+			return &BattleTickResult{
+				Character:    char,
+				Enemy:        session.CurrentEnemy,
+				Enemies:      session.CurrentEnemies,
+				Logs:         logs,
+				IsRunning:    session.IsRunning,
+				IsResting:    session.IsResting,
+				RestUntil:    session.RestUntil,
+				SessionKills: session.SessionKills,
+				SessionGold:  session.SessionGold,
+				SessionExp:   session.SessionExp,
+				BattleCount:  session.BattleCount,
+			}, nil
+		}
+	}
+
+	// 根据参与者类型设置CurrentTurnIndex以保持向后兼容
+	// 然后使用原有的回合逻辑执行行动
+	if currentParticipant.Type == "character" {
+		// 角色回合：设置CurrentTurnIndex为-1以保持兼容
+		actingChar := currentParticipant.Character
+		if actingChar == nil || actingChar.HP <= 0 {
+			// 角色已死亡，跳过
+			m.moveToNextTurn(session, characters, aliveEnemies)
+			return &BattleTickResult{
+				Character:    char,
+				Enemy:        session.CurrentEnemy,
+				Enemies:      session.CurrentEnemies,
+				Logs:         logs,
+				IsRunning:    session.IsRunning,
+				IsResting:    session.IsResting,
+				RestUntil:    session.RestUntil,
+				SessionKills: session.SessionKills,
+				SessionGold:  session.SessionGold,
+				SessionExp:   session.SessionExp,
+				BattleCount:  session.BattleCount,
+			}, nil
+		}
+		// 只处理主要角色（当前实现只支持单角色）
+		if actingChar.ID != char.ID {
+			// 其他角色，暂时跳过（多角色系统后续实现）
+			m.moveToNextTurn(session, characters, aliveEnemies)
+			return &BattleTickResult{
+				Character:    char,
+				Enemy:        session.CurrentEnemy,
+				Enemies:      session.CurrentEnemies,
+				Logs:         logs,
+				IsRunning:    session.IsRunning,
+				IsResting:    session.IsResting,
+				RestUntil:    session.RestUntil,
+				SessionKills: session.SessionKills,
+				SessionGold:  session.SessionGold,
+				SessionExp:   session.SessionExp,
+				BattleCount:  session.BattleCount,
+			}, nil
+		}
+		session.CurrentTurnIndex = -1
+	} else {
+		// 怪物回合：找到怪物在aliveEnemies中的索引
+		actingEnemy := currentParticipant.Monster
+		if actingEnemy == nil || actingEnemy.HP <= 0 {
+			// 怪物已死亡，跳过
+			m.moveToNextTurn(session, characters, aliveEnemies)
+			return &BattleTickResult{
+				Character:    char,
+				Enemy:        session.CurrentEnemy,
+				Enemies:      session.CurrentEnemies,
+				Logs:         logs,
+				IsRunning:    session.IsRunning,
+				IsResting:    session.IsResting,
+				RestUntil:    session.RestUntil,
+				SessionKills: session.SessionKills,
+				SessionGold:  session.SessionGold,
+				SessionExp:   session.SessionExp,
+				BattleCount:  session.BattleCount,
+			}, nil
+		}
+		// 找到怪物在aliveEnemies中的索引
+		enemyIndex := -1
+		for i, enemy := range aliveEnemies {
+			if enemy != nil && enemy.ID == actingEnemy.ID {
+				enemyIndex = i
+				break
+			}
+		}
+		if enemyIndex >= 0 {
+			session.CurrentTurnIndex = enemyIndex
+		} else {
+			// 找不到怪物，跳过这个回合
+			m.moveToNextTurn(session, characters, aliveEnemies)
+			return &BattleTickResult{
+				Character:    char,
+				Enemy:        session.CurrentEnemy,
+				Enemies:      session.CurrentEnemies,
+				Logs:         logs,
+				IsRunning:    session.IsRunning,
+				IsResting:    session.IsResting,
+				RestUntil:    session.RestUntil,
+				SessionKills: session.SessionKills,
+				SessionGold:  session.SessionGold,
+				SessionExp:   session.SessionExp,
+				BattleCount:  session.BattleCount,
+			}, nil
+		}
+	}
+
+	// 原有的回合制逻辑：CurrentTurnIndex == -1 表示玩家回合，>=0 表示敌人索引
+	// 现在这个逻辑会根据TurnOrder系统设置的CurrentTurnIndex来执行
 	if session.CurrentTurnIndex == -1 {
 		// 玩家回合：攻击第一个存活的敌人
 		if len(aliveEnemies) > 0 {
@@ -741,6 +919,9 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 					// 使用技能（设置冷却）
 					m.skillManager.UseSkill(char.ID, skillState.SkillID)
 					usedSkill = true
+					
+					// 处理被动技能的使用技能时效果
+					m.handlePassiveOnSkillUseEffects(char, skillState.SkillID, session, &logs)
 
 					// 处理技能特殊效果（怒气获得等）
 					if rageGain, ok := skillEffects["rageGain"].(int); ok {
@@ -788,6 +969,8 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 									if enemy.HP < 0 {
 										enemy.HP = 0
 									}
+									// 更新威胁值（AOE技能对每个目标都产生威胁）
+									m.updateThreat(session, enemy.ID, char.ID, damage)
 								}
 							}
 							// playerDamage用于日志显示（主目标伤害）
@@ -837,6 +1020,8 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 										if enemy.HP < 0 {
 											enemy.HP = 0
 										}
+										// 更新威胁值（顺劈斩对相邻目标也产生威胁）
+										m.updateThreat(session, enemy.ID, char.ID, adjacentDamage)
 										adjacentCount++
 										adjacentTotalDamage += adjacentDamage // 累计伤害用于统计
 										adjacentHPChange := m.formatHPChange(enemy.Name, adjacentOldHP, enemy.HP, enemy.MaxHP)
@@ -858,10 +1043,12 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 							skillState.Effect["_adjacentLogs"] = adjacentLogs
 							skillState.Effect["_adjacentTotalDamage"] = adjacentTotalDamage
 						} else {
-							// 单体技能 - 如果未闪避则造成伤害
-							if !isDodged {
-								target.HP -= playerDamage
-							}
+						// 单体技能 - 如果未闪避则造成伤害
+						if !isDodged {
+							target.HP -= playerDamage
+							// 更新威胁值（威胁值等于伤害值）
+							m.updateThreat(session, target.ID, char.ID, playerDamage)
+						}
 						}
 					} else {
 						// buff技能使用后，还需要进行普通攻击
@@ -995,11 +1182,11 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 					actualCritRate = 1.0
 				}
 				damageDetails.ActualCritRate = actualCritRate
-				randomRoll := rand.Float64()
-				damageDetails.RandomRoll = randomRoll
-				isCrit = randomRoll < actualCritRate
+				// 使用 Calculator 进行暴击判定（内部会处理上限）
+				isCrit = m.calculator.ShouldCrit(actualCritRate)
 				damageDetails.IsCrit = isCrit
 				damageDetails.CritMultiplier = char.PhysCritDamage
+				damageDetails.RandomRoll = 0 // Calculator内部处理随机数
 
 				if isCrit {
 					playerDamage = int(float64(baseDamage) * char.PhysCritDamage)
@@ -1011,7 +1198,14 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 				// 如果未闪避，造成伤害
 				if !isDodged {
 					target.HP -= playerDamage
+					// 更新威胁值（威胁值等于伤害值）
+					m.updateThreat(session, target.ID, char.ID, playerDamage)
+					// 记录伤害统计
+					if m.battleStatsCollector != nil {
+						m.battleStatsCollector.RecordDamage(char.ID, playerDamage, "physical", isCrit)
+					}
 				}
+				// 注意：闪避统计只记录角色的闪避，怪物的闪避不记录到角色统计中
 				resourceCost = 0
 				usedSkill = false
 			}
@@ -1039,6 +1233,11 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 			// 处理被动技能的特殊效果（攻击时触发）- 闪避时不触发
 			if !isDodged {
 				m.handlePassiveOnHitEffects(char, playerDamage, usedSkill, session, &logs)
+				
+				// 处理被动技能的暴击时效果（如果暴击）
+				if isCrit {
+					m.handlePassiveOnCritEffects(char, playerDamage, usedSkill, session, &logs)
+				}
 			}
 
 			// 构建战斗日志消息，包含资源变化（带颜色）
@@ -1187,6 +1386,29 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 				logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
 			}
 
+			// 处理DOT/HOT效果（在Buff持续时间减少之后）
+			dotDamage, hotHealing := m.buffManager.ProcessDOTEffects(char.ID, session.CurrentBattleRound)
+			if dotDamage > 0 {
+				char.HP -= dotDamage
+				if char.HP < 0 {
+					char.HP = 0
+				}
+				m.addLog(session, "dot", fmt.Sprintf("%s 受到持续伤害，损失 %d 点生命值", char.Name, dotDamage), "#ff6666")
+				logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
+			}
+			if hotHealing > 0 {
+				originalHP := char.HP
+				char.HP += hotHealing
+				if char.HP > char.MaxHP {
+					char.HP = char.MaxHP
+				}
+				actualHealing := char.HP - originalHP
+				if actualHealing > 0 {
+					m.addLog(session, "hot", fmt.Sprintf("%s 的持续恢复效果恢复了 %d 点生命值", char.Name, actualHealing), "#00ff00")
+					logs = append(logs, session.BattleLogs[len(session.BattleLogs)-1])
+				}
+			}
+
 			// 检查目标是否死亡
 			if target.HP <= 0 {
 				// 确保HP归零
@@ -1194,10 +1416,21 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 
 				// 处理战争机器的击杀回怒效果
 				m.handleWarMachineRageGain(char, session, &logs)
+				
+				// 处理被动技能的击杀时效果
+				m.handlePassiveOnKillEffects(char, target, session, &logs)
 
 				// 敌人死亡
 				expGain := target.ExpReward
 				goldGain := target.GoldMin + rand.Intn(target.GoldMax-target.GoldMin+1)
+				
+				// 应用区域收益倍率
+				if session.CurrentZone != nil && m.zoneManager != nil {
+					expMulti := m.zoneManager.CalculateExpMultiplier(session.CurrentZone.ID)
+					goldMulti := m.zoneManager.CalculateGoldMultiplier(session.CurrentZone.ID)
+					expGain = int(float64(expGain) * expMulti)
+					goldGain = int(float64(goldGain) * goldMulti)
+				}
 
 				// 记录敌人死亡日志（敌人名字用红色，避免前端错误着色）
 				m.addLog(session, "kill", fmt.Sprintf("💀 <span style=\"color: #ff7777\">%s</span> 被击杀！获得 <span style=\"color: #3d85c6\">%d</span> 经验、<span style=\"color: #ffd700\">%d</span> 金币", target.Name, expGain, goldGain), "#ff6b6b")
@@ -1251,8 +1484,8 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 				}
 			}
 
-			// 移动到下一个敌人回合
-			session.CurrentTurnIndex = 0
+			// 移动到下一个回合（使用TurnOrder系统）
+			m.moveToNextTurn(session, characters, aliveEnemies)
 		}
 	} else {
 		// 敌人回合：当前索引的敌人攻击玩家
@@ -1284,11 +1517,8 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 					}
 				}
 
-				// 移动到下一个敌人或回到玩家回合
-				session.CurrentTurnIndex++
-				if session.CurrentTurnIndex >= len(aliveEnemies) {
-					session.CurrentTurnIndex = -1 // 回到玩家回合
-				}
+				// 移动到下一个回合（使用TurnOrder系统）
+				m.moveToNextTurn(session, characters, aliveEnemies)
 
 				// 返回结果（眩晕，无行动）
 				return &BattleTickResult{
@@ -1316,11 +1546,8 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 				// 记录闪避统计
 				m.recordDodge(session, char.ID, char.TeamSlot)
 
-				// 移动到下一个敌人或回到玩家回合
-				session.CurrentTurnIndex++
-				if session.CurrentTurnIndex >= len(aliveEnemies) {
-					session.CurrentTurnIndex = -1 // 回到玩家回合
-				}
+				// 移动到下一个回合（使用TurnOrder系统）
+				m.moveToNextTurn(session, characters, aliveEnemies)
 
 				// 返回结果（闪避成功，无伤害）
 				return &BattleTickResult{
@@ -1395,7 +1622,13 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 				enemyDamageDetails.DefenseModifiers = append(enemyDamageDetails.DefenseModifiers,
 					fmt.Sprintf("被动减伤 -%.0f%%", reduction))
 			}
+			
+			// 处理被动技能的受到伤害时效果
+			m.handlePassiveOnDamageTakenEffects(char, enemyDamage, session, &logs)
 
+			// 处理被动技能的受到伤害时效果
+			m.handlePassiveOnDamageTakenEffects(char, enemyDamage, session, &logs)
+			
 			// 处理护盾效果（不灭壁垒等）
 			shieldAmount := m.buffManager.GetBuffValue(char.ID, "shield")
 			if shieldAmount > 0 {
@@ -1603,15 +1836,12 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 					BattleCount:  session.BattleCount,
 				}, nil
 			} else {
-				// 移动到下一个敌人或回到玩家回合
-				session.CurrentTurnIndex++
-				if session.CurrentTurnIndex >= len(aliveEnemies) {
-					session.CurrentTurnIndex = -1 // 回到玩家回合
-				}
+				// 移动到下一个回合（使用TurnOrder系统）
+				m.moveToNextTurn(session, characters, aliveEnemies)
 			}
 		} else {
-			// 索引超出范围，回到玩家回合
-			session.CurrentTurnIndex = -1
+			// 索引超出范围，重新构建TurnOrder
+			m.buildTurnOrder(session, characters, aliveEnemies)
 		}
 	}
 
@@ -1631,6 +1861,9 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 				enemy.HP = 0
 			}
 		}
+
+		// 处理怪物掉落
+		m.processMonsterDrops(session, session.CurrentEnemies, &logs, characters)
 
 		// 战斗胜利总结
 		m.addBattleSummary(session, true, &logs)
@@ -1831,29 +2064,42 @@ func (m *BattleManager) spawnEnemies(session *BattleSession, playerLevel int, pl
 	// 调试日志：记录生成的敌人数量
 	fmt.Printf("[DEBUG] Enemy count generation: playerCount=%d, enemyCount=%d, range=[%d,%d]\n", 
 		playerCount, enemyCount, minEnemyCount, maxEnemyCount)
+	
+	// 重置威胁表（新战斗开始）
+	m.resetThreatTable(session)
+	
 	session.CurrentEnemies = make([]*models.Monster, 0, enemyCount)
 
 	var enemyNames []string
 	for i := 0; i < enemyCount; i++ {
-		// 使用加权随机选择怪物模板（根据 spawn_weight）
-		template := m.selectMonsterByWeight(monsters)
-
-		enemy := &models.Monster{
-			ID:              template.ID,
-			ZoneID:          template.ZoneID,
-			Name:            template.Name,
-			Level:           template.Level,
-			Type:            template.Type,
-			HP:              template.HP,
-			MaxHP:           template.HP,
-			PhysicalAttack:  template.PhysicalAttack,
-			MagicAttack:     template.MagicAttack,
-			PhysicalDefense: template.PhysicalDefense,
-			MagicDefense:    template.MagicDefense,
-			ExpReward:       template.ExpReward,
-			GoldMin:         template.GoldMin,
-			GoldMax:         template.GoldMax,
+		// 优先使用 MonsterManager 生成怪物（配置化，支持平衡调整）
+		var enemy *models.Monster
+		var err error
+		if m.monsterManager != nil {
+			enemy, err = m.monsterManager.GenerateMonster(session.CurrentZone.ID, playerLevel)
 		}
+		
+		// 如果生成失败，回退到旧方法
+		if enemy == nil || err != nil {
+			template := m.selectMonsterByWeight(monsters)
+			enemy = &models.Monster{
+				ID:              template.ID,
+				ZoneID:          template.ZoneID,
+				Name:            template.Name,
+				Level:           template.Level,
+				Type:            template.Type,
+				HP:              template.HP,
+				MaxHP:           template.HP,
+				PhysicalAttack:  template.PhysicalAttack,
+				MagicAttack:     template.MagicAttack,
+				PhysicalDefense: template.PhysicalDefense,
+				MagicDefense:    template.MagicDefense,
+				ExpReward:       template.ExpReward,
+				GoldMin:         template.GoldMin,
+				GoldMax:         template.GoldMax,
+			}
+		}
+		
 		session.CurrentEnemies = append(session.CurrentEnemies, enemy)
 		enemyNames = append(enemyNames, fmt.Sprintf("%s (Lv.%d)", enemy.Name, enemy.Level))
 	}
@@ -1875,6 +2121,8 @@ func (m *BattleManager) spawnEnemies(session *BattleSession, playerLevel int, pl
 
 	return nil
 }
+
+// Note: buildTurnOrder will be called after enemies are spawned in ExecuteBattleTick
 
 // selectMonsterByWeight 根据权重随机选择怪物
 // 使用加权随机算法：权重越高，被选中的概率越大
@@ -1923,37 +2171,24 @@ func (m *BattleManager) selectMonsterByWeight(monsters []models.Monster) models.
 func (m *BattleManager) ChangeZone(userID int, zoneID string, playerLevel int, playerFaction string) error {
 	session := m.GetOrCreateSession(userID)
 
-	zone, err := m.gameRepo.GetZoneByID(zoneID)
+	// 使用ZoneManager检查区域访问条件
+	if m.zoneManager != nil {
+		err := m.zoneManager.CheckZoneAccess(userID, zoneID, playerLevel, playerFaction)
+		if err != nil {
+			return err
+		}
+	}
+
+	// 加载区域
+	var zone *models.Zone
+	var err error
+	if m.zoneManager != nil {
+		zone, err = m.zoneManager.GetZone(zoneID)
+	} else {
+		zone, err = m.gameRepo.GetZoneByID(zoneID)
+	}
 	if err != nil {
 		return fmt.Errorf("zone not found: %s", zoneID)
-	}
-
-	// 检查探索度解锁条件
-	if m.explorationRepo != nil {
-		unlocked, err := m.explorationRepo.IsZoneUnlocked(userID, zone)
-		if err != nil {
-			return fmt.Errorf("failed to check zone unlock status: %v", err)
-		}
-		if !unlocked {
-			if zone.UnlockZoneID != nil {
-				unlockZone, _ := m.gameRepo.GetZoneByID(*zone.UnlockZoneID)
-				if unlockZone != nil {
-					exploration, _ := m.explorationRepo.GetExploration(userID, *zone.UnlockZoneID)
-					return fmt.Errorf("zone locked: need %d exploration in %s (current: %d)", zone.RequiredExploration, unlockZone.Name, exploration.Exploration)
-				}
-			}
-			return fmt.Errorf("zone locked: need %d exploration", zone.RequiredExploration)
-		}
-	}
-
-	// 检查等级限制（保留作为最低等级要求）
-	if playerLevel < zone.MinLevel {
-		return fmt.Errorf("level too low, need level %d", zone.MinLevel)
-	}
-
-	// 检查阵营限制
-	if zone.Faction != "" && zone.Faction != playerFaction {
-		return fmt.Errorf("faction mismatch, this zone is for %s only", zone.Faction)
 	}
 
 	m.mu.Lock()
@@ -2097,19 +2332,15 @@ func (m *BattleManager) GetBattleLogs(userID int, limit int) []models.BattleLog 
 // checkDodge 检查闪避（返回 true 表示闪避成功）
 // dodgeRate: 闪避率（0.0-1.0）
 // ignoresDodge: 技能是否无视闪避
+// 使用新的 Calculator 系统进行统一判定
 func (m *BattleManager) checkDodge(dodgeRate float64, ignoresDodge bool) bool {
 	// 如果技能无视闪避，直接返回 false（未闪避）
 	if ignoresDodge {
 		return false
 	}
 
-	// 闪避率上限50%
-	if dodgeRate > 0.5 {
-		dodgeRate = 0.5
-	}
-
-	// 随机判定闪避
-	return rand.Float64() < dodgeRate
+	// 使用 Calculator 进行闪避判定（内部会处理上限）
+	return m.calculator.ShouldDodge(dodgeRate)
 }
 
 // skillIgnoresDodge 检查技能是否无视闪避
@@ -2171,6 +2402,7 @@ type DamageCalculationDetails struct {
 }
 
 // calculateMagicDamageWithDetails 计算魔法伤害（返回详情）
+// 使用新的 Calculator 系统进行统一计算
 func (m *BattleManager) calculateMagicDamageWithDetails(attack, defense int) (int, *DamageCalculationDetails) {
 	details := &DamageCalculationDetails{
 		BaseAttack:       attack,
@@ -2181,18 +2413,25 @@ func (m *BattleManager) calculateMagicDamageWithDetails(attack, defense int) (in
 		DefenseModifiers: []string{},
 	}
 
-	baseDamage := float64(attack) - float64(defense)
-	if baseDamage < 1 {
-		baseDamage = 1
-	}
+	// 基础伤害 = 攻击力
+	baseDamage := float64(attack)
 	details.BaseDamage = baseDamage
+	
+	// 应用防御减伤（减法公式：伤害 = 攻击 - 防御）
+	damageAfterDefense := baseDamage - float64(defense)
+	if damageAfterDefense < 1 {
+		damageAfterDefense = 1
+	}
+	details.BaseDamage = damageAfterDefense
+	
 	details.Variance = 0
-	details.FinalDamage = int(baseDamage)
+	details.FinalDamage = int(math.Round(damageAfterDefense))
 
-	return int(baseDamage), details
+	return details.FinalDamage, details
 }
 
 // calculatePhysicalDamage 计算物理伤害（返回详情）
+// 使用新的 Calculator 系统进行统一计算
 func (m *BattleManager) calculatePhysicalDamageWithDetails(attack, defense int) (int, *DamageCalculationDetails) {
 	details := &DamageCalculationDetails{
 		BaseAttack:       attack,
@@ -2203,16 +2442,21 @@ func (m *BattleManager) calculatePhysicalDamageWithDetails(attack, defense int) 
 		DefenseModifiers: []string{},
 	}
 
-	// 基础伤害 = 实际攻击力 - 目标防御力（不再除以2）
-	baseDamage := float64(attack) - float64(defense)
-	if baseDamage < 1 {
-		baseDamage = 1
-	}
+	// 基础伤害 = 攻击力
+	baseDamage := float64(attack)
 	details.BaseDamage = baseDamage
+	
+	// 应用防御减伤（减法公式：伤害 = 攻击 - 防御）
+	damageAfterDefense := baseDamage - float64(defense)
+	if damageAfterDefense < 1 {
+		damageAfterDefense = 1
+	}
+	details.BaseDamage = damageAfterDefense
+	
 	details.Variance = 0 // 不再使用随机波动，未来通过装备的攻击力上下限实现
-	details.FinalDamage = int(baseDamage)
+	details.FinalDamage = int(math.Round(damageAfterDefense))
 
-	return int(baseDamage), details
+	return details.FinalDamage, details
 }
 
 // resolveEnemyAttackType 决定敌人的攻击类型，如果未配置则按数值推断
@@ -2272,25 +2516,30 @@ func (m *BattleManager) addLog(session *BattleSession, logType, message, color s
 func (m *BattleManager) addBattleSummary(session *BattleSession, isVictory bool, logs *[]models.BattleLog) {
 	// 生成战斗总结，使用不同颜色标记不同指标
 	var summaryMsg string
+	battleDuration := time.Since(session.BattleStartTime)
+	battleDurationSeconds := int(battleDuration.Seconds())
+	
 	if isVictory {
 		if session.CurrentBattleKills > 0 {
-		// 使用HTML标签为不同部分添加颜色
-		// 结果：绿色 #00ff00，击杀：红色 #ff4444，经验：蓝色 #3d85c6，金币：金色 #ffd700
-		summaryMsg = fmt.Sprintf("━━━ 战斗总结 ━━━ 结果: <span style=\"color: #00ff00\">✓ 胜利</span> | 击杀: <span style=\"color: #ff4444\">%d</span> | 经验: <span style=\"color: #3d85c6\">%d</span> | 金币: <span style=\"color: #ffd700\">%d</span>",
-			session.CurrentBattleKills, session.CurrentBattleExp, session.CurrentBattleGold)
-	} else {
-		summaryMsg = "━━━ 战斗总结 ━━━ 结果: <span style=\"color: #00ff00\">✓ 胜利</span>"
-	}
-	m.addLog(session, "battle_summary", summaryMsg, "#00ff00")
+			// 使用HTML标签为不同部分添加颜色
+			// 结果：绿色 #00ff00，击杀：红色 #ff4444，经验：蓝色 #3d85c6，金币：金色 #ffd700，回合：紫色 #aa00ff
+			summaryMsg = fmt.Sprintf("━━━ 战斗总结 ━━━ 结果: <span style=\"color: #00ff00\">✓ 胜利</span> | 击杀: <span style=\"color: #ff4444\">%d</span> | 经验: <span style=\"color: #3d85c6\">%d</span> | 金币: <span style=\"color: #ffd700\">%d</span> | 回合: <span style=\"color: #aa00ff\">%d</span> | 耗时: <span style=\"color: #888888\">%d秒</span>",
+				session.CurrentBattleKills, session.CurrentBattleExp, session.CurrentBattleGold, session.CurrentBattleRound, battleDurationSeconds)
+		} else {
+			summaryMsg = fmt.Sprintf("━━━ 战斗总结 ━━━ 结果: <span style=\"color: #00ff00\">✓ 胜利</span> | 回合: <span style=\"color: #aa00ff\">%d</span> | 耗时: <span style=\"color: #888888\">%d秒</span>",
+				session.CurrentBattleRound, battleDurationSeconds)
+		}
+		m.addLog(session, "battle_summary", summaryMsg, "#00ff00")
 		*logs = append(*logs, session.BattleLogs[len(session.BattleLogs)-1])
 	} else {
 		// 失败时的总结
 		if session.CurrentBattleKills > 0 {
-			// 结果：红色 #ff6666，击杀：橙色 #ffaa00，经验：蓝色 #3d85c6，金币：金色 #ffd700
-			summaryMsg = fmt.Sprintf("━━━ 战斗总结 ━━━ 结果: <span style=\"color: #ff6666\">✗ 失败</span> | 击杀: <span style=\"color: #ffaa00\">%d</span> | 经验: <span style=\"color: #3d85c6\">%d</span> | 金币: <span style=\"color: #ffd700\">%d</span>",
-				session.CurrentBattleKills, session.CurrentBattleExp, session.CurrentBattleGold)
+			// 结果：红色 #ff6666，击杀：橙色 #ffaa00，经验：蓝色 #3d85c6，金币：金色 #ffd700，回合：紫色 #aa00ff
+			summaryMsg = fmt.Sprintf("━━━ 战斗总结 ━━━ 结果: <span style=\"color: #ff6666\">✗ 失败</span> | 击杀: <span style=\"color: #ffaa00\">%d</span> | 经验: <span style=\"color: #3d85c6\">%d</span> | 金币: <span style=\"color: #ffd700\">%d</span> | 回合: <span style=\"color: #aa00ff\">%d</span> | 耗时: <span style=\"color: #888888\">%d秒</span>",
+				session.CurrentBattleKills, session.CurrentBattleExp, session.CurrentBattleGold, session.CurrentBattleRound, battleDurationSeconds)
 		} else {
-			summaryMsg = "━━━ 战斗总结 ━━━ 结果: <span style=\"color: #ff6666\">✗ 失败</span>"
+			summaryMsg = fmt.Sprintf("━━━ 战斗总结 ━━━ 结果: <span style=\"color: #ff6666\">✗ 失败</span> | 回合: <span style=\"color: #aa00ff\">%d</span> | 耗时: <span style=\"color: #888888\">%d秒</span>",
+				session.CurrentBattleRound, battleDurationSeconds)
 		}
 		m.addLog(session, "battle_summary", summaryMsg, "#ff6666")
 		*logs = append(*logs, session.BattleLogs[len(session.BattleLogs)-1])
@@ -2824,6 +3073,8 @@ func (m *BattleManager) handleCounterAttacks(character *models.Character, attack
 			if attacker.HP < 0 {
 				attacker.HP = 0
 			}
+			// 更新威胁值（反击也产生威胁）
+			m.updateThreat(session, attacker.ID, character.ID, counterDamage)
 			counterHPChange := m.formatHPChange(attacker.Name, attackerOldHP, attacker.HP, attacker.MaxHP)
 			m.addLog(session, "combat", fmt.Sprintf("%s 的反击风暴对 %s 造成 %d 点反击伤害%s", character.Name, attacker.Name, counterDamage, counterHPChange), "#ff8800", withDamageType("physical"))
 			*logs = append(*logs, session.BattleLogs[len(session.BattleLogs)-1])
@@ -2863,6 +3114,8 @@ func (m *BattleManager) handleCounterAttacks(character *models.Character, attack
 					if attacker.HP < 0 {
 						attacker.HP = 0
 					}
+					// 更新威胁值（复仇反击也产生威胁）
+					m.updateThreat(session, attacker.ID, character.ID, counterDamage)
 					revengeHPChange := m.formatHPChange(attacker.Name, revengeOldHP, attacker.HP, attacker.MaxHP)
 					m.addLog(session, "combat", fmt.Sprintf("%s 的复仇对 %s 造成 %d 点反击伤害%s", character.Name, attacker.Name, counterDamage, revengeHPChange), "#ff8800", withDamageType("physical"))
 					*logs = append(*logs, session.BattleLogs[len(session.BattleLogs)-1])
@@ -2880,17 +3133,123 @@ func (m *BattleManager) handlePassiveOnHitEffects(character *models.Character, d
 
 	passives := m.passiveSkillManager.GetPassiveSkills(character.ID)
 	for _, passive := range passives {
+		if passive.Passive == nil {
+			continue // 跳过Passive为nil的情况
+		}
 		switch passive.Passive.EffectType {
 		case "on_hit_heal":
 			// 血之狂热：每次攻击恢复生命值
 			healPercent := passive.EffectValue // 百分比值（如1.0表示1%）
+			// 使用浮点数计算，然后四舍五入
+			healAmountFloat := float64(character.MaxHP) * healPercent / 100.0
+			healAmount := int(healAmountFloat + 0.5) // 四舍五入
+			// 确保至少恢复1点（如果计算为0但EffectValue>0）
+			if healPercent > 0 && healAmount == 0 && character.MaxHP > 0 {
+				healAmount = 1
+			}
+			if healAmount > 0 {
+				oldHP := character.HP
+				character.HP += healAmount
+				if character.HP > character.MaxHP {
+					character.HP = character.MaxHP
+				}
+				// 只有在HP实际增加时才记录日志
+				if character.HP > oldHP {
+					m.addLog(session, "heal", fmt.Sprintf("%s 的血之狂热恢复了 %d 点生命值", character.Name, healAmount), "#00ff00")
+					*logs = append(*logs, session.BattleLogs[len(session.BattleLogs)-1])
+				}
+			}
+		case "on_hit_resource":
+			// 攻击时获得资源（如怒气、法力）
+			resourceGain := int(passive.EffectValue)
+			if resourceGain > 0 {
+				character.Resource += resourceGain
+				if character.Resource > character.MaxResource {
+					character.Resource = character.MaxResource
+				}
+				resourceName := m.getResourceName(character.ResourceType)
+				m.addLog(session, "resource", fmt.Sprintf("%s 获得了 %d 点%s", character.Name, resourceGain, resourceName), "#8888ff")
+				*logs = append(*logs, session.BattleLogs[len(session.BattleLogs)-1])
+			}
+		}
+	}
+}
+
+// handlePassiveOnCritEffects 处理被动技能的暴击时效果
+func (m *BattleManager) handlePassiveOnCritEffects(character *models.Character, critDamage int, usedSkill bool, session *BattleSession, logs *[]models.BattleLog) {
+	if m.passiveSkillManager == nil {
+		return
+	}
+
+	passives := m.passiveSkillManager.GetPassiveSkills(character.ID)
+	for _, passive := range passives {
+		if passive.Passive == nil {
+			continue
+		}
+		switch passive.Passive.EffectType {
+		case "on_crit_heal":
+			// 暴击时恢复生命值
+			healPercent := passive.EffectValue // 百分比值（基于暴击伤害）
+			healAmount := int(float64(critDamage) * healPercent / 100.0)
+			if healAmount > 0 {
+				character.HP += healAmount
+				if character.HP > character.MaxHP {
+					character.HP = character.MaxHP
+				}
+				m.addLog(session, "heal", fmt.Sprintf("%s 的暴击恢复效果恢复了 %d 点生命值", character.Name, healAmount), "#00ff00")
+				*logs = append(*logs, session.BattleLogs[len(session.BattleLogs)-1])
+			}
+		case "on_crit_resource":
+			// 暴击时获得额外资源
+			resourceGain := int(passive.EffectValue)
+			if resourceGain > 0 {
+				character.Resource += resourceGain
+				if character.Resource > character.MaxResource {
+					character.Resource = character.MaxResource
+				}
+				resourceName := m.getResourceName(character.ResourceType)
+				m.addLog(session, "resource", fmt.Sprintf("%s 的暴击获得了额外 %d 点%s", character.Name, resourceGain, resourceName), "#8888ff")
+				*logs = append(*logs, session.BattleLogs[len(session.BattleLogs)-1])
+			}
+		}
+	}
+}
+
+// handlePassiveOnKillEffects 处理被动技能的击杀时效果
+func (m *BattleManager) handlePassiveOnKillEffects(character *models.Character, killedEnemy *models.Monster, session *BattleSession, logs *[]models.BattleLog) {
+	if m.passiveSkillManager == nil {
+		return
+	}
+
+	passives := m.passiveSkillManager.GetPassiveSkills(character.ID)
+	for _, passive := range passives {
+		if passive.Passive == nil {
+			continue
+		}
+		switch passive.Passive.EffectType {
+		case "on_kill_heal":
+			// 击杀时恢复生命值
+			healPercent := passive.EffectValue // 百分比值（基于最大HP）
 			healAmount := int(float64(character.MaxHP) * healPercent / 100.0)
 			if healAmount > 0 {
 				character.HP += healAmount
 				if character.HP > character.MaxHP {
 					character.HP = character.MaxHP
 				}
-				m.addLog(session, "heal", fmt.Sprintf("%s 的血之狂热恢复了 %d 点生命值", character.Name, healAmount), "#00ff00")
+				m.addLog(session, "heal", fmt.Sprintf("%s 的击杀恢复效果恢复了 %d 点生命值", character.Name, healAmount), "#00ff00")
+				*logs = append(*logs, session.BattleLogs[len(session.BattleLogs)-1])
+			}
+		case "on_kill_resource":
+			// 击杀时获得资源（战争机器等）
+			// 这个已经在handleWarMachineRageGain中处理，这里可以添加其他被动技能
+			resourceGain := int(passive.EffectValue)
+			if resourceGain > 0 && passive.Passive.ID != "warrior_passive_war_machine" {
+				character.Resource += resourceGain
+				if character.Resource > character.MaxResource {
+					character.Resource = character.MaxResource
+				}
+				resourceName := m.getResourceName(character.ResourceType)
+				m.addLog(session, "resource", fmt.Sprintf("%s 的击杀获得了 %d 点%s", character.Name, resourceGain, resourceName), "#8888ff")
 				*logs = append(*logs, session.BattleLogs[len(session.BattleLogs)-1])
 			}
 		}
@@ -2942,6 +3301,8 @@ func (m *BattleManager) handleActiveReflectEffects(character *models.Character, 
 				if attacker.HP < 0 {
 					attacker.HP = 0
 				}
+				// 更新威胁值（反射伤害也产生威胁）
+				m.updateThreat(session, attacker.ID, character.ID, reflectDamage)
 				reflectHPChange := m.formatHPChange(attacker.Name, reflectOldHP, attacker.HP, attacker.MaxHP)
 				m.addLog(session, "combat", fmt.Sprintf("%s 的盾牌反射对 %s 造成 %d 点反射伤害%s", character.Name, attacker.Name, reflectDamage, reflectHPChange), "#ff8800", withDamageType("magic"))
 				*logs = append(*logs, session.BattleLogs[len(session.BattleLogs)-1])
@@ -3025,6 +3386,81 @@ func (m *BattleManager) applySkillDebuffs(skillState *CharacterSkillState, chara
 	}
 }
 
+// handlePassiveOnDamageTakenEffects 处理被动技能的受到伤害时效果
+func (m *BattleManager) handlePassiveOnDamageTakenEffects(character *models.Character, damageTaken int, session *BattleSession, logs *[]models.BattleLog) {
+	if m.passiveSkillManager == nil {
+		return
+	}
+
+	passives := m.passiveSkillManager.GetPassiveSkills(character.ID)
+	for _, passive := range passives {
+		switch passive.Passive.EffectType {
+		case "on_damage_taken_resource":
+			// 受到伤害时获得资源（如战士的受击回怒）
+			// 这个已经在其他地方处理，这里可以添加其他被动技能
+			resourceGain := int(passive.EffectValue * float64(damageTaken) / 100.0)
+			if resourceGain > 0 {
+				character.Resource += resourceGain
+				if character.Resource > character.MaxResource {
+					character.Resource = character.MaxResource
+				}
+				resourceName := m.getResourceName(character.ResourceType)
+				m.addLog(session, "resource", fmt.Sprintf("%s 受到伤害获得了 %d 点%s", character.Name, resourceGain, resourceName), "#8888ff")
+				*logs = append(*logs, session.BattleLogs[len(session.BattleLogs)-1])
+			}
+		case "on_damage_taken_heal":
+			// 受到伤害时恢复生命值（如吸血效果）
+			healPercent := passive.EffectValue // 百分比值（基于受到的伤害）
+			healAmount := int(float64(damageTaken) * healPercent / 100.0)
+			if healAmount > 0 {
+				character.HP += healAmount
+				if character.HP > character.MaxHP {
+					character.HP = character.MaxHP
+				}
+				m.addLog(session, "heal", fmt.Sprintf("%s 的伤害恢复效果恢复了 %d 点生命值", character.Name, healAmount), "#00ff00")
+				*logs = append(*logs, session.BattleLogs[len(session.BattleLogs)-1])
+			}
+		}
+	}
+}
+
+// handlePassiveOnSkillUseEffects 处理被动技能的使用技能时效果
+func (m *BattleManager) handlePassiveOnSkillUseEffects(character *models.Character, skillID string, session *BattleSession, logs *[]models.BattleLog) {
+	if m.passiveSkillManager == nil {
+		return
+	}
+
+	passives := m.passiveSkillManager.GetPassiveSkills(character.ID)
+	for _, passive := range passives {
+		switch passive.Passive.EffectType {
+		case "on_skill_use_resource":
+			// 使用技能时获得资源
+			resourceGain := int(passive.EffectValue)
+			if resourceGain > 0 {
+				character.Resource += resourceGain
+				if character.Resource > character.MaxResource {
+					character.Resource = character.MaxResource
+				}
+				resourceName := m.getResourceName(character.ResourceType)
+				m.addLog(session, "resource", fmt.Sprintf("%s 使用技能获得了 %d 点%s", character.Name, resourceGain, resourceName), "#8888ff")
+				*logs = append(*logs, session.BattleLogs[len(session.BattleLogs)-1])
+			}
+		case "on_skill_use_heal":
+			// 使用技能时恢复生命值
+			healPercent := passive.EffectValue // 百分比值（基于最大HP）
+			healAmount := int(float64(character.MaxHP) * healPercent / 100.0)
+			if healAmount > 0 {
+				character.HP += healAmount
+				if character.HP > character.MaxHP {
+					character.HP = character.MaxHP
+				}
+				m.addLog(session, "heal", fmt.Sprintf("%s 使用技能恢复了 %d 点生命值", character.Name, healAmount), "#00ff00")
+				*logs = append(*logs, session.BattleLogs[len(session.BattleLogs)-1])
+			}
+		}
+	}
+}
+
 // handlePassiveReflectEffects 处理被动技能的反射效果
 func (m *BattleManager) handlePassiveReflectEffects(character *models.Character, attacker *models.Monster, damageTaken int, session *BattleSession, logs *[]models.BattleLog) {
 	if m.passiveSkillManager == nil {
@@ -3043,6 +3479,8 @@ func (m *BattleManager) handlePassiveReflectEffects(character *models.Character,
 				if attacker.HP < 0 {
 					attacker.HP = 0
 				}
+				// 更新威胁值（被动反射伤害也产生威胁）
+				m.updateThreat(session, attacker.ID, character.ID, reflectDamage)
 				passiveReflectHPChange := m.formatHPChange(attacker.Name, passiveReflectOldHP, attacker.HP, attacker.MaxHP)
 				m.addLog(session, "combat", fmt.Sprintf("%s 的盾牌反射对 %s 造成 %d 点反射伤害%s", character.Name, attacker.Name, reflectDamage, passiveReflectHPChange), "#ff8800", withDamageType("magic"))
 				*logs = append(*logs, session.BattleLogs[len(session.BattleLogs)-1])
@@ -3062,6 +3500,16 @@ func (m *BattleManager) initBattleStats(session *BattleSession, characters []*mo
 	session.CharacterStats = make(map[int]*CharacterBattleStatsCollector)
 	session.SkillBreakdown = make(map[int]map[string]*SkillUsageStats)
 
+	// 使用新的 BattleStatsCollector 初始化
+	if m.battleStatsCollector != nil {
+		characterIDs := make([]int, len(characters))
+		for i, char := range characters {
+			characterIDs[i] = char.ID
+		}
+		m.battleStatsCollector.InitializeBattle(characterIDs)
+	}
+
+	// 保留旧的统计收集器（向后兼容）
 	for _, char := range characters {
 		session.CharacterStats[char.ID] = &CharacterBattleStatsCollector{
 			CharacterID: char.ID,
@@ -3237,6 +3685,213 @@ func (m *BattleManager) recordCcReceived(session *BattleSession, characterID int
 // incrementBattleRound 增加战斗回合数
 func (m *BattleManager) incrementBattleRound(session *BattleSession) {
 	session.CurrentBattleRound++
+}
+
+// processMonsterDrops 处理怪物掉落
+func (m *BattleManager) processMonsterDrops(session *BattleSession, enemies []*models.Monster, logs *[]models.BattleLog, characters []*models.Character) {
+	if m.monsterManager == nil || enemies == nil || len(enemies) == 0 {
+		return
+	}
+
+	// 如果没有角色，无法分配物品
+	if len(characters) == 0 {
+		return
+	}
+
+	// 使用第一个角色作为掉落接收者（未来可以支持多角色分配）
+	character := characters[0]
+
+	// 获取区域掉落倍率（如果区域管理器可用）
+	dropMultiplier := 1.0
+	if m.zoneManager != nil && session.CurrentZone != nil {
+		dropMultiplier = m.zoneManager.CalculateDropMultiplier(session.CurrentZone.ID)
+	}
+
+	// 遍历所有被击败的敌人，计算掉落
+	for _, enemy := range enemies {
+		if enemy == nil || enemy.HP > 0 {
+			continue
+		}
+
+		// 计算掉落
+		drops, err := m.monsterManager.CalculateDrops(enemy.ID, enemy.Type)
+		if err != nil {
+			fmt.Printf("[WARN] Failed to calculate drops for monster %s: %v\n", enemy.ID, err)
+			continue
+		}
+
+		// 如果有掉落，分配物品并记录日志
+		if len(drops) > 0 {
+			dropMessages := make([]string, 0)
+			for _, drop := range drops {
+				// 检查物品类型
+				itemData, err := m.gameRepo.GetItemByID(drop.ItemID)
+				if err != nil {
+					fmt.Printf("[WARN] Failed to get item data for %s: %v\n", drop.ItemID, err)
+					// 如果不是装备，直接添加到背包
+					if m.inventoryRepo != nil {
+						m.inventoryRepo.AddItem(character.ID, drop.ItemID, drop.Quantity)
+					}
+					dropMessages = append(dropMessages, fmt.Sprintf("%s x%d", drop.ItemID, drop.Quantity))
+					continue
+				}
+
+				itemType, _ := itemData["type"].(string)
+				// 如果是装备，生成装备实例
+				if itemType == "equipment" && m.equipmentManager != nil {
+					// 确定装备品质（根据怪物类型）
+					quality := m.determineEquipmentQuality(enemy.Type, dropMultiplier)
+					
+					// 生成装备实例
+					_, err := m.equipmentManager.GenerateEquipment(drop.ItemID, quality, enemy.Level, character.UserID)
+					if err != nil {
+						fmt.Printf("[WARN] Failed to generate equipment %s: %v\n", drop.ItemID, err)
+						// 如果生成失败，仍然尝试添加到背包
+						if m.inventoryRepo != nil {
+							m.inventoryRepo.AddItem(character.ID, drop.ItemID, drop.Quantity)
+						}
+						dropMessages = append(dropMessages, fmt.Sprintf("%s x%d", drop.ItemID, drop.Quantity))
+					} else {
+						// 装备生成成功，添加到背包
+						if m.inventoryRepo != nil {
+							// 将装备实例ID添加到背包（需要InventoryRepository支持装备实例）
+							// 暂时使用ItemID
+							m.inventoryRepo.AddItem(character.ID, drop.ItemID, 1)
+						}
+						qualityName := m.getQualityDisplayName(quality)
+						dropMessages = append(dropMessages, fmt.Sprintf("<span style=\"color: %s\">%s</span> x1", 
+							m.getQualityColor(quality), qualityName))
+					}
+				} else {
+					// 非装备物品，直接添加到背包
+					if m.inventoryRepo != nil {
+						err := m.inventoryRepo.AddItem(character.ID, drop.ItemID, drop.Quantity)
+						if err != nil {
+							fmt.Printf("[WARN] Failed to add item %s to inventory: %v\n", drop.ItemID, err)
+						}
+					}
+					dropMessages = append(dropMessages, fmt.Sprintf("%s x%d", drop.ItemID, drop.Quantity))
+				}
+			}
+			
+			if len(dropMessages) > 0 {
+				dropText := fmt.Sprintf("🎁 击败 <span style=\"color: #ff7777\">%s</span> 获得: %s", 
+					enemy.Name, strings.Join(dropMessages, ", "))
+				m.addLog(session, "loot", dropText, "#4ecdc4")
+				*logs = append(*logs, session.BattleLogs[len(session.BattleLogs)-1])
+			}
+		}
+	}
+}
+
+// determineEquipmentQuality 根据怪物类型确定装备品质
+func (m *BattleManager) determineEquipmentQuality(monsterType string, dropMultiplier float64) string {
+	// 基础品质分布（根据文档）
+	var qualityWeights map[string]float64
+	
+	switch monsterType {
+	case "normal":
+		// 普通怪物: 30%白, 35%绿, 25%蓝, 8%紫, 1.8%橙, 0.2%传说
+		qualityWeights = map[string]float64{
+			"common":    30.0,
+			"uncommon":  35.0,
+			"rare":      25.0,
+			"epic":      8.0,
+			"legendary": 1.8,
+			"mythic":    0.2,
+		}
+	case "elite":
+		// 精英怪物: 40%白, 35%绿, 20%蓝, 4%紫, 0.9%橙, 0.1%传说
+		qualityWeights = map[string]float64{
+			"common":    40.0,
+			"uncommon":  35.0,
+			"rare":      20.0,
+			"epic":      4.0,
+			"legendary": 0.9,
+			"mythic":    0.1,
+		}
+	case "boss":
+		// Boss: 10%白, 25%绿, 35%蓝, 20%紫, 8%橙, 2%传说
+		qualityWeights = map[string]float64{
+			"common":    10.0,
+			"uncommon":  25.0,
+			"rare":      35.0,
+			"epic":      20.0,
+			"legendary": 8.0,
+			"mythic":    2.0,
+		}
+	default:
+		// 默认使用普通怪物分布
+		qualityWeights = map[string]float64{
+			"common":    30.0,
+			"uncommon":  35.0,
+			"rare":      25.0,
+			"epic":      8.0,
+			"legendary": 1.8,
+			"mythic":    0.2,
+		}
+	}
+
+	// 应用区域掉落倍率（提升高品质装备概率）
+	if dropMultiplier > 1.0 {
+		// 提升高品质装备的权重
+		qualityWeights["epic"] *= dropMultiplier
+		qualityWeights["legendary"] *= dropMultiplier
+		qualityWeights["mythic"] *= dropMultiplier
+	}
+
+	// 归一化权重
+	totalWeight := 0.0
+	for _, weight := range qualityWeights {
+		totalWeight += weight
+	}
+
+	// 随机选择品质
+	randValue := rand.Float64() * totalWeight
+	currentWeight := 0.0
+	
+	qualityOrder := []string{"common", "uncommon", "rare", "epic", "legendary", "mythic"}
+	for _, quality := range qualityOrder {
+		currentWeight += qualityWeights[quality]
+		if randValue <= currentWeight {
+			return quality
+		}
+	}
+
+	// 默认返回普通品质
+	return "common"
+}
+
+// getQualityDisplayName 获取品质显示名称
+func (m *BattleManager) getQualityDisplayName(quality string) string {
+	names := map[string]string{
+		"common":    "普通",
+		"uncommon":  "优秀",
+		"rare":      "精良",
+		"epic":      "稀有",
+		"legendary": "史诗",
+		"mythic":    "传说",
+	}
+	if name, ok := names[quality]; ok {
+		return name
+	}
+	return "普通"
+}
+
+// getQualityColor 获取品质颜色
+func (m *BattleManager) getQualityColor(quality string) string {
+	colors := map[string]string{
+		"common":    "#ffffff", // 白色
+		"uncommon":  "#1eff00", // 绿色
+		"rare":      "#0070dd", // 蓝色
+		"epic":      "#a335ee", // 紫色
+		"legendary": "#ff8000", // 橙色
+		"mythic":    "#ffd700", // 金色
+	}
+	if color, ok := colors[quality]; ok {
+		return color
+	}
+	return "#ffffff"
 }
 
 // saveBattleStats 保存战斗统计到数据库
@@ -3418,5 +4073,183 @@ func (m *BattleManager) GetStatsSession(userID int) *StatsSession {
 	defer m.statsSessionsMu.RUnlock()
 
 	return m.statsSessions[userID]
+}
+
+// updateThreat 更新威胁值
+// 当角色对怪物造成伤害时，增加该角色对该怪物的威胁值
+// threatGain: 威胁值增加量（通常等于伤害值，但可以根据技能类型调整）
+func (m *BattleManager) updateThreat(session *BattleSession, monsterID string, characterID int, threatGain int) {
+	if session == nil || session.ThreatTable == nil {
+		return
+	}
+
+	// 初始化该怪物的威胁表（如果不存在）
+	if session.ThreatTable[monsterID] == nil {
+		session.ThreatTable[monsterID] = make(map[int]int)
+	}
+
+	// 增加威胁值
+	session.ThreatTable[monsterID][characterID] += threatGain
+
+	// 确保威胁值不为负数
+	if session.ThreatTable[monsterID][characterID] < 0 {
+		session.ThreatTable[monsterID][characterID] = 0
+	}
+}
+
+// getThreatTableForMonster 获取特定怪物的威胁表
+func (m *BattleManager) getThreatTableForMonster(session *BattleSession, monsterID string) map[int]int {
+	if session == nil || session.ThreatTable == nil {
+		return make(map[int]int)
+	}
+
+	if threatTable, exists := session.ThreatTable[monsterID]; exists {
+		return threatTable
+	}
+
+	return make(map[int]int)
+}
+
+// resetThreatTable 重置威胁表（新战斗开始时调用）
+func (m *BattleManager) resetThreatTable(session *BattleSession) {
+	if session == nil {
+		return
+	}
+
+	// 清空所有威胁表
+	session.ThreatTable = make(map[string]map[int]int)
+}
+
+// buildTurnOrder 构建回合顺序队列（按速度排序）
+// 包含所有角色和敌人，按速度从高到低排序
+func (m *BattleManager) buildTurnOrder(session *BattleSession, characters []*models.Character, enemies []*models.Monster) {
+	if session == nil {
+		return
+	}
+
+	turnOrder := make([]*TurnParticipant, 0)
+
+	// 添加所有角色到队列
+	for i, char := range characters {
+		if char == nil || char.HP <= 0 {
+			continue
+		}
+		speed := m.calculator.CalculateSpeed(char)
+		turnOrder = append(turnOrder, &TurnParticipant{
+			Type:      "character",
+			Character: char,
+			Speed:     speed,
+			Index:     i,
+		})
+	}
+
+	// 添加所有敌人到队列
+	for i, enemy := range enemies {
+		if enemy == nil || enemy.HP <= 0 {
+			continue
+		}
+		speed := enemy.Speed
+		if speed <= 0 {
+			speed = 10 // 默认速度
+		}
+		turnOrder = append(turnOrder, &TurnParticipant{
+			Type:    "monster",
+			Monster: enemy,
+			Speed:   speed,
+			Index:   i,
+		})
+	}
+
+	// 按速度从高到低排序（速度相同则随机）
+	sort.Slice(turnOrder, func(i, j int) bool {
+		if turnOrder[i].Speed != turnOrder[j].Speed {
+			return turnOrder[i].Speed > turnOrder[j].Speed
+		}
+		// 速度相同时，随机排序（使用索引作为随机种子）
+		return rand.Intn(2) == 0
+	})
+
+	session.TurnOrder = turnOrder
+	session.CurrentTurnOrderIndex = 0
+}
+
+// getCurrentTurnParticipant 获取当前回合的参与者
+func (m *BattleManager) getCurrentTurnParticipant(session *BattleSession) *TurnParticipant {
+	if session == nil || session.TurnOrder == nil || len(session.TurnOrder) == 0 {
+		return nil
+	}
+	if session.CurrentTurnOrderIndex < 0 || session.CurrentTurnOrderIndex >= len(session.TurnOrder) {
+		return nil
+	}
+	return session.TurnOrder[session.CurrentTurnOrderIndex]
+}
+
+// moveToNextTurn 移动到下一个回合
+func (m *BattleManager) moveToNextTurn(session *BattleSession, characters []*models.Character, enemies []*models.Monster) {
+	if session == nil {
+		return
+	}
+
+	// 移动到下一个参与者
+	session.CurrentTurnOrderIndex++
+
+	// 如果所有参与者都行动完毕，开始新的一轮
+	if session.CurrentTurnOrderIndex >= len(session.TurnOrder) {
+		// 重新构建回合队列（因为可能有角色/敌人死亡，速度可能变化）
+		m.buildTurnOrder(session, characters, enemies)
+		// 增加回合数
+		session.CurrentBattleRound++
+		m.incrementBattleRound(session)
+		
+		// 添加回合开始日志（每5回合显示一次，避免日志过多）
+		// 注意：这个日志不会在moveToNextTurn中直接添加，而是在需要时由调用者添加
+		// 避免在每次移动回合时都产生日志
+	}
+}
+
+// checkBattleEnd 检查战斗是否结束
+// 返回: (isEnded, isVictory, allCharactersDead)
+// isEnded: 战斗是否结束
+// isVictory: 是否胜利（仅当isEnded为true时有效）
+// allCharactersDead: 所有角色是否都死亡（仅当isEnded为true时有效）
+func (m *BattleManager) checkBattleEnd(session *BattleSession, characters []*models.Character, enemies []*models.Monster) (isEnded bool, isVictory bool, allCharactersDead bool) {
+	if session == nil {
+		return false, false, false
+	}
+
+	// 检查所有角色是否都死亡
+	allDead := true
+	hasAliveCharacter := false
+	for _, char := range characters {
+		if char != nil && char.HP > 0 && !char.IsDead {
+			allDead = false
+			hasAliveCharacter = true
+			break
+		}
+	}
+
+	// 检查所有敌人是否都被击败
+	allEnemiesDefeated := true
+	hasAliveEnemy := false
+	for _, enemy := range enemies {
+		if enemy != nil && enemy.HP > 0 {
+			allEnemiesDefeated = false
+			hasAliveEnemy = true
+			break
+		}
+	}
+
+	// 如果所有角色都死亡，战斗失败
+	if allDead && !hasAliveCharacter {
+		return true, false, true
+	}
+
+	// 如果所有敌人都被击败，战斗胜利
+	if allEnemiesDefeated && !hasAliveEnemy && len(enemies) > 0 {
+		return true, true, false
+	}
+
+	// 战斗继续
+	return false, false, false
 }
 

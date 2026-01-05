@@ -1,0 +1,15 @@
+# 装备系统 - 装备掉落系统测试
+test_suite: "装备系统 - 装备掉落系统"
+description: "测试装备掉落系统，包括品质分布、区域掉落倍率、装备实例生成。注意：这些测试需要在实际游戏系统中运行，测试运行器仅提供文档说明。"
+
+tests:
+  - name: "装备掉落系统文档说明"
+    description: "说明装备掉落系统的测试需要在实际游戏系统中进行"
+    category: "documentation"
+    priority: "high"
+    setup:
+      - "此测试用例仅作为文档说明"
+    steps:
+      - action: "装备掉落系统已实现以下功能："
+        expected: "1. 根据怪物类型确定品质分布（普通/精英/Boss）\n2. 集成区域掉落倍率，提升高品质装备概率\n3. 掉落时生成装备实例（调用GenerateEquipment）\n4. 根据品质生成对应数量的词缀"
+    assertions: []

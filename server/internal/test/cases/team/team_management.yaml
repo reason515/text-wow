@@ -1,0 +1,151 @@
+# 队伍系统 - 队伍管理测试
+test_suite: "队伍系统 - 队伍管理"
+description: "测试队伍系统的核心功能，包括角色添加、移除、槽位管理等"
+
+tests:
+  - name: "添加角色到队伍测试"
+    description: "测试将角色添加到队伍指定槽位"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个空队伍"
+      - "创建3个角色：角色1、角色2、角色3"
+    steps:
+      - action: "将角色1添加到槽位1"
+        expected: "角色1成功添加到槽位1"
+      - action: "将角色2添加到槽位2"
+        expected: "角色2成功添加到槽位2"
+      - action: "将角色3添加到槽位3"
+        expected: "角色3成功添加到槽位3"
+    assertions:
+      - type: "equals"
+        target: "team.character_count"
+        expected: "3"
+        message: "队伍应该有3个角色"
+      - type: "equals"
+        target: "team.slot_1.character_id"
+        expected: "1"
+        message: "槽位1应该是角色1"
+      - type: "equals"
+        target: "team.slot_2.character_id"
+        expected: "2"
+        message: "槽位2应该是角色2"
+
+  - name: "槽位冲突测试"
+    description: "测试尝试将角色添加到已被占用的槽位"
+    category: "unit"
+    priority: "medium"
+    setup:
+      - "创建一个队伍，槽位1已有角色1"
+      - "创建角色2"
+    steps:
+      - action: "尝试将角色2添加到槽位1"
+        expected: "操作失败，提示槽位已被占用"
+    assertions:
+      - type: "equals"
+        target: "operation_success"
+        expected: "false"
+        message: "操作应该失败"
+      - type: "equals"
+        target: "team.slot_1.character_id"
+        expected: "1"
+        message: "槽位1应该仍然是角色1"
+
+  - name: "移除角色测试"
+    description: "测试从队伍中移除角色"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个队伍，包含3个角色"
+    steps:
+      - action: "从槽位2移除角色"
+        expected: "角色成功移除，槽位2变为空"
+    assertions:
+      - type: "equals"
+        target: "team.character_count"
+        expected: "2"
+        message: "队伍应该有2个角色"
+      - type: "equals"
+        target: "team.slot_2.character_id"
+        expected: "null"
+        message: "槽位2应该为空"
+
+  - name: "槽位解锁测试"
+    description: "测试槽位解锁机制"
+    category: "unit"
+    priority: "medium"
+    setup:
+      - "创建一个新队伍，初始解锁1个槽位"
+    steps:
+      - action: "尝试将角色添加到槽位2"
+        expected: "操作失败，提示槽位未解锁"
+      - action: "解锁槽位2"
+        expected: "槽位2成功解锁"
+      - action: "将角色添加到槽位2"
+        expected: "角色成功添加到槽位2"
+    assertions:
+      - type: "equals"
+        target: "team.unlocked_slots"
+        expected: "2"
+        message: "解锁槽位后应该有2个解锁槽位"
+      - type: "equals"
+        target: "team.slot_2.character_id"
+        expected: "2"
+        message: "槽位2应该有角色"
+
+  - name: "队伍最大人数测试"
+    description: "测试队伍最大人数限制（5人）"
+    category: "unit"
+    priority: "medium"
+    setup:
+      - "创建一个队伍，已有4个角色"
+      - "创建角色5和角色6"
+    steps:
+      - action: "将角色5添加到槽位5"
+        expected: "角色5成功添加，队伍满员（5人）"
+      - action: "尝试将角色6添加到队伍"
+        expected: "操作失败，提示队伍已满"
+    assertions:
+      - type: "equals"
+        target: "team.character_count"
+        expected: "5"
+        message: "队伍应该有5个角色（满员）"
+      - type: "equals"
+        target: "add_character_6_success"
+        expected: "false"
+        message: "添加第6个角色应该失败"
+
+  - name: "队伍属性加成测试"
+    description: "测试队伍中多个角色的属性加成"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个队伍，包含3个角色"
+      - "角色1有队伍攻击力+10%的被动技能"
+      - "角色2有队伍生命值+15%的被动技能"
+    steps:
+      - action: "计算队伍总攻击力"
+        expected: "所有角色攻击力+10%"
+      - action: "计算队伍总生命值"
+        expected: "所有角色生命值+15%"
+    assertions:
+      - type: "greater_than"
+        target: "team_total_attack"
+        expected: "base_total_attack"
+        message: "队伍总攻击力应该高于基础值（有加成）"
+      - type: "greater_than"
+        target: "team_total_hp"
+        expected: "base_total_hp"
+        message: "队伍总生命值应该高于基础值（有加成）"
+
+
+
+
+
+
+
+
+
+
+
+

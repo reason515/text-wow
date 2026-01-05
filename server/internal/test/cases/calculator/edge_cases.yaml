@@ -1,0 +1,158 @@
+# 数值计算系统 - 边界情况测试
+test_suite: "数值计算系统 - 边界情况"
+description: "测试边界情况处理，包括极端值、负数、零值等"
+
+tests:
+  - name: "零属性值测试"
+    description: "测试所有属性为0时的计算"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个角色，力量=0，敏捷=0，智力=0，精神=0，耐力=0"
+    steps:
+      - action: "计算物理攻击力"
+        expected: "物理攻击力应该至少为1（最小值保护）"
+      - action: "计算法术攻击力"
+        expected: "法术攻击力应该至少为1（最小值保护）"
+      - action: "计算最大生命值"
+        expected: "最大生命值应该至少为1（最小值保护）"
+    assertions:
+      - type: "greater_than_or_equal"
+        target: "physical_attack"
+        expected: "1"
+        message: "物理攻击力应该至少为1"
+      - type: "greater_than_or_equal"
+        target: "magic_attack"
+        expected: "1"
+        message: "法术攻击力应该至少为1"
+      - type: "greater_than_or_equal"
+        target: "max_hp"
+        expected: "1"
+        message: "最大生命值应该至少为1"
+
+  - name: "极端属性值测试"
+    description: "测试极高属性值时的计算和上限"
+    category: "unit"
+    priority: "medium"
+    setup:
+      - "创建一个角色，敏捷=10000"
+    steps:
+      - action: "计算物理暴击率"
+        expected: "暴击率应该被限制在50%（上限）"
+      - action: "计算闪避率"
+        expected: "闪避率应该被限制在50%（上限）"
+    assertions:
+      - type: "equals"
+        target: "phys_crit_rate"
+        expected: "0.5"
+        message: "物理暴击率应该等于50%（上限）"
+      - type: "equals"
+        target: "dodge_rate"
+        expected: "0.5"
+        message: "闪避率应该等于50%（上限）"
+
+  - name: "负数属性值测试"
+    description: "测试负数属性值时的处理"
+    category: "unit"
+    priority: "medium"
+    setup:
+      - "创建一个角色，力量=-10，敏捷=-10，智力=-10，精神=-10，耐力=-10"
+    steps:
+      - action: "计算物理攻击力"
+        expected: "物理攻击力应该至少为1（负数被处理）"
+      - action: "计算法术攻击力"
+        expected: "法术攻击力应该至少为1（负数被处理）"
+    assertions:
+      - type: "greater_than_or_equal"
+        target: "physical_attack"
+        expected: "1"
+        message: "物理攻击力应该至少为1（即使属性为负数）"
+      - type: "greater_than_or_equal"
+        target: "magic_attack"
+        expected: "1"
+        message: "法术攻击力应该至少为1（即使属性为负数）"
+
+  - name: "防御高于攻击测试"
+    description: "测试防御高于攻击时，至少造成1点伤害"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个攻击力=100的角色"
+      - "创建一个防御力=1000的怪物（防御远高于攻击）"
+    steps:
+      - action: "计算防御减伤"
+        expected: "伤害 = 攻击 - 防御 = 100 - 1000 = -900，但最低为1"
+      - action: "计算减伤后伤害"
+        expected: "减伤后伤害 = 1（最低伤害）"
+    assertions:
+      - type: "equals"
+        target: "damage_after_defense"
+        expected: "1"
+        message: "减伤后伤害应该等于1（防御高于攻击时最低伤害）"
+
+  - name: "至少1点伤害测试"
+    description: "测试即使防御很高，也应该至少造成1点伤害"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个攻击力=1的角色"
+      - "创建一个防御力=10000的怪物（防御极高）"
+    steps:
+      - action: "计算伤害"
+        expected: "即使防御极高，也应该至少造成1点伤害"
+    assertions:
+      - type: "greater_than_or_equal"
+        target: "final_damage"
+        expected: "1"
+        message: "最终伤害应该至少为1"
+
+  - name: "治疗过量处理测试"
+    description: "测试治疗过量时的处理"
+    category: "unit"
+    priority: "medium"
+    setup:
+      - "创建一个角色，HP=95/100"
+      - "创建一个治疗技能，治疗量=20"
+    steps:
+      - action: "使用治疗技能"
+        expected: "实际治疗应该为5（只能治疗到最大HP），过量治疗为15"
+    assertions:
+      - type: "equals"
+        target: "character.hp"
+        expected: "100"
+        message: "角色HP应该等于最大HP"
+      - type: "greater_than_or_equal"
+        target: "overhealing"
+        expected: "0"
+        message: "应该有过量治疗"
+
+  - name: "速度计算测试"
+    description: "测试速度计算公式（速度 = 敏捷）"
+    category: "unit"
+    priority: "medium"
+    setup:
+      - "创建一个角色，敏捷=20"
+    steps:
+      - action: "计算速度"
+        expected: "速度 = 敏捷 = 20"
+    assertions:
+      - type: "equals"
+        target: "speed"
+        expected: "20"
+        message: "速度应该等于20（敏捷值）"
+
+  - name: "速度最小值测试"
+    description: "测试速度最小值保护"
+    category: "unit"
+    priority: "low"
+    setup:
+      - "创建一个角色，敏捷=-100（负数）"
+    steps:
+      - action: "计算速度"
+        expected: "速度应该至少为1（最小值保护）"
+    assertions:
+      - type: "greater_than_or_equal"
+        target: "speed"
+        expected: "1"
+        message: "速度应该至少为1"
+

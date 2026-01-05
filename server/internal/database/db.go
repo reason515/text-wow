@@ -241,6 +241,10 @@ func runMigrations() error {
 	if err := migrateMonsterStrengthConfig(); err != nil {
 		return fmt.Errorf("failed to migrate monster_strength_config: %w", err)
 	}
+	// 迁移3: 创建配置版本表
+	if err := migrateConfigVersions(); err != nil {
+		return fmt.Errorf("failed to migrate config_versions: %w", err)
+	}
 	return nil
 }
 
@@ -402,5 +406,44 @@ func migrateMonsterStrengthConfig() error {
 	}
 
 	log.Println("✅ monster_strength_config table created successfully")
+	return nil
+}
+
+// migrateConfigVersions 迁移配置版本表
+func migrateConfigVersions() error {
+	// 检查表是否已存在
+	var tableName string
+	err := DB.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name='config_versions'").Scan(&tableName)
+	if err == nil {
+		// 表已存在，跳过
+		return nil
+	}
+	if err != sql.ErrNoRows {
+		return err
+	}
+
+	// 创建配置版本表
+	log.Println("🔄 Creating config_versions table...")
+	_, err = DB.Exec(`
+		CREATE TABLE IF NOT EXISTS config_versions (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			config_type VARCHAR(32) NOT NULL,
+			version INTEGER NOT NULL,
+			config_data TEXT NOT NULL,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			created_by VARCHAR(32),
+			description TEXT,
+			UNIQUE(config_type, version)
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create config_versions table: %w", err)
+	}
+
+	// 创建索引
+	DB.Exec("CREATE INDEX IF NOT EXISTS idx_config_versions_type ON config_versions(config_type)")
+	DB.Exec("CREATE INDEX IF NOT EXISTS idx_config_versions_version ON config_versions(config_type, version DESC)")
+
+	log.Println("✅ config_versions table created successfully")
 	return nil
 }

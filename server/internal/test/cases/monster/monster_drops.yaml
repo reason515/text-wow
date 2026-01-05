@@ -1,0 +1,108 @@
+# 怪物系统 - 怪物掉落测试
+test_suite: "怪物系统 - 怪物掉落"
+description: "测试怪物掉落系统，包括掉落概率计算、掉落率修正、装备生成"
+
+tests:
+  - name: "基础掉落测试"
+    description: "测试基础掉落概率计算"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "初始化怪物管理器"
+      - "创建怪物，掉落率=50%"
+    steps:
+      - action: "计算掉落"
+        expected: "根据概率计算是否掉落"
+    assertions:
+      - type: "range"
+        target: "drop_success_rate"
+        expected: "[0.3, 0.7]"
+        message: "多次测试后掉落成功率应该在30%-70%之间（考虑随机性）"
+
+  - name: "精英怪物掉落率修正测试"
+    description: "测试精英怪物的掉落率提升20%"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "初始化怪物管理器"
+      - "创建精英怪物，基础掉落率=50%"
+    steps:
+      - action: "计算掉落"
+        expected: "掉落率应该提升至60%（50%×1.2）"
+    assertions:
+      - type: "range"
+        target: "drop_success_rate"
+        expected: "[0.4, 0.8]"
+        message: "精英怪物掉落成功率应该更高"
+
+  - name: "Boss怪物掉落率修正测试"
+    description: "测试Boss怪物的掉落率提升50%"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "初始化怪物管理器"
+      - "创建Boss怪物，基础掉落率=50%"
+    steps:
+      - action: "计算掉落"
+        expected: "掉落率应该提升至75%（50%×1.5，但不超过100%）"
+    assertions:
+      - type: "range"
+        target: "drop_success_rate"
+        expected: "[0.6, 0.9]"
+        message: "Boss怪物掉落成功率应该更高"
+
+  - name: "掉落数量计算测试"
+    description: "测试掉落数量的随机范围"
+    category: "unit"
+    priority: "medium"
+    setup:
+      - "初始化怪物管理器"
+      - "创建怪物，掉落数量范围=1-3"
+    steps:
+      - action: "计算掉落"
+        expected: "掉落数量应该在1-3之间"
+    assertions:
+      - type: "range"
+        target: "drop_quantity"
+        expected: "[1, 3]"
+        message: "掉落数量应该在指定范围内"
+
+  - name: "多物品掉落测试"
+    description: "测试怪物可以掉落多个物品"
+    category: "unit"
+    priority: "medium"
+    setup:
+      - "初始化怪物管理器"
+      - "创建怪物，掉落表包含多个物品"
+    steps:
+      - action: "计算掉落"
+        expected: "可能掉落多个物品"
+    assertions:
+      - type: "greater_than_or_equal"
+        target: "drop_count"
+        expected: "0"
+        message: "应该可能掉落物品"
+      - type: "less_than_or_equal"
+        target: "drop_count"
+        expected: "drop_table_size"
+        message: "掉落数量不应该超过掉落表大小"
+
+  - name: "无掉落表测试"
+    description: "测试没有掉落表的怪物"
+    category: "unit"
+    priority: "low"
+    setup:
+      - "初始化怪物管理器"
+      - "创建怪物，无掉落表"
+    steps:
+      - action: "计算掉落"
+        expected: "应该返回空掉落结果"
+    assertions:
+      - type: "equals"
+        target: "drop_count"
+        expected: "0"
+        message: "没有掉落表的怪物应该返回空结果"
+
+
+
+

@@ -1,0 +1,90 @@
+# 技能系统 - 集成测试
+test_suite: "技能系统 - 集成测试"
+description: "测试技能系统与其他系统的集成，包括Buff、DOT/HOT等的综合交互"
+
+tests:
+  - name: "技能与Buff集成测试"
+    description: "测试技能和Buff的综合效果"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色，攻击力=20"
+      - "创建一个怪物，HP=100，防御力=10"
+      - "给角色添加攻击力+20%的Buff（持续3回合）"
+    steps:
+      - action: "角色对怪物进行物理攻击"
+        expected: "Buff提升攻击力，造成更高伤害"
+    assertions:
+      - type: "greater_than"
+        target: "damage_dealt"
+        expected: "15"
+        message: "有Buff时伤害应该更高（基础约18，有Buff应该更高）"
+      - type: "equals"
+        target: "character.buff_attack_modifier"
+        expected: "0.2"
+        message: "Buff攻击力加成应该为20%"
+
+  - name: "DOT与Buff集成测试"
+    description: "测试DOT效果和Buff的交互"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色，HP=50/100"
+      - "给角色添加持续3回合，每回合15点治疗的HOT"
+      - "给角色添加攻击力+20%的Buff（持续3回合）"
+    steps:
+      - action: "执行第1回合"
+        expected: "HOT恢复HP，Buff仍然有效"
+    assertions:
+      - type: "equals"
+        target: "character.hp_round_1"
+        expected: "65"
+        message: "第1回合后HP应该为65（50+15）"
+      - type: "equals"
+        target: "character.buff_attack_modifier"
+        expected: "0.2"
+        message: "Buff应该仍然有效"
+
+  - name: "技能冷却测试"
+    description: "测试技能冷却机制（需要实际技能系统支持）"
+    category: "documentation"
+    priority: "medium"
+    setup:
+      - "技能冷却功能需要通过Go单元测试进行验证"
+    steps:
+      - action: "参考 server/internal/game/skill_manager_test.go"
+        expected: "技能冷却测试位于Go单元测试文件中"
+    assertions:
+      - type: "contains"
+        target: "test_location"
+        expected: "skill_manager_test"
+        message: "技能冷却测试位于Go单元测试文件中"
+
+  - name: "完整战斗流程测试"
+    description: "测试包含技能、Buff、DOT/HOT的完整战斗流程"
+    category: "e2e"
+    priority: "high"
+    setup:
+      - "创建一个角色，HP=100/1000，攻击力=20，资源=50/100"
+      - "创建一个怪物，HP=100，防御力=10"
+      - "给角色添加攻击力+20%的Buff（持续3回合）"
+      - "给怪物添加持续3回合，每回合10点伤害的DOT"
+    steps:
+      - action: "开始战斗"
+        expected: "战斗状态为进行中"
+      - action: "角色对怪物进行物理攻击"
+        expected: "Buff提升伤害，造成更高伤害"
+      - action: "执行第1回合"
+        expected: "DOT持续造成伤害"
+      - action: "继续战斗直到怪物死亡"
+        expected: "战斗结束，角色获胜"
+        max_rounds: 20
+    assertions:
+      - type: "equals"
+        target: "monster.hp"
+        expected: "0"
+        message: "怪物HP应该为0（死亡）"
+      - type: "greater_than"
+        target: "character.hp"
+        expected: "0"
+        message: "角色HP应该大于0（存活）"

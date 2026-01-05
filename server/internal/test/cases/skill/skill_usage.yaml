@@ -1,0 +1,161 @@
+# 技能系统 - 技能使用测试
+test_suite: "技能系统 - 技能使用"
+description: "测试技能系统的核心功能，包括技能使用、冷却、资源消耗等"
+
+tests:
+  - name: "技能资源消耗测试"
+    description: "测试使用技能时的资源消耗"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个战士角色，怒气=100/100"
+      - "创建一个消耗30点怒气的技能"
+    steps:
+      - action: "角色使用技能"
+        expected: "角色怒气减少30点，剩余70点"
+    assertions:
+      - type: "equals"
+        target: "character.resource"
+        expected: "70"
+        message: "使用技能后怒气应该为70"
+
+  - name: "技能冷却测试"
+    description: "测试技能的冷却机制"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色，怒气=100/100"
+      - "创建一个冷却时间为3回合的技能"
+    steps:
+      - action: "角色使用技能（第1回合）"
+        expected: "技能使用成功，进入冷却"
+      - action: "执行第2回合"
+        expected: "技能仍在冷却中，无法使用"
+      - action: "执行第3回合"
+        expected: "技能仍在冷却中，无法使用"
+      - action: "执行第4回合"
+        expected: "技能冷却结束，可以再次使用"
+    assertions:
+      - type: "equals"
+        target: "skill_cooldown_round_1"
+        expected: "3"
+        message: "第1回合后技能冷却时间应该为3"
+      - type: "equals"
+        target: "skill_usable_round_2"
+        expected: "false"
+        message: "第2回合技能应该不可用"
+      - type: "equals"
+        target: "skill_usable_round_4"
+        expected: "true"
+        message: "第4回合技能应该可用"
+
+  - name: "资源不足测试"
+    description: "测试资源不足时无法使用技能"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个战士角色，怒气=20/100"
+      - "创建一个消耗30点怒气的技能"
+    steps:
+      - action: "角色尝试使用技能"
+        expected: "技能使用失败，提示资源不足"
+    assertions:
+      - type: "equals"
+        target: "skill_used"
+        expected: "false"
+        message: "技能应该使用失败"
+      - type: "equals"
+        target: "character.resource"
+        expected: "20"
+        message: "角色怒气应该仍为20（未消耗）"
+
+  - name: "技能伤害倍率测试"
+    description: "测试不同伤害倍率的技能"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个攻击力=20的角色"
+      - "创建一个防御力=10的怪物"
+      - "创建一个伤害倍率为150%的技能"
+    steps:
+      - action: "角色使用技能攻击怪物"
+        expected: "基础伤害=20×1.5=30，防御减伤后≈27"
+    assertions:
+      - type: "approximately"
+        target: "skill_damage_dealt"
+        expected: "27"
+        tolerance: 2.0
+        message: "技能伤害应该约等于27"
+
+  - name: "AOE技能测试"
+    description: "测试范围攻击（AOE）技能"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个攻击力=20的角色"
+      - "创建3个防御力=10的怪物"
+      - "创建一个AOE技能，伤害倍率100%"
+    steps:
+      - action: "角色使用AOE技能"
+        expected: "所有3个怪物都受到伤害"
+    assertions:
+      - type: "greater_than"
+        target: "monster_1.hp_damage"
+        expected: "0"
+        message: "怪物1应该受到伤害"
+      - type: "greater_than"
+        target: "monster_2.hp_damage"
+        expected: "0"
+        message: "怪物2应该受到伤害"
+      - type: "greater_than"
+        target: "monster_3.hp_damage"
+        expected: "0"
+        message: "怪物3应该受到伤害"
+
+  - name: "治疗技能测试"
+    description: "测试治疗技能的效果"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个角色，HP=50/100"
+      - "创建一个治疗技能，治疗量=30"
+    steps:
+      - action: "角色对自己使用治疗技能"
+        expected: "角色HP增加30点，HP=80"
+    assertions:
+      - type: "equals"
+        target: "character.hp"
+        expected: "80"
+        message: "使用治疗技能后HP应该为80"
+
+  - name: "Buff技能测试"
+    description: "测试Buff技能的效果"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色"
+      - "创建一个Buff技能，效果：攻击力+50%，持续3回合"
+    steps:
+      - action: "角色使用Buff技能"
+        expected: "角色获得攻击力+50%的Buff，持续3回合"
+    assertions:
+      - type: "equals"
+        target: "character.buff_attack_modifier"
+        expected: "0.5"
+        message: "Buff应该提供50%攻击力加成"
+      - type: "equals"
+        target: "character.buff_duration"
+        expected: "3"
+        message: "Buff持续时间应该为3回合"
+
+
+
+
+
+
+
+
+
+
+
+

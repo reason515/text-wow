@@ -1,0 +1,84 @@
+# 战斗系统 - 基础战斗测试
+test_suite: "战斗系统 - 基础战斗"
+description: "测试战斗系统的核心功能，包括单角色和多角色战斗流程"
+
+tests:
+  - name: "单角色基础战斗流程测试"
+    description: "测试一个简单的单角色战斗流程，角色攻击怪物直到一方死亡"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个1级人类战士角色，HP=25，攻击力=8"
+      - "创建一个1级森林狼怪物，HP=20，攻击力=5"
+      - "初始化战斗系统"
+    steps:
+      - action: "开始战斗"
+        expected: "战斗状态为进行中"
+        timeout: 5
+      - action: "执行一个回合"
+        expected: "角色攻击怪物，怪物受到伤害"
+        assertions:
+          - "怪物HP应该减少"
+          - "战斗日志应该包含攻击信息"
+      - action: "怪物反击"
+        expected: "怪物攻击角色，角色受到伤害"
+        assertions:
+          - "角色HP应该减少"
+          - "战斗日志应该包含受击信息"
+      - action: "继续战斗直到怪物死亡"
+        expected: "战斗结束，角色获胜，获得经验和金币"
+        max_rounds: 20
+    assertions:
+      - type: "greater_than"
+        target: "character.hp"
+        expected: "0"
+        message: "角色HP应该大于0"
+      - type: "equals"
+        target: "monster.hp"
+        expected: "0"
+        message: "怪物HP应该等于0"
+      - type: "greater_than"
+        target: "character.exp"
+        expected: "0"
+        message: "角色应该获得经验值"
+      - type: "contains"
+        target: "battle_logs"
+        expected: "攻击"
+        message: "战斗日志应该包含攻击信息"
+
+  - name: "多角色队伍战斗测试"
+    description: "测试多角色队伍战斗，验证队伍协同和仇恨系统"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个3人队伍：战士(坦克)、牧师(治疗)、法师(DPS)"
+      - "创建一个精英怪物，HP=50，攻击力=10"
+      - "初始化战斗系统"
+    steps:
+      - action: "开始战斗"
+        expected: "战斗状态为进行中"
+      - action: "执行一个回合"
+        expected: "所有角色按速度顺序行动"
+        assertions:
+          - "战士应该优先使用高仇恨技能"
+          - "牧师应该优先治疗低血量队友"
+          - "法师应该优先攻击敌人"
+      - action: "怪物攻击"
+        expected: "怪物应该优先攻击仇恨最高的角色（通常是战士）"
+      - action: "继续战斗直到怪物死亡"
+        expected: "战斗结束，队伍获胜"
+        max_rounds: 30
+    assertions:
+      - type: "greater_than"
+        target: "team_alive_count"
+        expected: "0"
+        message: "至少有一个角色存活"
+      - type: "equals"
+        target: "monster.hp"
+        expected: "0"
+        message: "怪物HP应该等于0"
+      - type: "greater_than"
+        target: "team_total_exp"
+        expected: "0"
+        message: "队伍应该获得经验值"
+

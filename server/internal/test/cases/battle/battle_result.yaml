@@ -1,0 +1,208 @@
+# 战斗系统 - 胜负判定测试
+test_suite: "战斗系统 - 胜负判定"
+description: "测试战斗的胜负判定，包括胜利、失败、平局等场景"
+
+tests:
+  - name: "角色胜利判定测试"
+    description: "测试角色击败怪物后的胜利判定"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个1级战士角色，HP=25"
+      - "创建一个1级怪物，HP=1（濒死）"
+      - "初始化战斗系统"
+    steps:
+      - action: "角色攻击怪物"
+        expected: "怪物HP降至0，战斗结束"
+      - action: "检查战斗结果"
+        expected: "战斗结果为角色胜利"
+        assertions:
+          - "is_victory应该为true"
+          - "角色应该获得经验值"
+          - "角色应该获得金币"
+    assertions:
+      - type: "equals"
+        target: "battle_result.is_victory"
+        expected: "true"
+        message: "战斗结果应该为胜利"
+      - type: "greater_than"
+        target: "character.exp"
+        expected: "0"
+        message: "角色应该获得经验值"
+      - type: "greater_than"
+        target: "character.gold"
+        expected: "0"
+        message: "角色应该获得金币"
+
+  - name: "角色失败判定测试"
+    description: "测试角色死亡后的失败判定"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个1级战士角色，HP=1（濒死）"
+      - "创建一个1级怪物，攻击力=10"
+      - "初始化战斗系统"
+    steps:
+      - action: "怪物攻击角色"
+        expected: "角色HP降至0，战斗结束"
+      - action: "检查战斗结果"
+        expected: "战斗结果为角色失败"
+        assertions:
+          - "is_victory应该为false"
+          - "角色应该标记为死亡"
+          - "角色不应该获得经验值和金币"
+    assertions:
+      - type: "equals"
+        target: "battle_result.is_victory"
+        expected: "false"
+        message: "战斗结果应该为失败"
+      - type: "equals"
+        target: "character.hp"
+        expected: "0"
+        message: "角色HP应该为0"
+      - type: "equals"
+        target: "character.is_dead"
+        expected: "true"
+        message: "角色应该标记为死亡"
+
+  - name: "队伍胜利判定测试"
+    description: "测试队伍击败怪物后的胜利判定"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个3人队伍：战士、牧师、法师"
+      - "创建一个怪物，HP=1（濒死）"
+      - "初始化战斗系统"
+    steps:
+      - action: "队伍攻击怪物"
+        expected: "怪物HP降至0，战斗结束"
+      - action: "检查战斗结果"
+        expected: "战斗结果为队伍胜利"
+        assertions:
+          - "is_victory应该为true"
+          - "所有存活角色应该获得经验值"
+    assertions:
+      - type: "equals"
+        target: "battle_result.is_victory"
+        expected: "true"
+        message: "战斗结果应该为胜利"
+      - type: "greater_than"
+        target: "warrior.exp"
+        expected: "0"
+        message: "战士应该获得经验值"
+      - type: "greater_than"
+        target: "priest.exp"
+        expected: "0"
+        message: "牧师应该获得经验值"
+
+  - name: "队伍失败判定测试"
+    description: "测试所有队伍成员死亡后的失败判定"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个2人队伍：战士(HP=1)，法师(HP=1)"
+      - "创建一个怪物，攻击力=10"
+      - "初始化战斗系统"
+    steps:
+      - action: "怪物连续攻击所有角色"
+        expected: "所有角色HP降至0，战斗结束"
+        max_rounds: 5
+      - action: "检查战斗结果"
+        expected: "战斗结果为队伍失败"
+        assertions:
+          - "is_victory应该为false"
+          - "所有角色应该标记为死亡"
+    assertions:
+      - type: "equals"
+        target: "battle_result.is_victory"
+        expected: "false"
+        message: "战斗结果应该为失败"
+      - type: "equals"
+        target: "team_alive_count"
+        expected: "0"
+        message: "队伍存活人数应该为0"
+
+  - name: "多敌人战斗胜利判定测试"
+    description: "测试击败多个敌人后的胜利判定"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "创建一个1级战士角色"
+      - "创建3个怪物，每个HP=10"
+      - "初始化战斗系统"
+    steps:
+      - action: "角色逐个击败所有怪物"
+        expected: "所有怪物HP降至0，战斗结束"
+        max_rounds: 30
+      - action: "检查战斗结果"
+        expected: "战斗结果为胜利，角色获得所有怪物的经验和金币"
+    assertions:
+      - type: "equals"
+        target: "battle_result.is_victory"
+        expected: "true"
+        message: "战斗结果应该为胜利"
+      - type: "equals"
+        target: "enemies_alive_count"
+        expected: "0"
+        message: "存活敌人数量应该为0"
+      - type: "greater_than"
+        target: "character.exp"
+        expected: "0"
+        message: "角色应该获得经验值"
+
+  - name: "战斗奖励计算测试"
+    description: "测试战斗胜利后的奖励计算（经验、金币、掉落）"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "创建一个10级战士角色"
+      - "创建一个10级精英怪物，HP=50，ExpReward=50，GoldMin=10，GoldMax=30"
+      - "初始化战斗系统"
+    steps:
+      - action: "击败怪物"
+        expected: "战斗结束，计算奖励"
+      - action: "检查奖励"
+        expected: "角色应该获得经验值和金币"
+        assertions:
+          - "经验值应该等于或接近50"
+          - "金币应该在10-30之间"
+    assertions:
+      - type: "approximately"
+        target: "character.exp_gained"
+        expected: "50"
+        tolerance: 5.0
+        message: "经验值应该约等于50"
+      - type: "range"
+        target: "character.gold_gained"
+        expected: "[10, 30]"
+        message: "金币应该在10-30之间"
+
+  - name: "战斗时长统计测试"
+    description: "测试战斗时长的统计"
+    category: "integration"
+    priority: "low"
+    setup:
+      - "创建一个角色"
+      - "创建一个怪物"
+      - "初始化战斗系统"
+    steps:
+      - action: "开始战斗并记录开始时间"
+        expected: "记录战斗开始时间"
+      - action: "执行战斗直到结束"
+        expected: "战斗结束，计算战斗时长"
+        max_rounds: 20
+      - action: "检查战斗时长"
+        expected: "战斗时长应该大于0"
+    assertions:
+      - type: "greater_than"
+        target: "battle_result.duration_seconds"
+        expected: "0"
+        message: "战斗时长应该大于0"
+
+
+
+
+
+
+
+

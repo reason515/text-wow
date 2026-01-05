@@ -1,0 +1,143 @@
+# 策略系统 - 技能优先级测试
+test_suite: "策略系统 - 技能优先级"
+description: "测试策略系统中技能的优先级排序和执行顺序"
+
+tests:
+  - name: "技能优先级排序测试"
+    description: "测试技能按优先级排序"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个角色，拥有多个技能"
+      - "配置技能优先级：治疗（优先级10）> 攻击（优先级5）> 防御（优先级1）"
+    steps:
+      - action: "执行策略选择"
+        expected: "技能应该按优先级排序"
+    assertions:
+      - type: "equals"
+        target: "skill_priority_order[0].name"
+        expected: "heal"
+        message: "优先级最高的应该是治疗技能"
+      - type: "equals"
+        target: "skill_priority_order[1].name"
+        expected: "attack"
+        message: "第二优先级应该是攻击技能"
+
+  - name: "冷却技能跳过测试"
+    description: "测试冷却中的技能应该被跳过"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色，拥有技能A（优先级10，冷却中）和技能B（优先级5，可用）"
+    steps:
+      - action: "执行策略选择"
+        expected: "应该跳过技能A，选择技能B"
+    assertions:
+      - type: "equals"
+        target: "selected_skill.name"
+        expected: "skill_b"
+        message: "应该选择技能B（技能A在冷却中）"
+
+  - name: "资源不足技能跳过测试"
+    description: "测试资源不足的技能应该被跳过"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色，MP=20/100"
+      - "拥有技能A（优先级10，消耗50MP）和技能B（优先级5，消耗10MP）"
+    steps:
+      - action: "执行策略选择"
+        expected: "应该跳过技能A，选择技能B"
+    assertions:
+      - type: "equals"
+        target: "selected_skill.name"
+        expected: "skill_b"
+        message: "应该选择技能B（技能A资源不足）"
+
+  - name: "优先级相同技能选择测试"
+    description: "测试优先级相同的技能选择（选择第一个可用）"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "创建一个角色，拥有技能A和技能B（优先级相同=5）"
+    steps:
+      - action: "执行策略选择"
+        expected: "应该选择第一个可用的技能"
+    assertions:
+      - type: "contains"
+        target: "selected_skill.name"
+        expected: "[skill_a, skill_b]"
+        message: "应该选择技能A或技能B之一"
+
+  - name: "技能优先级动态调整测试"
+    description: "测试根据战斗情况动态调整技能优先级"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "创建一个角色，HP=30/100"
+      - "配置策略：低HP时，治疗技能优先级提升到最高"
+    steps:
+      - action: "执行策略选择"
+        expected: "治疗技能优先级应该提升，优先选择"
+    assertions:
+      - type: "equals"
+        target: "selected_skill.type"
+        expected: "heal"
+        message: "应该优先选择治疗技能"
+
+  - name: "技能组合优先级测试"
+    description: "测试技能组合的优先级（连击技能）"
+    category: "integration"
+    priority: "low"
+    setup:
+      - "创建一个角色，拥有连击技能：技能A→技能B"
+      - "技能A已使用"
+    steps:
+      - action: "执行策略选择"
+        expected: "应该优先选择技能B（连击技能）"
+    assertions:
+      - type: "equals"
+        target: "selected_skill.name"
+        expected: "skill_b"
+        message: "应该选择连击技能B"
+
+  - name: "目标选择优先级测试"
+    description: "测试目标选择的优先级"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色"
+      - "创建3个敌人：敌人A（HP=10），敌人B（HP=50），敌人C（HP=100）"
+      - "配置策略：优先攻击HP最低的敌人"
+    steps:
+      - action: "执行策略选择目标"
+        expected: "应该选择敌人A（HP最低）"
+    assertions:
+      - type: "equals"
+        target: "selected_target.id"
+        expected: "enemy_a.id"
+        message: "应该选择HP最低的敌人A"
+
+  - name: "技能优先级覆盖条件测试"
+    description: "测试技能优先级可以覆盖条件规则"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "创建一个角色，HP=80/100"
+      - "配置策略：规则1：如果HP<50%，使用治疗（优先级5）；规则2：使用攻击技能（优先级10）"
+    steps:
+      - action: "执行策略选择"
+        expected: "应该选择攻击技能（优先级更高，即使条件不满足）"
+    assertions:
+      - type: "equals"
+        target: "selected_skill.type"
+        expected: "attack"
+        message: "应该选择攻击技能（优先级覆盖条件）"
+
+
+
+
+
+
+
+

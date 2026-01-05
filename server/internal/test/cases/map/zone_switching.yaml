@@ -1,0 +1,57 @@
+# 地图系统 - 区域切换测试
+test_suite: "地图系统 - 区域切换"
+description: "测试区域切换功能，包括条件检查、信息展示等"
+
+tests:
+  - name: "区域切换基础测试"
+    description: "测试切换到已解锁的区域"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个用户"
+      - "创建一个角色，等级=10，阵营=alliance"
+      - "初始化战斗系统"
+    steps:
+      - action: "切换到区域 elwynn"
+        expected: "应该成功切换"
+    assertions:
+      - type: "equals"
+        target: "current_zone_id"
+        expected: "elwynn"
+        message: "当前区域应该为 elwynn"
+
+  - name: "等级限制检查测试"
+    description: "测试区域切换时的等级限制"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色，等级=5"
+      - "初始化战斗系统"
+    steps:
+      - action: "尝试切换到需要等级10的区域"
+        expected: "应该返回等级不足的错误"
+    assertions:
+      - type: "contains"
+        target: "error_message"
+        expected: "level too low"
+        message: "应该提示等级不足"
+
+  - name: "阵营限制检查测试"
+    description: "测试区域切换时的阵营限制"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色，阵营=horde"
+      - "初始化战斗系统"
+    steps:
+      - action: "尝试切换到alliance专属区域"
+        expected: "应该返回阵营不匹配的错误"
+    assertions:
+      - type: "contains"
+        target: "error_message"
+        expected: "faction mismatch"
+        message: "应该提示阵营不匹配"
+
+
+
+

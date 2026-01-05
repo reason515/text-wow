@@ -1,0 +1,156 @@
+# 数值计算系统 - 资源计算测试
+test_suite: "数值计算系统 - 资源计算"
+description: "测试资源计算，包括法力恢复、怒气获得、能量恢复等"
+
+tests:
+  - name: "法力恢复计算测试"
+    description: "测试法力恢复计算公式，验证基础恢复 + 精神×0.1"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个角色，精神=20"
+    steps:
+      - action: "计算法力恢复（基础恢复=10）"
+        expected: "法力恢复 = 10 + 20×0.1 = 12"
+    assertions:
+      - type: "equals"
+        target: "mana_regen"
+        expected: "12"
+        message: "法力恢复应该等于12"
+
+  - name: "法力恢复零精神测试"
+    description: "测试精神为0时的法力恢复计算"
+    category: "unit"
+    priority: "medium"
+    setup:
+      - "创建一个角色，精神=0"
+    steps:
+      - action: "计算法力恢复（基础恢复=10）"
+        expected: "法力恢复 = 10 + 0×0.1 = 10"
+    assertions:
+      - type: "equals"
+        target: "mana_regen"
+        expected: "10"
+        message: "法力恢复应该等于10（无精神加成）"
+
+  - name: "法力恢复负数基础恢复测试"
+    description: "测试负数基础恢复时的处理"
+    category: "unit"
+    priority: "medium"
+    setup:
+      - "创建一个角色，精神=10"
+    steps:
+      - action: "计算法力恢复（基础恢复=-5）"
+        expected: "负数基础恢复被处理为0，法力恢复 = 0 + 10×0.1 = 1"
+    assertions:
+      - type: "equals"
+        target: "mana_regen"
+        expected: "1"
+        message: "法力恢复应该等于1（负数基础恢复被处理）"
+
+  - name: "法力恢复nil角色测试"
+    description: "测试nil角色时的法力恢复计算"
+    category: "unit"
+    priority: "low"
+    setup:
+      - "创建一个nil角色"
+    steps:
+      - action: "计算法力恢复（基础恢复=10）"
+        expected: "nil角色时，法力恢复 = 0"
+    assertions:
+      - type: "equals"
+        target: "mana_regen"
+        expected: "0"
+        message: "nil角色时，法力恢复应该等于0"
+
+  - name: "怒气获得计算测试"
+    description: "测试怒气获得计算公式，验证基础获得 × (1 + 加成百分比/100)"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "设置基础怒气获得=10，加成百分比=20%"
+    steps:
+      - action: "计算怒气获得"
+        expected: "怒气获得 = 10 × (1 + 20/100) = 10 × 1.2 = 12"
+    assertions:
+      - type: "equals"
+        target: "rage_gain"
+        expected: "12"
+        message: "怒气获得应该等于12"
+
+  - name: "怒气获得无加成测试"
+    description: "测试无加成时的怒气获得计算"
+    category: "unit"
+    priority: "medium"
+    setup:
+      - "设置基础怒气获得=10，加成百分比=0%"
+    steps:
+      - action: "计算怒气获得"
+        expected: "怒气获得 = 10 × (1 + 0/100) = 10"
+    assertions:
+      - type: "equals"
+        target: "rage_gain"
+        expected: "10"
+        message: "怒气获得应该等于10（无加成）"
+
+  - name: "怒气获得负数基础获得测试"
+    description: "测试负数基础获得时的处理"
+    category: "unit"
+    priority: "medium"
+    setup:
+      - "设置基础怒气获得=-5，加成百分比=10%"
+    steps:
+      - action: "计算怒气获得"
+        expected: "负数基础获得被处理为0，怒气获得 = 0"
+    assertions:
+      - type: "equals"
+        target: "rage_gain"
+        expected: "0"
+        message: "负数基础获得时，怒气获得应该等于0"
+
+  - name: "怒气获得负数加成测试"
+    description: "测试负数加成时的处理"
+    category: "unit"
+    priority: "medium"
+    setup:
+      - "设置基础怒气获得=10，加成百分比=-10%"
+    steps:
+      - action: "计算怒气获得"
+        expected: "负数加成被处理为0，怒气获得 = 10 × (1 + 0/100) = 10"
+    assertions:
+      - type: "equals"
+        target: "rage_gain"
+        expected: "10"
+        message: "负数加成时，怒气获得应该等于10（加成被忽略）"
+
+  - name: "能量恢复计算测试"
+    description: "测试能量恢复计算公式，验证主要依赖基础值"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个角色，精神=20"
+    steps:
+      - action: "计算能量恢复（基础恢复=10）"
+        expected: "能量恢复 = 10（主要依赖基础值）"
+    assertions:
+      - type: "equals"
+        target: "energy_regen"
+        expected: "10"
+        message: "能量恢复应该等于10"
+
+  - name: "能量恢复负数基础恢复测试"
+    description: "测试负数基础恢复时的处理"
+    category: "unit"
+    priority: "medium"
+    setup:
+      - "创建一个角色，精神=10"
+    steps:
+      - action: "计算能量恢复（基础恢复=-5）"
+        expected: "负数基础恢复被处理为0，能量恢复 = 0"
+    assertions:
+      - type: "equals"
+        target: "energy_regen"
+        expected: "0"
+        message: "负数基础恢复时，能量恢复应该等于0"
+
+

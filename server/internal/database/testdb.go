@@ -210,11 +210,11 @@ VALUES
     ('elwynn', '艾尔文森林', '暴风城周边的和平森林', 1, 10, 'alliance', 1.0, 1.0),
     ('durotar', '杜隆塔尔', '兽人的荒芜家园', 1, 10, 'horde', 1.0, 1.0);
 
-INSERT OR IGNORE INTO monsters (id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense, exp_reward, gold_min, gold_max, spawn_weight)
+INSERT OR IGNORE INTO monsters (id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense, speed, exp_reward, gold_min, gold_max, spawn_weight)
 VALUES 
-    ('wolf', 'elwynn', '森林狼', 2, 'normal', 30, 8, 4, 2, 1, 15, 1, 5, 100),
-    ('kobold', 'elwynn', '狗头人', 3, 'normal', 40, 10, 5, 3, 2, 20, 2, 8, 80),
-    ('boar', 'durotar', '野猪', 2, 'normal', 35, 9, 4, 3, 2, 18, 2, 6, 100);
+    ('wolf', 'elwynn', '森林狼', 2, 'normal', 30, 8, 4, 2, 1, 15, 15, 1, 5, 100),
+    ('kobold', 'elwynn', '狗头人', 3, 'normal', 40, 10, 5, 3, 2, 12, 20, 2, 8, 80),
+    ('boar', 'durotar', '野猪', 2, 'normal', 35, 9, 4, 3, 2, 14, 18, 2, 6, 100);
 `
 }
 
@@ -347,6 +347,9 @@ CREATE TABLE IF NOT EXISTS monsters (
     magic_attack INTEGER DEFAULT 5,
     physical_defense INTEGER DEFAULT 5,
     magic_defense INTEGER DEFAULT 3,
+    speed INTEGER DEFAULT 10,
+    ai_type TEXT DEFAULT 'balanced',
+    ai_behavior TEXT,
     exp_reward INTEGER DEFAULT 20,
     gold_min INTEGER DEFAULT 1,
     gold_max INTEGER DEFAULT 10,
@@ -370,10 +373,10 @@ VALUES
     ('elwynn', '艾尔文森林', '暴风城周边的和平森林', 1, 10, 'alliance', 1.0, 1.0),
     ('durotar', '杜隆塔尔', '兽人的荒芜家园', 1, 10, 'horde', 1.0, 1.0);
 
-INSERT INTO monsters (id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense, exp_reward, gold_min, gold_max, spawn_weight)
+INSERT INTO monsters (id, zone_id, name, level, type, hp, physical_attack, magic_attack, physical_defense, magic_defense, speed, exp_reward, gold_min, gold_max, spawn_weight)
 VALUES 
-    ('wolf', 'elwynn', '森林狼', 2, 'normal', 30, 8, 4, 2, 1, 15, 1, 5, 100),
-    ('kobold', 'elwynn', '狗头人', 3, 'normal', 40, 10, 5, 3, 2, 20, 2, 8, 80),
-    ('boar', 'durotar', '野猪', 2, 'normal', 35, 9, 4, 3, 2, 18, 2, 6, 100);
+    ('wolf', 'elwynn', '森林狼', 2, 'normal', 30, 8, 4, 2, 1, 15, 15, 1, 5, 100),
+    ('kobold', 'elwynn', '狗头人', 3, 'normal', 40, 10, 5, 3, 2, 12, 20, 2, 8, 80),
+    ('boar', 'durotar', '野猪', 2, 'normal', 35, 9, 4, 3, 2, 14, 18, 2, 6, 100);
 `
 }

@@ -1,0 +1,197 @@
+# 怪物系统 - 怪物AI测试
+test_suite: "怪物系统 - 怪物AI"
+description: "测试怪物AI系统，包括目标选择、技能选择、威胁值系统"
+
+tests:
+  - name: "AI目标选择测试 - 最低HP"
+    description: "测试AI选择HP最低的目标"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个AI，目标优先级=最低HP"
+      - "创建多个角色，HP分别为100、50、80"
+    steps:
+      - action: "AI选择目标"
+        expected: "应该选择HP=50的角色"
+    assertions:
+      - type: "equals"
+        target: "selected_target.hp"
+        expected: "50"
+        message: "应该选择HP最低的目标"
+
+  - name: "AI目标选择测试 - 最高威胁值"
+    description: "测试AI选择威胁值最高的目标"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个AI，目标优先级=最高威胁值"
+      - "创建多个角色"
+      - "设置威胁值表：角色1=100，角色2=200，角色3=50"
+    steps:
+      - action: "AI选择目标"
+        expected: "应该选择威胁值=200的角色"
+    assertions:
+      - type: "equals"
+        target: "selected_target.id"
+        expected: "character_2"
+        message: "应该选择威胁值最高的目标"
+
+  - name: "AI目标选择测试 - 最低防御"
+    description: "测试AI选择防御最低的目标"
+    category: "unit"
+    priority: "medium"
+    setup:
+      - "创建一个AI，目标优先级=最低防御"
+      - "创建多个角色，防御分别为10、5、15"
+    steps:
+      - action: "AI选择目标"
+        expected: "应该选择防御=5的角色"
+    assertions:
+      - type: "equals"
+        target: "selected_target.defense"
+        expected: "5"
+        message: "应该选择防御最低的目标"
+
+  - name: "AI技能选择测试 - 高伤害技能"
+    description: "测试AI优先选择高伤害技能"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个AI，技能优先级=高伤害"
+      - "创建怪物，拥有多个技能"
+    steps:
+      - action: "AI选择技能"
+        expected: "应该选择伤害最高的技能"
+    assertions:
+      - type: "equals"
+        target: "selected_skill.type"
+        expected: "attack"
+        message: "应该选择攻击类型技能"
+
+  - name: "AI技能选择测试 - 防御技能"
+    description: "测试AI在HP低时优先使用防御技能"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个AI，防御阈值=30%"
+      - "创建怪物，HP=20%，拥有防御技能"
+    steps:
+      - action: "AI选择技能"
+        expected: "应该选择防御技能"
+    assertions:
+      - type: "equals"
+        target: "selected_skill.type"
+        expected: "defense"
+        message: "HP低时应该选择防御技能"
+
+  - name: "AI技能冷却管理测试"
+    description: "测试AI技能冷却时间管理"
+    category: "unit"
+    priority: "medium"
+    setup:
+      - "创建一个AI"
+      - "创建怪物，拥有冷却中的技能"
+    steps:
+      - action: "AI选择技能"
+        expected: "不应该选择冷却中的技能"
+      - action: "减少技能冷却时间"
+        expected: "技能冷却时间应该减少"
+    assertions:
+      - type: "equals"
+        target: "selected_skill.cooldown_left"
+        expected: "0"
+        message: "不应该选择冷却中的技能"
+      - type: "less_than"
+        target: "skill.cooldown_left_after_tick"
+        expected: "skill.cooldown_left_before_tick"
+        message: "冷却时间应该减少"
+
+  - name: "威胁值系统测试"
+    description: "测试威胁值系统的更新和查询"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "初始化战斗管理器"
+      - "创建战斗会话"
+      - "创建角色和怪物"
+    steps:
+      - action: "角色对怪物造成100点伤害"
+        expected: "应该增加100点威胁值"
+      - action: "查询威胁值表"
+        expected: "应该返回正确的威胁值"
+    assertions:
+      - type: "equals"
+        target: "threat_value"
+        expected: "100"
+        message: "威胁值应该等于伤害值"
+
+  - name: "威胁值累加测试"
+    description: "测试威胁值的累加机制"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "初始化战斗管理器"
+      - "创建战斗会话"
+    steps:
+      - action: "角色对怪物造成100点伤害"
+        expected: "威胁值=100"
+      - action: "角色再次对怪物造成50点伤害"
+        expected: "威胁值=150"
+    assertions:
+      - type: "equals"
+        target: "threat_value_after_second_attack"
+        expected: "150"
+        message: "威胁值应该累加"
+
+  - name: "威胁值重置测试"
+    description: "测试新战斗开始时威胁值重置"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "初始化战斗管理器"
+      - "创建战斗会话，已有威胁值"
+    steps:
+      - action: "开始新战斗"
+        expected: "威胁值表应该被重置"
+    assertions:
+      - type: "equals"
+        target: "threat_table_empty"
+        expected: "true"
+        message: "新战斗开始时威胁值应该被重置"
+
+  - name: "威胁值清零测试"
+    description: "测试角色死亡后威胁值清零（注意：需要测试运行器支持威胁值系统）"
+    category: "documentation"
+    priority: "medium"
+    setup:
+      - "威胁值系统需要在实际游戏系统中测试"
+    steps:
+      - action: "这些功能需要通过Go单元测试进行验证"
+        expected: "参考 server/internal/game/monster_system_test.go 中的 TestThreatSystem_* 测试"
+    assertions: []
+
+  - name: "多怪物威胁值独立测试"
+    description: "测试不同怪物的威胁值表是独立的（注意：需要测试运行器支持威胁值系统）"
+    category: "documentation"
+    priority: "medium"
+    setup:
+      - "威胁值系统需要在实际游戏系统中测试"
+    steps:
+      - action: "这些功能需要通过Go单元测试进行验证"
+        expected: "参考 server/internal/game/monster_system_test.go 中的 TestThreatSystem_* 测试"
+    assertions: []
+
+  - name: "威胁值衰减测试"
+    description: "测试威胁值随时间衰减（如果实现，注意：需要测试运行器支持威胁值系统）"
+    category: "documentation"
+    priority: "low"
+    setup:
+      - "威胁值系统需要在实际游戏系统中测试"
+    steps:
+      - action: "这些功能需要通过Go单元测试进行验证"
+        expected: "参考 server/internal/game/monster_system_test.go 中的 TestThreatSystem_* 测试"
+    assertions: []
+
+
+
+

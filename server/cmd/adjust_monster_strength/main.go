@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strconv"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -245,6 +244,22 @@ func applyConfigToMonsters(db *sql.DB) error {
 
 	return nil
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

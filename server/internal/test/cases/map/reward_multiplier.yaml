@@ -1,0 +1,61 @@
+# 地图系统 - 收益倍率测试
+test_suite: "地图系统 - 收益倍率"
+description: "测试区域收益倍率（经验、金币、掉落）的计算和应用"
+
+tests:
+  - name: "经验倍率计算测试"
+    description: "测试区域经验倍率的计算"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "初始化地图管理器"
+      - "创建一个区域，经验倍率=1.5"
+    steps:
+      - action: "计算该区域的经验倍率"
+        expected: "应该返回1.5"
+    assertions:
+      - type: "equals"
+        target: "exp_multiplier"
+        expected: "1.5"
+        message: "经验倍率应该为1.5"
+
+  - name: "金币倍率计算测试"
+    description: "测试区域金币倍率的计算"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "初始化地图管理器"
+      - "创建一个区域，金币倍率=1.2"
+    steps:
+      - action: "计算该区域的金币倍率"
+        expected: "应该返回1.2"
+    assertions:
+      - type: "equals"
+        target: "gold_multiplier"
+        expected: "1.2"
+        message: "金币倍率应该为1.2"
+
+  - name: "收益倍率应用测试"
+    description: "测试收益倍率在战斗奖励中的应用"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色"
+      - "创建一个区域，经验倍率=1.5，金币倍率=1.2"
+      - "初始化战斗系统"
+    steps:
+      - action: "角色在该区域击杀怪物（基础经验=10，基础金币=5）"
+        expected: "应该应用倍率：经验=15，金币=6"
+    assertions:
+      - type: "equals"
+        target: "exp_gain"
+        expected: "15"
+        message: "经验应该为15（10×1.5）"
+      - type: "equals"
+        target: "gold_gain"
+        expected: "6"
+        message: "金币应该为6（5×1.2）"
+
+
+
+

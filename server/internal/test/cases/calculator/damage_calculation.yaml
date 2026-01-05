@@ -1,0 +1,109 @@
+# 数值计算系统 - 伤害计算测试
+test_suite: "数值计算系统 - 伤害计算"
+description: "测试伤害计算公式，包括基础伤害、防御减伤、暴击、闪避"
+
+tests:
+  - name: "基础伤害计算测试"
+    description: "测试基础伤害计算，攻击力×技能系数"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个攻击力=20的角色"
+      - "创建一个防御力=10的怪物"
+    steps:
+      - action: "计算基础伤害（技能系数1.0）"
+        expected: "基础伤害 = 20 × 1.0 = 20"
+    assertions:
+      - type: "equals"
+        target: "base_damage"
+        expected: "20"
+        message: "基础伤害应该等于20"
+
+  - name: "防御减伤计算测试"
+    description: "测试防御减伤公式（减法公式：伤害=攻击-防御）"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个攻击力=20的角色"
+      - "创建一个防御力=10的怪物"
+    steps:
+      - action: "计算防御减伤"
+        expected: "伤害 = 攻击 - 防御 = 20 - 10 = 10"
+      - action: "计算减伤后伤害"
+        expected: "减伤后伤害 = 10"
+    assertions:
+      - type: "equals"
+        target: "damage_after_defense"
+        expected: "10"
+        message: "减伤后伤害应该等于10（20-10）"
+
+  - name: "防御高于攻击测试"
+    description: "测试防御高于攻击时，至少造成1点伤害"
+    category: "unit"
+    priority: "medium"
+    setup:
+      - "创建一个攻击力=100的角色"
+      - "创建一个防御力=300的怪物（防御高于攻击）"
+    steps:
+      - action: "计算防御减伤"
+        expected: "伤害 = 攻击 - 防御 = 100 - 300 = -200，但最低为1"
+      - action: "计算减伤后伤害"
+        expected: "减伤后伤害 = 1（最低伤害）"
+    assertions:
+      - type: "equals"
+        target: "damage_after_defense"
+        expected: "1"
+        message: "减伤后伤害应该等于1（防御高于攻击时最低伤害）"
+
+  - name: "暴击伤害计算测试"
+    description: "测试暴击伤害计算，验证暴击时伤害乘以暴击倍率"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个攻击力=20，物理暴击率=10%，物理暴击伤害=150%的角色"
+      - "创建一个防御力=10的怪物"
+    steps:
+      - action: "计算基础伤害"
+        expected: "基础伤害 = 20"
+      - action: "应用防御减伤"
+        expected: "减伤后伤害 = 10（20-10）"
+      - action: "如果触发暴击，应用暴击倍率"
+        expected: "最终伤害 = 18 × 1.5 = 27"
+    assertions:
+      - type: "range"
+        target: "final_damage"
+        expected: "[15, 30]"
+        message: "最终伤害应该在15-30之间（考虑是否暴击）"
+
+  - name: "闪避判定测试"
+    description: "测试闪避判定，验证闪避时伤害为0"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个攻击力=20的角色"
+      - "创建一个防御力=10，闪避率=10%的怪物"
+    steps:
+      - action: "计算伤害"
+        expected: "如果闪避，最终伤害=0；如果不闪避，最终伤害≈18"
+    assertions:
+      - type: "range"
+        target: "final_damage"
+        expected: "[0, 20]"
+        message: "最终伤害应该在0-20之间（考虑是否闪避）"
+
+  - name: "至少1点伤害测试"
+    description: "测试至少造成1点伤害的机制"
+    category: "unit"
+    priority: "medium"
+    setup:
+      - "创建一个攻击力=5的角色"
+      - "创建一个防御力=10的怪物（防御高于攻击）"
+    steps:
+      - action: "计算伤害"
+        expected: "即使防御高于攻击，也应该至少造成1点伤害"
+    assertions:
+      - type: "greater_than_or_equal"
+        target: "final_damage"
+        expected: "1"
+        message: "最终伤害应该至少为1"
+

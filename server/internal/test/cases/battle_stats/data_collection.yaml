@@ -1,0 +1,173 @@
+# 战斗统计系统 - 数据收集测试
+test_suite: "战斗统计系统 - 数据收集"
+description: "测试战斗统计系统的数据收集功能，包括伤害、承伤、治疗等数据收集"
+
+tests:
+  - name: "伤害数据收集测试"
+    description: "测试战斗中的伤害数据收集"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色，攻击力=20"
+      - "创建一个怪物"
+      - "初始化战斗系统和统计系统"
+    steps:
+      - action: "角色攻击怪物，造成18点伤害"
+        expected: "统计系统应该记录这次伤害"
+    assertions:
+      - type: "equals"
+        target: "battle_stats.total_damage_dealt"
+        expected: "18"
+        message: "总伤害应该为18"
+      - type: "equals"
+        target: "battle_stats.attack_count"
+        expected: "1"
+        message: "攻击次数应该为1"
+
+  - name: "承伤数据收集测试"
+    description: "测试战斗中的承伤数据收集"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色，HP=100"
+      - "创建一个怪物，攻击力=15"
+      - "初始化战斗系统和统计系统"
+    steps:
+      - action: "怪物攻击角色，造成12点伤害"
+        expected: "统计系统应该记录这次承伤"
+    assertions:
+      - type: "equals"
+        target: "battle_stats.total_damage_taken"
+        expected: "12"
+        message: "总承伤应该为12"
+      - type: "equals"
+        target: "battle_stats.hit_count"
+        expected: "1"
+        message: "受击次数应该为1"
+
+  - name: "治疗数据收集测试"
+    description: "测试战斗中的治疗数据收集"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色，HP=50/100"
+      - "创建一个治疗技能，治疗量=30"
+      - "初始化战斗系统和统计系统"
+    steps:
+      - action: "角色使用治疗技能，恢复30点HP"
+        expected: "统计系统应该记录这次治疗"
+    assertions:
+      - type: "equals"
+        target: "battle_stats.total_healing"
+        expected: "30"
+        message: "总治疗应该为30"
+      - type: "equals"
+        target: "battle_stats.heal_count"
+        expected: "1"
+        message: "治疗次数应该为1"
+
+  - name: "暴击数据收集测试"
+    description: "测试暴击数据的收集"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色，攻击力=20，暴击率=100%"
+      - "创建一个怪物"
+      - "初始化战斗系统和统计系统"
+    steps:
+      - action: "角色攻击怪物，触发暴击，造成27点伤害"
+        expected: "统计系统应该记录暴击"
+    assertions:
+      - type: "equals"
+        target: "battle_stats.crit_count"
+        expected: "1"
+        message: "暴击次数应该为1"
+      - type: "equals"
+        target: "battle_stats.crit_rate"
+        expected: "1.0"
+        message: "暴击率应该为100%"
+
+  - name: "闪避数据收集测试"
+    description: "测试闪避数据的收集"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色，闪避率=50%"
+      - "创建一个怪物，攻击力=15"
+      - "初始化战斗系统和统计系统"
+    steps:
+      - action: "怪物攻击角色10次"
+        expected: "统计系统应该记录闪避次数"
+    assertions:
+      - type: "range"
+        target: "battle_stats.dodge_rate"
+        expected: "[0.3, 0.7]"
+        message: "闪避率应该在30%-70%之间（考虑随机性）"
+
+  - name: "技能使用数据收集测试"
+    description: "测试技能使用数据的收集"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色，拥有多个技能"
+      - "初始化战斗系统和统计系统"
+    steps:
+      - action: "角色使用技能A 3次，技能B 2次"
+        expected: "统计系统应该记录每个技能的使用次数"
+    assertions:
+      - type: "equals"
+        target: "battle_stats.skill_usage.skill_a"
+        expected: "3"
+        message: "技能A使用次数应该为3"
+      - type: "equals"
+        target: "battle_stats.skill_usage.skill_b"
+        expected: "2"
+        message: "技能B使用次数应该为2"
+
+  - name: "战斗时长统计测试"
+    description: "测试战斗时长的统计"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "创建一个角色"
+      - "创建一个怪物"
+      - "初始化战斗系统和统计系统"
+    steps:
+      - action: "开始战斗并记录开始时间"
+        expected: "记录战斗开始时间"
+      - action: "执行战斗直到结束"
+        expected: "战斗结束，计算战斗时长"
+        max_rounds: 20
+    assertions:
+      - type: "greater_than"
+        target: "battle_stats.duration_seconds"
+        expected: "0"
+        message: "战斗时长应该大于0"
+
+  - name: "多场战斗数据累积测试"
+    description: "测试多场战斗数据的累积统计"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "创建一个角色"
+      - "初始化战斗系统和统计系统"
+    steps:
+      - action: "进行3场战斗，每场造成100点伤害"
+        expected: "统计系统应该累积所有战斗的数据"
+    assertions:
+      - type: "equals"
+        target: "battle_stats.total_damage_dealt"
+        expected: "300"
+        message: "总伤害应该为300（3场×100）"
+      - type: "equals"
+        target: "battle_stats.battle_count"
+        expected: "3"
+        message: "战斗场次应该为3"
+
+
+
+
+
+
+
+

@@ -1,0 +1,121 @@
+# 战斗系统 - 休息系统测试
+test_suite: "战斗系统 - 休息系统"
+description: "注意：休息系统功能需要实际游戏系统支持，测试运行器目前不完全支持休息系统的完整测试。这些测试用例作为文档说明，实际测试需要通过Go单元测试进行验证。参考 server/internal/game/battle_manager_test.go 中的 TestBattleManager_RestMechanism_* 测试。"
+
+tests:
+  - name: "休息系统功能说明"
+    description: "休息系统功能需要在实际游戏系统中测试。参考 server/internal/game/battle_manager_test.go 中的 TestBattleManager_RestMechanism_* 测试。"
+    category: "documentation"
+    priority: "high"
+    setup:
+      - "休息系统功能包括：战斗后自动进入休息、HP和Resource恢复、休息时间计算、休息速度倍率等"
+    steps:
+      - action: "这些功能需要通过Go单元测试进行验证"
+        expected: "参考 server/internal/game/battle_manager_test.go"
+    assertions: []
+
+  - name: "战斗胜利后自动进入休息测试"
+    description: "测试击败所有敌人后自动进入休息状态"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色，攻击力=20，HP=100/100"
+      - "创建一个怪物，HP=10，防御=0（低血量便于快速击败）"
+      - "初始化战斗系统"
+    steps:
+      - action: "开始战斗"
+        expected: "战斗开始"
+      - action: "继续战斗直到怪物死亡"
+        expected: "战斗结束后自动进入休息状态"
+        max_rounds: 10
+    assertions:
+      - type: "equals"
+        target: "battle_state"
+        expected: "resting"
+        message: "击败所有敌人后应该自动进入休息状态"
+      - type: "equals"
+        target: "enemy_alive_count"
+        expected: "0"
+        message: "存活敌人数量应该为0"
+      - type: "equals"
+        target: "is_resting"
+        expected: "true"
+        message: "应该处于休息状态"
+      - type: "not_null"
+        target: "rest_until"
+        message: "应该有休息结束时间"
+
+  - name: "休息恢复测试"
+    description: "测试休息期间HP和Resource的恢复"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色，HP=50/100，Resource=25/50"
+      - "创建一个怪物，HP=10，防御=0"
+      - "初始化战斗系统"
+    steps:
+      - action: "开始战斗"
+      - action: "继续战斗直到怪物死亡"
+        max_rounds: 10
+      - action: "记录战斗后HP和Resource"
+        expected: "记录当前值用于后续比较"
+      - action: "等待休息恢复"
+        expected: "HP和Resource应该逐渐恢复"
+    assertions:
+      - type: "equals"
+        target: "is_resting"
+        expected: "true"
+        message: "应该处于休息状态"
+      - type: "greater_than"
+        target: "character.hp"
+        expected: "0"
+        message: "HP应该大于0（可能因战斗受伤）"
+      - type: "greater_than"
+        target: "character.resource"
+        expected: "0"
+        message: "Resource应该大于等于0"
+
+  - name: "休息速度倍率测试"
+    description: "测试休息速度倍率对恢复速度的影响"
+    category: "unit"
+    priority: "medium"
+    setup:
+      - "创建一个角色，HP=50/100，Resource=25/50"
+      - "创建一个怪物，HP=10，防御=0"
+      - "初始化战斗系统"
+    steps:
+      - action: "开始战斗"
+      - action: "继续战斗直到怪物死亡"
+        max_rounds: 10
+      - action: "进入休息状态，休息速度倍率=2.0"
+        expected: "恢复速度应该是正常的2倍"
+      - action: "等待休息恢复"
+        expected: "恢复速度更快"
+    assertions:
+      - type: "equals"
+        target: "rest_speed"
+        expected: "2"
+        message: "休息速度倍率应该为2.0（存储为2）"
+
+  - name: "战斗后角色状态测试"
+    description: "测试战斗后角色的HP和Resource状态（用于验证休息前的状态）"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "创建一个角色，HP=50/100，Resource=25/50"
+      - "创建一个怪物，HP=10"
+      - "初始化战斗系统"
+    steps:
+      - action: "开始战斗"
+      - action: "继续战斗直到怪物死亡"
+        max_rounds: 10
+    assertions:
+      - type: "greater_than_or_equal"
+        target: "character.hp"
+        expected: "0"
+        message: "战斗后角色HP应该大于等于0（可能受伤）"
+      - type: "greater_than_or_equal"
+        target: "character.resource"
+        expected: "0"
+        message: "战斗后角色Resource应该大于等于0"
+

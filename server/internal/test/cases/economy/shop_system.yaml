@@ -1,0 +1,138 @@
+# 经济系统 - 商店系统测试
+test_suite: "经济系统 - 商店系统"
+description: "测试商店系统，包括物品购买、价格计算、库存管理等"
+
+tests:
+  - name: "商店物品列表测试"
+    description: "测试查看商店物品列表"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "初始化商店系统"
+      - "商店包含多个物品：材料A、材料B、消耗品C"
+    steps:
+      - action: "查看商店物品列表"
+        expected: "显示所有可购买的物品及其价格"
+    assertions:
+      - type: "greater_than"
+        target: "shop.items_count"
+        expected: "0"
+        message: "商店应该有物品"
+
+  - name: "购买商店物品测试"
+    description: "测试从商店购买物品"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色，金币=500"
+      - "初始化商店，包含物品A（价格=50）"
+    steps:
+      - action: "角色购买物品A"
+        expected: "购买成功，角色获得物品A，金币减少50"
+    assertions:
+      - type: "equals"
+        target: "character.gold"
+        expected: "450"
+        message: "购买后金币应该为450"
+      - type: "equals"
+        target: "character.has_item_a"
+        expected: "true"
+        message: "角色应该拥有物品A"
+
+  - name: "批量购买测试"
+    description: "测试批量购买物品"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "创建一个角色，金币=1000"
+      - "初始化商店，包含物品A（价格=50，可堆叠）"
+    steps:
+      - action: "角色购买10个物品A"
+        expected: "购买成功，消耗500金币，获得10个物品A"
+    assertions:
+      - type: "equals"
+        target: "character.gold"
+        expected: "500"
+        message: "购买后金币应该为500"
+      - type: "equals"
+        target: "character.item_a_count"
+        expected: "10"
+        message: "角色应该拥有10个物品A"
+
+  - name: "商店金币不足测试"
+    description: "测试金币不足时无法购买"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个角色，金币=30"
+      - "初始化商店，包含物品A（价格=50）"
+    steps:
+      - action: "角色尝试购买物品A"
+        expected: "购买失败，提示金币不足"
+    assertions:
+      - type: "equals"
+        target: "purchase_success"
+        expected: "false"
+        message: "购买应该失败"
+      - type: "equals"
+        target: "character.gold"
+        expected: "30"
+        message: "角色金币应该仍为30（未消耗）"
+
+  - name: "商店物品价格测试"
+    description: "测试商店物品的价格计算"
+    category: "unit"
+    priority: "medium"
+    setup:
+      - "初始化商店系统"
+      - "商店包含物品A（基础价格=100）"
+    steps:
+      - action: "查看物品A的价格"
+        expected: "价格应该为100"
+    assertions:
+      - type: "equals"
+        target: "shop.item_a.price"
+        expected: "100"
+        message: "物品A价格应该为100"
+
+  - name: "商店库存测试"
+    description: "测试商店物品的库存管理（如果有）"
+    category: "integration"
+    priority: "low"
+    setup:
+      - "初始化商店，包含物品A（库存=5）"
+      - "创建一个角色，金币充足"
+    steps:
+      - action: "角色购买物品A 3次"
+        expected: "购买成功，库存减少到2"
+      - action: "角色再购买物品A 3次"
+        expected: "前2次成功，第3次失败（库存不足）"
+    assertions:
+      - type: "equals"
+        target: "shop.item_a.stock"
+        expected: "0"
+        message: "库存应该为0"
+
+  - name: "商店刷新测试"
+    description: "测试商店物品的刷新机制（如果有）"
+    category: "integration"
+    priority: "low"
+    setup:
+      - "初始化商店系统"
+      - "商店包含限时物品A"
+    steps:
+      - action: "等待商店刷新时间"
+        expected: "商店物品列表更新"
+    assertions:
+      - type: "not_equals"
+        target: "shop.items_after_refresh"
+        expected: "shop.items_before_refresh"
+        message: "刷新后物品列表应该改变"
+
+
+
+
+
+
+
+

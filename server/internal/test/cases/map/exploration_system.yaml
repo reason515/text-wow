@@ -1,0 +1,41 @@
+# 地图系统 - 探索度系统测试
+test_suite: "地图系统 - 探索度系统"
+description: "测试探索度获取、解锁检查、数据持久化"
+
+tests:
+  - name: "探索度获取测试"
+    description: "测试击杀怪物时增加探索度"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个用户"
+      - "创建一个角色"
+      - "初始化战斗系统"
+    steps:
+      - action: "角色在 elwynn 区域击杀1个怪物"
+        expected: "探索度应该增加1点"
+    assertions:
+      - type: "equals"
+        target: "exploration_increase"
+        expected: "1"
+        message: "击杀怪物应该增加1点探索度"
+
+  - name: "探索度解锁检查测试"
+    description: "测试根据探索度检查区域解锁"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个用户"
+      - "设置区域解锁要求：需要10点探索度"
+    steps:
+      - action: "用户获得10点探索度"
+        expected: "区域应该解锁"
+    assertions:
+      - type: "equals"
+        target: "zone_unlocked"
+        expected: "true"
+        message: "达到探索度要求后区域应该解锁"
+
+
+
+

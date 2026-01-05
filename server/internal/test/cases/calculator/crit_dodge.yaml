@@ -1,0 +1,142 @@
+# 数值计算系统 - 暴击和闪避测试
+test_suite: "数值计算系统 - 暴击和闪避"
+description: "测试暴击率和闪避率的计算和判定"
+
+tests:
+  - name: "物理暴击率计算测试"
+    description: "测试物理暴击率的计算公式"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个角色，敏捷=30"
+    steps:
+      - action: "计算物理暴击率"
+        expected: "物理暴击率 = 5% + 30/20 = 6.5%"
+    assertions:
+      - type: "approximately"
+        target: "phys_crit_rate"
+        expected: "0.065"
+        tolerance: 0.001
+        message: "物理暴击率应该约等于6.5%"
+
+  - name: "法术暴击率计算测试"
+    description: "测试法术暴击率的计算公式"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个角色，精神=40"
+    steps:
+      - action: "计算法术暴击率"
+        expected: "法术暴击率 = 5% + 40/20 = 7%"
+    assertions:
+      - type: "approximately"
+        target: "spell_crit_rate"
+        expected: "0.07"
+        tolerance: 0.001
+        message: "法术暴击率应该约等于7%"
+
+  - name: "暴击率上限测试"
+    description: "测试暴击率上限50%"
+    category: "unit"
+    priority: "medium"
+    setup:
+      - "创建一个角色，敏捷=1000（理论上暴击率会超过50%）"
+    steps:
+      - action: "计算物理暴击率"
+        expected: "暴击率应该被限制在50%"
+    assertions:
+      - type: "equals"
+        target: "phys_crit_rate"
+        expected: "0.5"
+        message: "暴击率应该等于50%（上限）"
+
+  - name: "闪避率计算测试"
+    description: "测试闪避率的计算公式"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个角色，敏捷=50"
+    steps:
+      - action: "计算闪避率"
+        expected: "闪避率 = 5% + 50/20 = 7.5%"
+    assertions:
+      - type: "approximately"
+        target: "dodge_rate"
+        expected: "0.075"
+        tolerance: 0.001
+        message: "闪避率应该约等于7.5%"
+
+  - name: "闪避率上限测试"
+    description: "测试闪避率上限50%"
+    category: "unit"
+    priority: "medium"
+    setup:
+      - "创建一个角色，敏捷=1000（理论上闪避率会超过50%）"
+    steps:
+      - action: "计算闪避率"
+        expected: "闪避率应该被限制在50%"
+    assertions:
+      - type: "equals"
+        target: "dodge_rate"
+        expected: "0.5"
+        message: "闪避率应该等于50%（上限）"
+
+  - name: "暴击伤害倍率计算测试"
+    description: "测试物理暴击伤害倍率的计算"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个角色，力量=50"
+    steps:
+      - action: "计算物理暴击伤害倍率"
+        expected: "暴击伤害 = 150% + 50×0.3% = 165%"
+    assertions:
+      - type: "approximately"
+        target: "phys_crit_damage"
+        expected: "1.65"
+        tolerance: 0.01
+        message: "物理暴击伤害倍率应该约等于165%"
+
+  - name: "暴击判定测试"
+    description: "测试暴击判定机制（多次攻击统计）"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色，物理暴击率=20%"
+      - "创建一个怪物"
+    steps:
+      - action: "角色对怪物进行100次攻击"
+        expected: "大约20%的攻击触发暴击"
+    assertions:
+      - type: "range"
+        target: "crit_rate_actual"
+        expected: "[0.15, 0.25]"
+        message: "实际暴击率应该在15%-25%之间（考虑随机性）"
+
+  - name: "闪避判定测试"
+    description: "测试闪避判定机制（多次攻击统计）"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色，攻击力=20"
+      - "创建一个怪物，闪避率=30%"
+    steps:
+      - action: "角色对怪物进行100次攻击"
+        expected: "大约30%的攻击被闪避"
+    assertions:
+      - type: "range"
+        target: "dodge_rate_actual"
+        expected: "[0.20, 0.40]"
+        message: "实际闪避率应该在20%-40%之间（考虑随机性）"
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,183 @@
+# 装备系统 - 词缀生成测试
+test_suite: "装备系统 - 词缀生成"
+description: "测试装备掉落时随机词缀的生成，包括词缀数量、词缀类型、词缀数值等"
+
+tests:
+  - name: "白色装备词缀测试"
+    description: "测试白色装备应该没有词缀"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个30级角色"
+      - "击败一个普通怪物"
+    steps:
+      - action: "怪物掉落一件白色装备"
+        expected: "装备应该没有词缀"
+    assertions:
+      - type: "equals"
+        target: "equipment.prefix_id"
+        expected: "null"
+        message: "白色装备不应该有前缀"
+      - type: "equals"
+        target: "equipment.suffix_id"
+        expected: "null"
+        message: "白色装备不应该有后缀"
+      - type: "equals"
+        target: "equipment.affix_count"
+        expected: "0"
+        message: "白色装备词缀数量应该为0"
+
+  - name: "绿色装备词缀测试"
+    description: "测试绿色装备应该有1个词缀（前缀或后缀）"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个30级角色"
+      - "击败一个普通怪物"
+    steps:
+      - action: "怪物掉落一件绿色装备"
+        expected: "装备应该有1个随机词缀"
+    assertions:
+      - type: "equals"
+        target: "equipment.affix_count"
+        expected: "1"
+        message: "绿色装备应该有1个词缀"
+      - type: "contains"
+        target: "equipment.affixes"
+        expected: "prefix_or_suffix"
+        message: "词缀应该是前缀或后缀之一"
+
+  - name: "蓝色装备词缀测试"
+    description: "测试蓝色装备应该有2个词缀（前缀+后缀）"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个30级角色"
+      - "击败一个精英怪物"
+    steps:
+      - action: "怪物掉落一件蓝色装备"
+        expected: "装备应该有2个随机词缀（前缀+后缀）"
+    assertions:
+      - type: "equals"
+        target: "equipment.affix_count"
+        expected: "2"
+        message: "蓝色装备应该有2个词缀"
+      - type: "not_equals"
+        target: "equipment.prefix_id"
+        expected: "null"
+        message: "蓝色装备应该有前缀"
+      - type: "not_equals"
+        target: "equipment.suffix_id"
+        expected: "null"
+        message: "蓝色装备应该有后缀"
+
+  - name: "紫色装备词缀测试"
+    description: "测试紫色装备应该有3个词缀"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个30级角色"
+      - "击败一个精英怪物"
+    steps:
+      - action: "怪物掉落一件紫色装备"
+        expected: "装备应该有3个词缀（前缀+后缀+额外词缀1）"
+    assertions:
+      - type: "equals"
+        target: "equipment.affix_count"
+        expected: "3"
+        message: "紫色装备应该有3个词缀"
+      - type: "not_equals"
+        target: "equipment.bonus_affix_1"
+        expected: "null"
+        message: "紫色装备应该有额外词缀1"
+
+  - name: "橙色装备词缀测试"
+    description: "测试橙色装备应该有4个词缀"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个30级角色"
+      - "击败一个Boss怪物"
+    steps:
+      - action: "Boss掉落一件橙色装备"
+        expected: "装备应该有4个词缀（前缀+后缀+额外词缀1+额外词缀2）"
+    assertions:
+      - type: "equals"
+        target: "equipment.affix_count"
+        expected: "4"
+        message: "橙色装备应该有4个词缀"
+      - type: "not_equals"
+        target: "equipment.bonus_affix_2"
+        expected: "null"
+        message: "橙色装备应该有额外词缀2"
+
+  - name: "词缀数值范围测试"
+    description: "测试词缀数值应该在合理范围内"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个30级角色"
+      - "获得一件蓝色装备，词缀：力量+3"
+    steps:
+      - action: "检查词缀数值"
+        expected: "词缀数值应该在Tier 2范围内（2-5）"
+    assertions:
+      - type: "range"
+        target: "equipment.suffix_value"
+        expected: "[2, 5]"
+        message: "词缀数值应该在2-5范围内"
+
+  - name: "词缀类型匹配测试"
+    description: "测试词缀类型应该符合装备类型"
+    category: "unit"
+    priority: "medium"
+    setup:
+      - "创建一个角色"
+      - "获得一件武器，带有词缀"
+    steps:
+      - action: "检查词缀类型"
+        expected: "词缀应该适用于武器类型"
+    assertions:
+      - type: "contains"
+        target: "affix.slot_type"
+        expected: "weapon_or_all"
+        message: "词缀类型应该匹配装备类型"
+
+  - name: "词缀Tier测试"
+    description: "测试词缀Tier应该符合装备等级"
+    category: "unit"
+    priority: "medium"
+    setup:
+      - "创建一个30级角色"
+      - "获得一件30级装备，带有词缀"
+    steps:
+      - action: "检查词缀Tier"
+        expected: "词缀Tier应该符合装备等级（Tier 2，21-40级）"
+    assertions:
+      - type: "equals"
+        target: "affix.tier"
+        expected: "2"
+        message: "30级装备的词缀应该是Tier 2"
+
+  - name: "词缀随机性测试"
+    description: "测试多次掉落时词缀的随机性"
+    category: "integration"
+    priority: "low"
+    setup:
+      - "创建一个角色"
+    steps:
+      - action: "连续获得10件蓝色装备"
+        expected: "每件装备的词缀应该不同"
+    assertions:
+      - type: "greater_than"
+        target: "unique_affix_combinations"
+        expected: "5"
+        message: "至少应该有5种不同的词缀组合"
+
+
+
+
+
+
+
+

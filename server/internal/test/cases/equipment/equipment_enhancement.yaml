@@ -1,0 +1,130 @@
+# 装备系统 - 装备强化测试
+test_suite: "装备系统 - 装备强化"
+description: "测试装备强化系统，包括材料强化、催化剂强化、词缀锁定等"
+
+tests:
+  - name: "基础材料重铸测试"
+    description: "测试使用基础材料重铸装备词缀"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "获得一件蓝色装备，力量+5"
+      - "准备重铸石材料"
+    steps:
+      - action: "使用重铸石重铸装备"
+        expected: "装备词缀被重新生成"
+    assertions:
+      - type: "not_equals"
+        target: "equipment.prefix_id"
+        expected: "null"
+        message: "装备应该有词缀（可能被重铸）"
+
+  - name: "催化剂强化测试"
+    description: "测试使用催化剂强化已有词缀数值"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "获得一件蓝色装备，力量+5"
+      - "准备催化剂材料"
+    steps:
+      - action: "使用催化剂强化力量词缀"
+        expected: "力量词缀数值从+5提升到+7"
+        assertions:
+          - "力量词缀数值应该提升"
+          - "词缀ID不应该改变"
+    assertions:
+      - type: "greater_than"
+        target: "equipment.suffix_value"
+        expected: "5"
+        message: "词缀数值应该提升"
+      - type: "equals"
+        target: "equipment.suffix_id"
+        expected: "original_suffix_id"
+        message: "词缀ID不应该改变"
+
+  - name: "保护材料锁定测试"
+    description: "测试使用保护材料锁定词缀"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "获得一件蓝色装备，力量+5"
+      - "准备保护材料"
+    steps:
+      - action: "使用保护材料锁定力量词缀"
+        expected: "力量词缀被锁定"
+      - action: "使用基础材料重铸装备"
+        expected: "力量词缀不应该被改变，其他词缀可能改变"
+    assertions:
+      - type: "equals"
+        target: "equipment.suffix_id"
+        expected: "original_suffix_id"
+        message: "锁定的词缀ID不应该改变"
+      - type: "equals"
+        target: "equipment.suffix_value"
+        expected: "5"
+        message: "锁定的词缀数值不应该改变"
+
+  - name: "精华材料保证词缀测试"
+    description: "测试使用精华材料保证特定词缀"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "获得一件蓝色装备，没有力量词缀"
+      - "准备力量精华材料"
+    steps:
+      - action: "使用力量精华材料强化装备"
+        expected: "装备应该获得力量词缀"
+    assertions:
+      - type: "not_equals"
+        target: "equipment.suffix_id"
+        expected: "null"
+        message: "装备应该获得词缀"
+      - type: "contains"
+        target: "equipment.suffix_id"
+        expected: "strength"
+        message: "词缀应该是力量相关"
+
+  - name: "材料消耗测试"
+    description: "测试材料强化的材料消耗"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色"
+      - "获得一件蓝色装备"
+      - "准备催化剂材料"
+    steps:
+      - action: "使用催化剂强化词缀"
+        expected: "消耗催化剂材料"
+    assertions:
+      - type: "not_equals"
+        target: "material_consumed"
+        expected: "false"
+        message: "材料应该被消耗"
+
+  - name: "多词缀强化测试"
+    description: "测试同时强化多个词缀"
+    category: "integration"
+    priority: "low"
+    setup:
+      - "获得一件紫色装备，有3个词缀"
+      - "准备多个催化剂材料"
+    steps:
+      - action: "使用催化剂分别强化所有词缀"
+        expected: "所有词缀数值都应该提升"
+    assertions:
+      - type: "greater_than"
+        target: "equipment.prefix_value"
+        expected: "original_prefix_value"
+        message: "前缀数值应该提升"
+      - type: "greater_than"
+        target: "equipment.suffix_value"
+        expected: "original_suffix_value"
+        message: "后缀数值应该提升"
+
+
+
+
+
+
+
+

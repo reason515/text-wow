@@ -1,0 +1,135 @@
+# 战斗系统 - 伤害计算测试
+test_suite: "战斗系统 - 伤害计算"
+description: "测试战斗中的伤害计算，包括物理伤害、魔法伤害、暴击、闪避等"
+
+tests:
+  - name: "物理伤害计算测试"
+    description: "测试物理攻击的伤害计算流程（减法公式：伤害=攻击-防御）"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个攻击力=20的角色"
+      - "创建一个防御力=10的怪物"
+    steps:
+      - action: "角色对怪物进行物理攻击"
+        expected: "计算伤害：基础伤害=20，防御减伤=10，最终伤害=10"
+    assertions:
+      - type: "equals"
+        target: "damage_dealt"
+        expected: "10"
+        message: "物理伤害应该等于10（20-10）"
+
+  - name: "魔法伤害计算测试"
+    description: "测试魔法攻击的伤害计算流程（减法公式：伤害=攻击-防御）"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个法术攻击力=25的角色"
+      - "创建一个魔法防御力=15的怪物"
+    steps:
+      - action: "角色对怪物进行魔法攻击"
+        expected: "计算伤害：基础伤害=25，防御减伤=15，最终伤害=10"
+    assertions:
+      - type: "equals"
+        target: "magic_damage_dealt"
+        expected: "10"
+        message: "魔法伤害应该等于10（25-15）"
+
+  - name: "暴击伤害测试"
+    description: "测试暴击时的伤害计算（减法公式：伤害=攻击-防御，然后×暴击倍率）"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个攻击力=20，物理暴击率=100%，物理暴击伤害=150%的角色"
+      - "创建一个防御力=10的怪物"
+    steps:
+      - action: "角色对怪物进行物理攻击（必定暴击）"
+        expected: "基础伤害=10（20-10），暴击后伤害=15（10×1.5）"
+    assertions:
+      - type: "equals"
+        target: "crit_damage_dealt"
+        expected: "15"
+        message: "暴击伤害应该等于15（(20-10)×1.5）"
+      - type: "equals"
+        target: "is_crit"
+        expected: "true"
+        message: "应该触发暴击"
+
+  - name: "闪避判定测试"
+    description: "测试闪避机制"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个攻击力=20的角色"
+      - "创建一个防御力=10，闪避率=50%的怪物"
+    steps:
+      - action: "角色对怪物进行10次攻击"
+        expected: "大约50%的攻击被闪避"
+    assertions:
+      - type: "range"
+        target: "dodge_rate_actual"
+        expected: "[0.3, 0.7]"
+        message: "实际闪避率应该在30%-70%之间（考虑随机性）"
+
+  - name: "防御高于攻击测试"
+    description: "测试防御高于攻击时，至少造成1点伤害"
+    category: "unit"
+    priority: "medium"
+    setup:
+      - "创建一个攻击力=100的角色"
+      - "创建一个防御力=300的怪物（防御高于攻击）"
+    steps:
+      - action: "角色对怪物进行攻击"
+        expected: "防御高于攻击，最终伤害=1（最低伤害）"
+    assertions:
+      - type: "equals"
+        target: "damage_dealt"
+        expected: "1"
+        message: "最终伤害应该等于1（防御高于攻击时最低伤害）"
+
+  - name: "至少1点伤害测试"
+    description: "测试即使防御很高，也应该至少造成1点伤害"
+    category: "unit"
+    priority: "medium"
+    setup:
+      - "创建一个攻击力=5的角色"
+      - "创建一个防御力=100的怪物（防御远高于攻击）"
+    steps:
+      - action: "角色对怪物进行攻击"
+        expected: "即使防御很高，也应该至少造成1点伤害"
+    assertions:
+      - type: "greater_than_or_equal"
+        target: "damage_dealt"
+        expected: "1"
+        message: "最终伤害应该至少为1"
+
+  - name: "元素伤害类型测试"
+    description: "测试不同元素伤害类型（火焰、冰霜、暗影、神圣、自然）"
+    category: "unit"
+    priority: "medium"
+    setup:
+      - "创建一个角色，法术攻击力=30"
+      - "创建一个怪物，魔法防御力=20"
+    steps:
+      - action: "角色对怪物使用火焰伤害技能"
+        expected: "应该造成火焰伤害，伤害=10（30-20）"
+      - action: "角色对怪物使用冰霜伤害技能"
+        expected: "应该造成冰霜伤害，伤害=10（30-20）"
+      - action: "角色对怪物使用暗影伤害技能"
+        expected: "应该造成暗影伤害，伤害=10（30-20）"
+    assertions:
+      - type: "equals"
+        target: "fire_damage_type"
+        expected: "fire"
+        message: "伤害类型应该是fire"
+      - type: "equals"
+        target: "frost_damage_type"
+        expected: "frost"
+        message: "伤害类型应该是frost"
+      - type: "equals"
+        target: "shadow_damage_type"
+        expected: "shadow"
+        message: "伤害类型应该是shadow"
+
+
+

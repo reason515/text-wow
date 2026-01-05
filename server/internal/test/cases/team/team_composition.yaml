@@ -1,0 +1,173 @@
+# 队伍系统 - 队伍搭配测试
+test_suite: "队伍系统 - 队伍搭配"
+description: "测试队伍搭配系统，包括角色职业搭配、属性互补、协同效果等"
+
+tests:
+  - name: "经典坦克+治疗+DPS搭配测试"
+    description: "测试经典的坦克+治疗+DPS三人搭配"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个3人队伍：战士（坦克）、牧师（治疗）、法师（DPS）"
+    steps:
+      - action: "检查队伍搭配"
+        expected: "队伍应该包含坦克、治疗、DPS三种角色"
+    assertions:
+      - type: "equals"
+        target: "team.has_tank"
+        expected: "true"
+        message: "队伍应该有坦克"
+      - type: "equals"
+        target: "team.has_healer"
+        expected: "true"
+        message: "队伍应该有治疗"
+      - type: "equals"
+        target: "team.has_dps"
+        expected: "true"
+        message: "队伍应该有DPS"
+
+  - name: "职业互补测试"
+    description: "测试不同职业的属性互补"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个3人队伍：战士（高物理防御）、法师（高魔法攻击）、牧师（平衡）"
+    steps:
+      - action: "检查队伍属性分布"
+        expected: "队伍应该覆盖物理和魔法两种伤害类型"
+    assertions:
+      - type: "greater_than"
+        target: "team.physical_attack"
+        expected: "0"
+        message: "队伍应该有物理攻击能力"
+      - type: "greater_than"
+        target: "team.magic_attack"
+        expected: "0"
+        message: "队伍应该有魔法攻击能力"
+
+  - name: "队伍协同技能测试"
+    description: "测试队伍中的协同技能效果"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个3人队伍：战士、法师"
+      - "战士有协同技能：为法师提供法术伤害+20%"
+    steps:
+      - action: "检查协同效果"
+        expected: "法师应该获得法术伤害+20%的加成"
+    assertions:
+      - type: "equals"
+        target: "mage.spell_damage_bonus"
+        expected: "0.2"
+        message: "法师应该获得20%法术伤害加成"
+
+  - name: "队伍属性平衡测试"
+    description: "测试队伍属性的平衡性"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "创建一个5人队伍：战士、圣骑士、牧师、法师、盗贼"
+    steps:
+      - action: "检查队伍属性"
+        expected: "队伍应该有平衡的物理/魔法攻击、防御、治疗能力"
+    assertions:
+      - type: "range"
+        target: "team.physical_attack_ratio"
+        expected: "[0.3, 0.7]"
+        message: "物理攻击占比应该在30%-70%之间"
+      - type: "range"
+        target: "team.magic_attack_ratio"
+        expected: "[0.3, 0.7]"
+        message: "魔法攻击占比应该在30%-70%之间"
+
+  - name: "队伍资源类型测试"
+    description: "测试队伍中不同资源类型的角色"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "创建一个3人队伍：战士（怒气）、法师（法力）、盗贼（能量）"
+    steps:
+      - action: "检查资源类型"
+        expected: "队伍应该包含多种资源类型"
+    assertions:
+      - type: "equals"
+        target: "team.has_rage_resource"
+        expected: "true"
+        message: "队伍应该有怒气资源角色"
+      - type: "equals"
+        target: "team.has_mana_resource"
+        expected: "true"
+        message: "队伍应该有法力资源角色"
+      - type: "equals"
+        target: "team.has_energy_resource"
+        expected: "true"
+        message: "队伍应该有能量资源角色"
+
+  - name: "队伍速度搭配测试"
+    description: "测试队伍中角色的速度搭配（先手值）"
+    category: "integration"
+    priority: "low"
+    setup:
+      - "创建一个3人队伍：盗贼（高速度）、战士（中速度）、法师（低速度）"
+    steps:
+      - action: "检查行动顺序"
+        expected: "角色应该按速度顺序行动"
+    assertions:
+      - type: "equals"
+        target: "action_order[0].character_id"
+        expected: "rogue.id"
+        message: "盗贼应该最先行动"
+      - type: "equals"
+        target: "action_order[2].character_id"
+        expected: "mage.id"
+        message: "法师应该最后行动"
+
+  - name: "队伍Buff覆盖测试"
+    description: "测试队伍中不同角色提供的Buff覆盖"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "创建一个3人队伍：战士（提供攻击力Buff）、牧师（提供防御力Buff）、法师（提供暴击率Buff）"
+    steps:
+      - action: "检查Buff覆盖"
+        expected: "队伍应该获得多种Buff效果"
+    assertions:
+      - type: "equals"
+        target: "team.has_attack_buff"
+        expected: "true"
+        message: "队伍应该有攻击力Buff"
+      - type: "equals"
+        target: "team.has_defense_buff"
+        expected: "true"
+        message: "队伍应该有防御力Buff"
+      - type: "equals"
+        target: "team.has_crit_buff"
+        expected: "true"
+        message: "队伍应该有暴击率Buff"
+
+  - name: "单角色队伍测试"
+    description: "测试单角色队伍（初始状态）"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "创建一个1人队伍：战士"
+    steps:
+      - action: "检查队伍状态"
+        expected: "队伍应该只有1个角色，可以正常战斗"
+    assertions:
+      - type: "equals"
+        target: "team.character_count"
+        expected: "1"
+        message: "队伍应该有1个角色"
+      - type: "equals"
+        target: "team.can_battle"
+        expected: "true"
+        message: "单角色队伍应该可以战斗"
+
+
+
+
+
+
+
+

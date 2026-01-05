@@ -1,0 +1,122 @@
+# 战斗系统 - 战斗失败测试
+test_suite: "战斗系统 - 战斗失败"
+description: "测试战斗失败的各种场景，包括角色死亡、战斗结束等"
+
+tests:
+  - name: "单角色战斗失败测试"
+    description: "测试单角色HP归零时战斗失败"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色，HP=10，攻击力=5"
+      - "创建一个怪物，HP=50，攻击力=15"
+      - "初始化战斗系统"
+    steps:
+      - action: "开始战斗"
+        expected: "战斗状态为进行中"
+      - action: "怪物攻击角色"
+        expected: "角色受到15点伤害，HP归零"
+      - action: "检查战斗状态"
+        expected: "战斗失败，状态为defeat"
+    assertions:
+      - type: "equals"
+        target: "character.hp"
+        expected: "0"
+        message: "角色HP应该为0"
+      - type: "equals"
+        target: "battle_state"
+        expected: "defeat"
+        message: "战斗状态应该为失败"
+      - type: "contains"
+        target: "battle_logs"
+        expected: "战败"
+        message: "战斗日志应该包含战败信息"
+
+  - name: "队伍全部死亡测试"
+    description: "测试队伍所有成员死亡时战斗失败"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个3人队伍：战士(HP=10)、牧师(HP=10)、法师(HP=10)"
+      - "创建一个怪物，HP=100，攻击力=20"
+      - "初始化战斗系统"
+    steps:
+      - action: "开始战斗"
+        expected: "战斗状态为进行中"
+      - action: "怪物连续攻击队伍"
+        expected: "所有角色HP归零"
+      - action: "检查战斗状态"
+        expected: "战斗失败，状态为defeat"
+    assertions:
+      - type: "equals"
+        target: "team_alive_count"
+        expected: "0"
+        message: "队伍存活数应该为0"
+      - type: "equals"
+        target: "battle_state"
+        expected: "defeat"
+        message: "战斗状态应该为失败"
+      - type: "contains"
+        target: "battle_logs"
+        expected: "战败"
+        message: "战斗日志应该包含战败信息"
+
+  - name: "角色死亡后不再行动测试"
+    description: "测试角色死亡后不再参与战斗"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "创建一个角色，HP=5，攻击力=10"
+      - "创建一个怪物，HP=50，攻击力=10"
+      - "初始化战斗系统"
+    steps:
+      - action: "开始战斗"
+        expected: "战斗状态为进行中"
+      - action: "怪物攻击角色"
+        expected: "角色HP归零，死亡"
+      - action: "执行一个回合"
+        expected: "死亡的角色不再行动"
+      - action: "怪物继续攻击"
+        expected: "怪物攻击已死亡的角色（无效）"
+    assertions:
+      - type: "equals"
+        target: "character.hp"
+        expected: "0"
+        message: "角色HP应该为0"
+      - type: "equals"
+        target: "character_action_count"
+        expected: "0"
+        message: "死亡的角色不应该有行动"
+
+  - name: "战斗超时测试"
+    description: "测试达到最大回合数时战斗结束"
+    category: "integration"
+    priority: "low"
+    setup:
+      - "创建一个角色，HP=100，攻击力=1"
+      - "创建一个怪物，HP=1000，攻击力=1"
+      - "初始化战斗系统"
+    steps:
+      - action: "开始战斗"
+        expected: "战斗状态为进行中"
+      - action: "继续战斗直到达到最大回合数"
+        expected: "达到最大回合数，战斗结束"
+        max_rounds: 5
+    assertions:
+      - type: "equals"
+        target: "battle_rounds"
+        expected: "5"
+        message: "战斗回合数应该等于最大回合数"
+      - type: "not_equals"
+        target: "monster.hp"
+        expected: "0"
+        message: "怪物可能未死亡（战斗超时）"
+
+
+
+
+
+
+
+
+

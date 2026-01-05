@@ -1,0 +1,124 @@
+# 战斗系统 - 状态转换测试
+test_suite: "战斗系统 - 状态转换"
+description: "测试战斗状态的转换，包括开始、进行中、休息、结束等"
+
+tests:
+  - name: "战斗开始状态测试"
+    description: "测试战斗开始时的状态初始化"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色和一个怪物"
+      - "初始化战斗系统"
+    steps:
+      - action: "开始战斗"
+        expected: "战斗状态应该初始化为正确值"
+    assertions:
+      - type: "equals"
+        target: "battle_state"
+        expected: "in_progress"
+        message: "战斗应该处于运行状态"
+      - type: "not_null"
+        target: "battle_logs"
+        message: "应该有战斗日志系统"
+
+  - name: "战斗胜利状态转换测试"
+    description: "测试战斗胜利后的状态转换（victory -> resting）"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色，攻击力=20，HP=100/100"
+      - "创建一个怪物，HP=10，防御=0"
+      - "初始化战斗系统"
+    steps:
+      - action: "开始战斗"
+        expected: "战斗状态=in_progress"
+      - action: "继续战斗直到怪物死亡"
+        expected: "战斗状态应该从in_progress -> victory -> resting"
+        max_rounds: 10
+    assertions:
+      - type: "equals"
+        target: "battle_state"
+        expected: "resting"
+        message: "胜利后应该进入休息状态"
+      - type: "equals"
+        target: "is_resting"
+        expected: "true"
+        message: "应该处于休息状态"
+
+  - name: "战斗失败状态转换测试"
+    description: "测试战斗失败后的状态转换"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色，HP=10，防御=0（低血量）"
+      - "创建一个怪物，攻击力=20，HP=100"
+      - "初始化战斗系统"
+    steps:
+      - action: "开始战斗"
+        expected: "战斗状态=in_progress"
+      - action: "继续战斗直到角色死亡"
+        expected: "战斗状态应该变为defeat"
+        max_rounds: 10
+    assertions:
+      - type: "equals"
+        target: "battle_state"
+        expected: "defeat"
+        message: "失败后战斗状态应该为defeat"
+      - type: "equals"
+        target: "character.hp"
+        expected: "0"
+        message: "角色HP应该为0"
+
+  - name: "休息结束状态转换测试"
+    description: "测试休息结束后的状态转换"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "创建一个角色，HP=50/100"
+      - "创建一个怪物，HP=10，防御=0"
+      - "初始化战斗系统"
+    steps:
+      - action: "开始战斗"
+      - action: "继续战斗直到怪物死亡"
+        max_rounds: 10
+      - action: "结束休息"
+        expected: "休息状态应该结束"
+    assertions:
+      - type: "equals"
+        target: "is_resting"
+        expected: "false"
+        message: "休息应该结束"
+      - type: "not_equals"
+        target: "battle_state"
+        expected: "resting"
+        message: "休息结束后状态不应该为resting"
+
+  - name: "战斗状态循环测试"
+    description: "测试完整的战斗状态循环（开始->进行中->胜利->休息->准备）"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "创建一个角色，攻击力=20，HP=100/100"
+      - "创建2个怪物，每个HP=10，防御=0"
+      - "初始化战斗系统"
+    steps:
+      - action: "开始战斗"
+        expected: "状态=in_progress"
+      - action: "继续战斗直到第一个怪物死亡"
+        max_rounds: 10
+      - action: "继续战斗直到第二个怪物死亡"
+        expected: "状态应该变为resting"
+        max_rounds: 10
+      - action: "结束休息"
+        expected: "状态应该更新"
+    assertions:
+      - type: "not_equals"
+        target: "battle_state"
+        expected: "resting"
+        message: "休息结束后状态不应该为resting"
+      - type: "equals"
+        target: "enemy_alive_count"
+        expected: "0"
+        message: "所有怪物应该被击败"
+

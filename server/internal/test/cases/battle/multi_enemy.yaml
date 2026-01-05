@@ -1,0 +1,112 @@
+# 战斗系统 - 多敌人战斗测试
+test_suite: "战斗系统 - 多敌人战斗"
+description: "测试同时与多个敌人战斗的场景"
+
+tests:
+  - name: "单角色对战多个敌人测试"
+    description: "测试一个角色同时与多个怪物战斗"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色，HP=100，攻击力=15"
+      - "创建3个怪物，每个HP=30，攻击力=5"
+      - "初始化战斗系统"
+    steps:
+      - action: "开始战斗"
+        expected: "战斗状态为进行中"
+      - action: "角色攻击第一个怪物"
+        expected: "第一个怪物受到伤害"
+      - action: "所有怪物攻击角色"
+        expected: "角色受到3次攻击，总共15点伤害"
+      - action: "继续战斗直到所有怪物死亡"
+        expected: "战斗结束，角色获胜"
+        max_rounds: 30
+    assertions:
+      - type: "equals"
+        target: "enemy_count"
+        expected: "3"
+        message: "应该有3个敌人"
+      - type: "equals"
+        target: "enemy_alive_count"
+        expected: "0"
+        message: "所有敌人应该被击败"
+      - type: "greater_than"
+        target: "character.hp"
+        expected: "0"
+        message: "角色应该存活"
+      - type: "greater_than"
+        target: "character.exp"
+        expected: "0"
+        message: "角色应该获得经验值"
+
+  - name: "队伍对战多个敌人测试"
+    description: "测试队伍同时与多个怪物战斗"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个3人队伍：战士(坦克)、牧师(治疗)、法师(DPS)"
+      - "创建5个怪物，每个HP=20，攻击力=3"
+      - "初始化战斗系统"
+    steps:
+      - action: "开始战斗"
+        expected: "战斗状态为进行中"
+      - action: "执行一个回合"
+        expected: "队伍成员攻击敌人"
+      - action: "所有怪物攻击队伍"
+        expected: "怪物优先攻击仇恨最高的角色"
+      - action: "继续战斗直到所有怪物死亡"
+        expected: "战斗结束，队伍获胜"
+        max_rounds: 50
+    assertions:
+      - type: "greater_than"
+        target: "team_alive_count"
+        expected: "0"
+        message: "至少有一个角色存活"
+      - type: "equals"
+        target: "enemy_alive_count"
+        expected: "0"
+        message: "所有敌人应该被击败"
+      - type: "greater_than"
+        target: "team_total_exp"
+        expected: "0"
+        message: "队伍应该获得经验值"
+
+  - name: "敌人逐个死亡测试"
+    description: "测试敌人逐个死亡时的战斗状态"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "创建一个角色，攻击力=20"
+      - "创建3个怪物，HP分别为10、20、30"
+      - "初始化战斗系统"
+    steps:
+      - action: "开始战斗"
+        expected: "战斗状态为进行中"
+      - action: "角色攻击第一个怪物（HP=10）"
+        expected: "第一个怪物死亡"
+      - action: "剩余2个怪物攻击角色"
+        expected: "只有2个怪物攻击"
+      - action: "角色攻击第二个怪物（HP=20）"
+        expected: "第二个怪物死亡"
+      - action: "剩余1个怪物攻击角色"
+        expected: "只有1个怪物攻击"
+      - action: "角色攻击最后一个怪物"
+        expected: "最后一个怪物死亡，战斗结束"
+    assertions:
+      - type: "equals"
+        target: "enemy_death_count"
+        expected: "3"
+        message: "应该有3个敌人死亡"
+      - type: "equals"
+        target: "battle_state"
+        expected: "victory"
+        message: "战斗状态应该为胜利"
+
+
+
+
+
+
+
+
+
