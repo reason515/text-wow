@@ -273,12 +273,34 @@ func (tr *TestRunner) executeInstruction(instruction string) error {
 	} else if strings.Contains(instruction, "检查词缀") || strings.Contains(instruction, "检查词缀数值") || strings.Contains(instruction, "检查词缀类型") || strings.Contains(instruction, "检查词缀Tier") {
 		// 这些操作已经在updateAssertionContext中处理
 		return nil
+	} else if strings.Contains(instruction, "设置") {
+		return tr.executeSetVariable(instruction)
+	} else if strings.Contains(instruction, "创建一个nil角色") {
+		// 创建一个nil角色（用于测试nil情况）
+		tr.context.Characters["character"] = nil
+		return nil
 	} else if strings.Contains(instruction, "创建一个") && strings.Contains(instruction, "角色") {
 		return tr.createCharacter(instruction)
 	} else if (strings.Contains(instruction, "创建一个") || strings.Contains(instruction, "创建")) && strings.Contains(instruction, "怪物") {
 		return tr.createMonster(instruction)
 	} else if strings.Contains(instruction, "击败") && strings.Contains(instruction, "怪物") {
 		return tr.createMonster(instruction)
+	} else if strings.Contains(instruction, "计算物理攻击力") {
+		return tr.executeCalculatePhysicalAttack()
+	} else if strings.Contains(instruction, "计算法术攻击力") {
+		return tr.executeCalculateMagicAttack()
+	} else if strings.Contains(instruction, "计算最大生命值") || strings.Contains(instruction, "计算生命值") {
+		return tr.executeCalculateMaxHP()
+	} else if strings.Contains(instruction, "计算物理暴击率") {
+		return tr.executeCalculatePhysCritRate()
+	} else if strings.Contains(instruction, "计算法术暴击率") {
+		return tr.executeCalculateSpellCritRate()
+	} else if strings.Contains(instruction, "计算闪避率") {
+		return tr.executeCalculateDodgeRate()
+	} else if strings.Contains(instruction, "计算速度") {
+		return tr.executeCalculateSpeed()
+	} else if strings.Contains(instruction, "计算资源回复") || strings.Contains(instruction, "计算法力回复") || strings.Contains(instruction, "计算法力恢复") || strings.Contains(instruction, "计算怒气获得") || strings.Contains(instruction, "计算能量回复") || strings.Contains(instruction, "计算能量恢复") {
+		return tr.executeCalculateResourceRegen(instruction)
 	} else if strings.Contains(instruction, "计算基础伤害") {
 		return tr.executeCalculateBaseDamage()
 	} else if strings.Contains(instruction, "应用防御减伤") {
@@ -692,6 +714,76 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 		Spirit:    10,
 		MaxHP:    0,
 		MaxResource: 0,
+	}
+	
+	// 解析主属性（如"力量=20"、"敏捷=10"等）
+	if strings.Contains(instruction, "力量=") {
+		parts := strings.Split(instruction, "力量=")
+		if len(parts) > 1 {
+			strStr := strings.TrimSpace(strings.Split(parts[1], "，")[0])
+			strStr = strings.TrimSpace(strings.Split(strStr, ",")[0])
+			if str, err := strconv.Atoi(strStr); err == nil {
+				char.Strength = str
+				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: set Strength=%d\n", str)
+			}
+		}
+	}
+	if strings.Contains(instruction, "敏捷=") {
+		parts := strings.Split(instruction, "敏捷=")
+		if len(parts) > 1 {
+			agiStr := strings.TrimSpace(strings.Split(parts[1], "，")[0])
+			agiStr = strings.TrimSpace(strings.Split(agiStr, ",")[0])
+			if agi, err := strconv.Atoi(agiStr); err == nil {
+				char.Agility = agi
+				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: set Agility=%d\n", agi)
+			}
+		}
+	}
+	if strings.Contains(instruction, "智力=") {
+		parts := strings.Split(instruction, "智力=")
+		if len(parts) > 1 {
+			intStr := strings.TrimSpace(strings.Split(parts[1], "，")[0])
+			intStr = strings.TrimSpace(strings.Split(intStr, ",")[0])
+			if intel, err := strconv.Atoi(intStr); err == nil {
+				char.Intellect = intel
+				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: set Intellect=%d\n", intel)
+			}
+		}
+	}
+	if strings.Contains(instruction, "精神=") {
+		parts := strings.Split(instruction, "精神=")
+		if len(parts) > 1 {
+			spiStr := strings.TrimSpace(strings.Split(parts[1], "，")[0])
+			spiStr = strings.TrimSpace(strings.Split(spiStr, ",")[0])
+			if spi, err := strconv.Atoi(spiStr); err == nil {
+				char.Spirit = spi
+				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: set Spirit=%d\n", spi)
+			}
+		}
+	}
+	if strings.Contains(instruction, "耐力=") {
+		parts := strings.Split(instruction, "耐力=")
+		if len(parts) > 1 {
+			staStr := strings.TrimSpace(strings.Split(parts[1], "，")[0])
+			staStr = strings.TrimSpace(strings.Split(staStr, ",")[0])
+			if sta, err := strconv.Atoi(staStr); err == nil {
+				char.Stamina = sta
+				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: set Stamina=%d\n", sta)
+			}
+		}
+	}
+	
+	// 解析基础HP（如"基础HP=35"）
+	if strings.Contains(instruction, "基础HP=") {
+		parts := strings.Split(instruction, "基础HP=")
+		if len(parts) > 1 {
+			baseHPStr := strings.TrimSpace(strings.Split(parts[1], "，")[0])
+			baseHPStr = strings.TrimSpace(strings.Split(baseHPStr, ",")[0])
+			if baseHP, err := strconv.Atoi(baseHPStr); err == nil {
+				tr.context.Variables["character_base_hp"] = baseHP
+				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: set baseHP=%d\n", baseHP)
+			}
+		}
 	}
 	
 	// 解析攻击力（如"攻击力=20"）
@@ -1108,6 +1200,310 @@ func (tr *TestRunner) createTestCharacter(userID, level int) (*models.Character,
 		}
 	}
 	return char, nil
+}
+
+// executeCalculatePhysicalAttack 计算物理攻击力
+func (tr *TestRunner) executeCalculatePhysicalAttack() error {
+	char, ok := tr.context.Characters["character"]
+	if !ok || char == nil {
+		return fmt.Errorf("character not found")
+	}
+	
+	physicalAttack := tr.calculator.CalculatePhysicalAttack(char)
+	tr.assertion.SetContext("physical_attack", physicalAttack)
+	tr.context.Variables["physical_attack"] = physicalAttack
+	return nil
+}
+
+// executeCalculateMagicAttack 计算法术攻击力
+func (tr *TestRunner) executeCalculateMagicAttack() error {
+	char, ok := tr.context.Characters["character"]
+	if !ok || char == nil {
+		return fmt.Errorf("character not found")
+	}
+	
+	magicAttack := tr.calculator.CalculateMagicAttack(char)
+	tr.assertion.SetContext("magic_attack", magicAttack)
+	tr.context.Variables["magic_attack"] = magicAttack
+	return nil
+}
+
+// executeCalculateMaxHP 计算最大生命值
+func (tr *TestRunner) executeCalculateMaxHP() error {
+	char, ok := tr.context.Characters["character"]
+	if !ok || char == nil {
+		return fmt.Errorf("character not found")
+	}
+	
+	// 获取基础HP（从Variables或使用默认值）
+	baseHP := 35 // 默认战士基础HP
+	if baseHPVal, exists := tr.context.Variables["character_base_hp"]; exists {
+		if hp, ok := baseHPVal.(int); ok {
+			baseHP = hp
+		}
+	} else if char.MaxHP > 0 {
+		// 如果没有设置基础HP，尝试从当前MaxHP反推
+		// MaxHP = baseHP + Stamina*2
+		// baseHP = MaxHP - Stamina*2
+		baseHP = char.MaxHP - char.Stamina*2
+	}
+	
+	maxHP := tr.calculator.CalculateHP(char, baseHP)
+	tr.assertion.SetContext("max_hp", maxHP)
+	tr.context.Variables["max_hp"] = maxHP
+	return nil
+}
+
+// executeCalculatePhysCritRate 计算物理暴击率
+func (tr *TestRunner) executeCalculatePhysCritRate() error {
+	char, ok := tr.context.Characters["character"]
+	if !ok || char == nil {
+		return fmt.Errorf("character not found")
+	}
+	
+	critRate := tr.calculator.CalculatePhysCritRate(char)
+	tr.assertion.SetContext("phys_crit_rate", critRate)
+	tr.context.Variables["phys_crit_rate"] = critRate
+	return nil
+}
+
+// executeCalculateSpellCritRate 计算法术暴击率
+func (tr *TestRunner) executeCalculateSpellCritRate() error {
+	char, ok := tr.context.Characters["character"]
+	if !ok || char == nil {
+		return fmt.Errorf("character not found")
+	}
+	
+	critRate := tr.calculator.CalculateSpellCritRate(char)
+	tr.assertion.SetContext("spell_crit_rate", critRate)
+	tr.context.Variables["spell_crit_rate"] = critRate
+	return nil
+}
+
+// executeCalculateDodgeRate 计算闪避率
+func (tr *TestRunner) executeCalculateDodgeRate() error {
+	char, ok := tr.context.Characters["character"]
+	if !ok || char == nil {
+		return fmt.Errorf("character not found")
+	}
+	
+	dodgeRate := tr.calculator.CalculateDodgeRate(char)
+	tr.assertion.SetContext("dodge_rate", dodgeRate)
+	tr.context.Variables["dodge_rate"] = dodgeRate
+	return nil
+}
+
+// executeCalculateSpeed 计算速度
+func (tr *TestRunner) executeCalculateSpeed() error {
+	char, ok := tr.context.Characters["character"]
+	if !ok || char == nil {
+		return fmt.Errorf("character not found")
+	}
+	
+	speed := tr.calculator.CalculateSpeed(char)
+	tr.assertion.SetContext("speed", speed)
+	tr.context.Variables["speed"] = speed
+	return nil
+}
+
+// executeCalculateResourceRegen 计算资源回复
+func (tr *TestRunner) executeCalculateResourceRegen(instruction string) error {
+	// 怒气获得不需要角色
+	if strings.Contains(instruction, "怒气") || strings.Contains(instruction, "rage") {
+		// 解析基础获得值（如"计算怒气获得（基础获得=10）"）
+		baseGain := 0
+		if strings.Contains(instruction, "基础获得=") {
+			parts := strings.Split(instruction, "基础获得=")
+			if len(parts) > 1 {
+				gainStr := strings.TrimSpace(strings.Split(parts[1], "）")[0])
+				gainStr = strings.TrimSpace(strings.Split(gainStr, "）")[0])
+				if gain, err := strconv.Atoi(gainStr); err == nil {
+					baseGain = gain
+				}
+			}
+		}
+		// 如果没有在指令中指定，尝试从Variables获取
+		if baseGain == 0 {
+			if gainVal, exists := tr.context.Variables["rage_base_gain"]; exists {
+				if gain, ok := gainVal.(int); ok {
+					baseGain = gain
+				}
+			}
+		}
+		
+		// 解析加成百分比（从Variables获取）
+		bonusPercent := 0.0
+		if percentVal, exists := tr.context.Variables["rage_bonus_percent"]; exists {
+			if percent, ok := percentVal.(float64); ok {
+				bonusPercent = percent
+			}
+		}
+		
+		// 默认基础获得值
+		if baseGain == 0 {
+			baseGain = 10
+		}
+		
+		regen := tr.calculator.CalculateRageGain(baseGain, bonusPercent)
+		tr.assertion.SetContext("rage_gain", regen)
+		tr.context.Variables["rage_gain"] = regen
+		return nil
+	}
+	
+	// 其他资源类型需要角色（但允许nil）
+	char, ok := tr.context.Characters["character"]
+	if !ok {
+		return fmt.Errorf("character not found")
+	}
+	// 允许char为nil（用于测试nil情况）
+	
+	// 解析基础恢复值（如"计算法力恢复（基础恢复=10）"）
+	baseRegen := 0
+	if strings.Contains(instruction, "基础恢复=") {
+		parts := strings.Split(instruction, "基础恢复=")
+		if len(parts) > 1 {
+			regenStr := strings.TrimSpace(strings.Split(parts[1], "）")[0])
+			regenStr = strings.TrimSpace(strings.Split(regenStr, "）")[0])
+			if regen, err := strconv.Atoi(regenStr); err == nil {
+				baseRegen = regen
+			}
+		}
+	}
+	
+	// 解析基础获得值（如"计算怒气获得（基础获得=10）"）
+	baseGain := 0
+	if strings.Contains(instruction, "基础获得=") {
+		parts := strings.Split(instruction, "基础获得=")
+		if len(parts) > 1 {
+			gainStr := strings.TrimSpace(strings.Split(parts[1], "）")[0])
+			gainStr = strings.TrimSpace(strings.Split(gainStr, "）")[0])
+			if gain, err := strconv.Atoi(gainStr); err == nil {
+				baseGain = gain
+			}
+		}
+	}
+	// 如果没有在指令中指定，尝试从Variables获取
+	if baseGain == 0 {
+		if gainVal, exists := tr.context.Variables["rage_base_gain"]; exists {
+			if gain, ok := gainVal.(int); ok {
+				baseGain = gain
+			}
+		}
+	}
+	
+	// 解析加成百分比（从Variables获取）
+	bonusPercent := 0.0
+	if percentVal, exists := tr.context.Variables["rage_bonus_percent"]; exists {
+		if percent, ok := percentVal.(float64); ok {
+			bonusPercent = percent
+		}
+	}
+	
+	// 如果没有在指令中指定基础恢复，尝试从Variables获取
+	if baseRegen == 0 {
+		if regenVal, exists := tr.context.Variables["mana_base_regen"]; exists {
+			if regen, ok := regenVal.(int); ok {
+				baseRegen = regen
+			}
+		}
+	}
+	
+	// 根据指令确定资源类型
+	if strings.Contains(instruction, "法力") || strings.Contains(instruction, "mana") {
+		regen := tr.calculator.CalculateManaRegen(char, baseRegen)
+		tr.assertion.SetContext("mana_regen", regen)
+		tr.context.Variables["mana_regen"] = regen
+	} else if strings.Contains(instruction, "怒气") || strings.Contains(instruction, "rage") {
+		// 怒气获得不需要角色，只需要基础获得值和加成百分比
+		if baseGain > 0 {
+			// 使用基础获得值和加成百分比
+			regen := tr.calculator.CalculateRageGain(baseGain, bonusPercent)
+			tr.assertion.SetContext("rage_gain", regen)
+			tr.context.Variables["rage_gain"] = regen
+		} else {
+			// 默认基础获得值
+			regen := tr.calculator.CalculateRageGain(10, bonusPercent)
+			tr.assertion.SetContext("rage_gain", regen)
+			tr.context.Variables["rage_gain"] = regen
+		}
+	} else if strings.Contains(instruction, "能量") || strings.Contains(instruction, "energy") {
+		regen := tr.calculator.CalculateEnergyRegen(char, baseRegen)
+		tr.assertion.SetContext("energy_regen", regen)
+		tr.context.Variables["energy_regen"] = regen
+	} else {
+		// 默认使用角色的资源类型
+		resourceType := char.ResourceType
+		if resourceType == "" {
+			resourceType = "mana"
+		}
+		var regen int
+		var key string
+		switch resourceType {
+		case "mana":
+			regen = tr.calculator.CalculateManaRegen(char, baseRegen)
+			key = "mana_regen"
+		case "rage":
+			// 从Variables获取基础获得值和加成百分比
+			rageBaseGain := 10
+			rageBonusPercent := 0.0
+			if gainVal, exists := tr.context.Variables["rage_base_gain"]; exists {
+				if gain, ok := gainVal.(int); ok {
+					rageBaseGain = gain
+				}
+			}
+			if percentVal, exists := tr.context.Variables["rage_bonus_percent"]; exists {
+				if percent, ok := percentVal.(float64); ok {
+					rageBonusPercent = percent
+				}
+			}
+			regen = tr.calculator.CalculateRageGain(rageBaseGain, rageBonusPercent)
+			key = "rage_gain"
+		case "energy":
+			regen = tr.calculator.CalculateEnergyRegen(char, baseRegen)
+			key = "energy_regen"
+		default:
+			regen = tr.calculator.CalculateManaRegen(char, baseRegen)
+			key = "resource_regen"
+		}
+		tr.assertion.SetContext(key, regen)
+		tr.context.Variables[key] = regen
+	}
+	return nil
+}
+
+// executeSetVariable 设置变量（用于setup指令）
+func (tr *TestRunner) executeSetVariable(instruction string) error {
+	// 解析"设置基础怒气获得=10，加成百分比=20%"这样的指令
+	if strings.Contains(instruction, "基础怒气获得=") {
+		parts := strings.Split(instruction, "基础怒气获得=")
+		if len(parts) > 1 {
+			gainStr := strings.TrimSpace(strings.Split(parts[1], "，")[0])
+			gainStr = strings.TrimSpace(strings.Split(gainStr, ",")[0])
+			if gain, err := strconv.Atoi(gainStr); err == nil {
+				tr.context.Variables["rage_base_gain"] = gain
+			}
+		}
+	}
+	if strings.Contains(instruction, "加成百分比=") {
+		parts := strings.Split(instruction, "加成百分比=")
+		if len(parts) > 1 {
+			percentStr := strings.TrimSpace(strings.Split(parts[1], "%")[0])
+			if percent, err := strconv.ParseFloat(percentStr, 64); err == nil {
+				tr.context.Variables["rage_bonus_percent"] = percent
+			}
+		}
+	}
+	if strings.Contains(instruction, "基础恢复=") {
+		parts := strings.Split(instruction, "基础恢复=")
+		if len(parts) > 1 {
+			regenStr := strings.TrimSpace(strings.Split(parts[1], "，")[0])
+			regenStr = strings.TrimSpace(strings.Split(regenStr, ",")[0])
+			if regen, err := strconv.Atoi(regenStr); err == nil {
+				tr.context.Variables["mana_base_regen"] = regen
+			}
+		}
+	}
+	return nil
 }
 
 // executeCalculateBaseDamage 计算基础伤害
