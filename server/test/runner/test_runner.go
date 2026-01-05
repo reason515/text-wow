@@ -1160,9 +1160,24 @@ func (tr *TestRunner) executeUseSkill(skillName string) error {
 		char.Resource = 0
 	}
 	
+	// 更新上下文中的角色对象（确保资源更新被反映）
+	for i, teamChar := range tr.context.Team {
+		if teamChar.ID == char.ID {
+			tr.context.Team[i].Resource = char.Resource
+			break
+		}
+	}
+	for key, contextChar := range tr.context.Characters {
+		if contextChar.ID == char.ID {
+			tr.context.Characters[key].Resource = char.Resource
+			break
+		}
+	}
+	
 	// 存储技能使用结果
 	tr.assertion.SetContext("skill_used", true)
 	tr.assertion.SetContext("skill_cooldown_round_1", usedState.CooldownLeft)
+	tr.assertion.SetContext("character.resource", char.Resource)  // 显式设置资源值到上下文
 	
 	// 如果战斗会话存在，执行技能效果
 	if session != nil && len(session.CurrentEnemies) > 0 {

@@ -2,7 +2,9 @@ package runner
 
 import (
 	"fmt"
+	"log"
 	"math"
+	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -39,8 +41,12 @@ func (ae *AssertionExecutor) Execute(assertion Assertion) AssertionResult {
 	// 获取实际值
 	actual, err := ae.getValue(assertion.Target)
 	
+	// 调试日志（输出到stderr）
+	fmt.Fprintf(os.Stderr, "[DEBUG Execute] path=%s, actual=%v (type=%T), err=%v\n", assertion.Target, actual, actual, err)
+	
 	// 强制检查：如果err为nil但actual也为nil，这是不应该发生的
 	if err == nil && actual == nil {
+		fmt.Fprintf(os.Stderr, "[DEBUG Execute] 捕获到 (nil, nil) 情况\n")
 		result.Status = "failed"
 		teamLen := 0
 		hasCalculator := false
@@ -126,7 +132,47 @@ func (ae *AssertionExecutor) Execute(assertion Assertion) AssertionResult {
 		return result
 	}
 
+	// 在执行断言前，再次进行严格的nil检查
+	// 使用反射进行更严格的检查，确保不会遗漏任何形式的nil
+	rv := reflect.ValueOf(actual)
+	if !rv.IsValid() {
+		result.Status = "failed"
+		result.Error = fmt.Sprintf("actual value is invalid (reflect.IsValid=false) for path: %s", assertion.Target)
+		result.Actual = nil
+		return result
+	}
+	
+	// 检查interface{}类型的nil
+	if rv.Kind() == reflect.Interface && rv.IsNil() {
+		result.Status = "failed"
+		result.Error = fmt.Sprintf("actual value is nil (interface{}) for path: %s", assertion.Target)
+		result.Actual = nil
+		return result
+	}
+	
+	// 检查指针、切片、map、chan、func类型的nil
+	if rv.Kind() == reflect.Ptr || rv.Kind() == reflect.Slice || rv.Kind() == reflect.Map || 
+	   rv.Kind() == reflect.Chan || rv.Kind() == reflect.Func {
+		if rv.IsNil() {
+			result.Status = "failed"
+			result.Error = fmt.Sprintf("actual value is nil (%s) for path: %s", rv.Kind().String(), assertion.Target)
+			result.Actual = nil
+			return result
+		}
+	}
+	
+	// 如果actual是nil（简单检查），也应该被捕获
+	if actual == nil {
+		result.Status = "failed"
+		result.Error = fmt.Sprintf("actual value is nil (simple check) for path: %s", assertion.Target)
+		result.Actual = nil
+		return result
+	}
+
 	result.Actual = actual
+	
+	// 调试日志：在执行断言前再次检查
+	fmt.Fprintf(os.Stderr, "[DEBUG Execute] 执行断言前: actual=%v (type=%T), status=%s\n", actual, actual, result.Status)
 
 	// 根据类型执行断言
 	switch assertion.Type {
@@ -149,6 +195,28 @@ func (ae *AssertionExecutor) Execute(assertion Assertion) AssertionResult {
 		result.Error = fmt.Sprintf("unknown assertion type: %s", assertion.Type)
 	}
 
+	// 如果断言失败且Error为空，设置默认错误信息
+	// 这确保即使断言函数没有设置Error，我们也能看到失败的原因
+	if result.Status == "failed" && result.Error == "" {
+		// 再次检查actual是否为nil（可能绕过了之前的检查）
+		if actual == nil {
+			result.Error = fmt.Sprintf("assertion failed: actual value is nil for path: %s (expected: %s)", 
+				assertion.Target, assertion.Expected)
+		} else {
+			// 使用反射再次检查
+			rv := reflect.ValueOf(actual)
+			if !rv.IsValid() || (rv.Kind() == reflect.Interface && rv.IsNil()) {
+				result.Error = fmt.Sprintf("assertion failed: actual value is nil (interface{}) for path: %s (expected: %s)", 
+					assertion.Target, assertion.Expected)
+			} else {
+				result.Error = fmt.Sprintf("assertion failed: %s %s %s (actual: %v, type: %T)", 
+					assertion.Target, assertion.Type, assertion.Expected, actual, actual)
+			}
+		}
+		fmt.Fprintf(os.Stderr, "[DEBUG Execute] 设置默认错误信息: Error=%s\n", result.Error)
+	}
+
+	fmt.Fprintf(os.Stderr, "[DEBUG Execute] 返回结果: Status=%s, Error=%s, Actual=%v\n", result.Status, result.Error, result.Actual)
 	return result
 }
 
@@ -175,15 +243,18 @@ func (ae *AssertionExecutor) getValue(path string) (interface{}, error) {
 	// 如果有测试上下文，尝试路径解析
 	if ae.testContext != nil {
 		value, err := ae.resolvePath(path)
+		fmt.Fprintf(os.Stderr, "[DEBUG getValue] resolvePath返回: path=%s, value=%v (type=%T), err=%v\n", path, value, value, err)
 		if err == nil {
 			// 如果解析成功但值为nil，返回错误
 			if value == nil {
+				fmt.Fprintf(os.Stderr, "[DEBUG getValue] resolvePath返回nil但err为nil: path=%s\n", path)
 				return nil, fmt.Errorf("resolvePath returned nil for path: %s", path)
 			}
 			// 将计算得到的值存储到上下文中，以便后续使用
 			if !strings.Contains(path, ".") {
 				ae.context[path] = value
 			}
+			fmt.Fprintf(os.Stderr, "[DEBUG getValue] 成功返回: path=%s, value=%v (type=%T)\n", path, value, value)
 			return value, nil
 		}
 		// 如果路径解析失败，尝试作为简单键再次查找
@@ -433,9 +504,18 @@ func (ae *AssertionExecutor) resolvePath(path string) (interface{}, error) {
 
 	// 确保不会返回 (nil, nil)
 	if current == nil {
+		fmt.Fprintf(os.Stderr, "[DEBUG resolvePath] 最终current为nil: path=%s\n", path)
 		return nil, fmt.Errorf("object is nil at end of resolvePath for path: %s", path)
 	}
+	
+	// 使用反射检查current是否为nil
+	rv := reflect.ValueOf(current)
+	if !rv.IsValid() || (rv.Kind() == reflect.Interface && rv.IsNil()) {
+		fmt.Fprintf(os.Stderr, "[DEBUG resolvePath] 反射检查发现nil: path=%s, kind=%v, isValid=%v\n", path, rv.Kind(), rv.IsValid())
+		return nil, fmt.Errorf("object is nil (interface{}) at end of resolvePath for path: %s", path)
+	}
 
+	fmt.Fprintf(os.Stderr, "[DEBUG resolvePath] 成功解析: path=%s, current=%v (type=%T)\n", path, current, current)
 	return current, nil
 }
 
@@ -689,6 +769,10 @@ func (ae *AssertionExecutor) getMonsterField(monster *models.Monster, fieldName 
 
 // assertEquals 断言相等（支持比较运算符如 "> 0", "< 100" 等）
 func (ae *AssertionExecutor) assertEquals(actual interface{}, expected string) string {
+	// 调试日志
+	if actual == nil {
+		fmt.Fprintf(os.Stderr, "[DEBUG assertEquals] actual为nil: expected=%s\n", expected)
+	}
 	actualStr := fmt.Sprintf("%v", actual)
 	
 	// 如果期望值是纯字符串，直接比较
