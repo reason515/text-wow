@@ -197,10 +197,19 @@ func (h *BattleHandler) GetBattleStatus(c *gin.Context) {
 	
 	status := h.battleMgr.GetBattleStatus(userID)
 	
-	// 为每个角色添加buff信息
+	// 为每个角色添加buff信息，并确保战士的怒气正确
 	for _, char := range characters {
 		buffs := h.battleMgr.GetCharacterBuffs(char.ID)
 		char.Buffs = buffs
+		
+		// 确保战士的怒气上限为100
+		if char.ResourceType == "rage" {
+			char.MaxResource = 100
+			// 如果不在战斗中，怒气应该为0
+			if !status.IsRunning {
+				char.Resource = 0
+			}
+		}
 	}
 	
 	status.Team = characters

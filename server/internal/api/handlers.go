@@ -501,6 +501,17 @@ func (h *Handler) GetCharacter(c *gin.Context) {
 			}
 		}
 		
+		// 确保战士的怒气上限为100（如果不在战斗中，怒气应该为0）
+		if char.ResourceType == "rage" {
+			char.MaxResource = 100
+			// 如果不在战斗中，怒气应该为0
+			battleMgr := game.GetBattleManager()
+			session := battleMgr.GetSession(c.GetInt("userID"))
+			if session == nil || !session.IsRunning {
+				char.Resource = 0
+			}
+		}
+		
 		// 添加buff信息
 		battleMgr := game.GetBattleManager()
 		char.Buffs = battleMgr.GetCharacterBuffs(char.ID)

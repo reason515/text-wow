@@ -287,6 +287,21 @@ func (m *BattleManager) StartBattle(userID int) (bool, error) {
 		}
 	}
 
+	// 战斗开始时，重置所有战士角色的怒气为0
+	characters, err := m.charRepo.GetByUserID(userID)
+	if err == nil {
+		for _, char := range characters {
+			if char != nil && char.ResourceType == "rage" {
+				char.Resource = 0
+				char.MaxResource = 100
+				// 立即保存到数据库
+				m.charRepo.UpdateAfterBattle(char.ID, char.HP, char.Resource, char.Exp, char.Level,
+					char.ExpToNext, char.MaxHP, char.MaxResource, char.PhysicalAttack, char.MagicAttack, char.PhysicalDefense, char.MagicDefense,
+					char.Strength, char.Agility, char.Intellect, char.Stamina, char.Spirit, char.UnspentPoints, char.TotalKills)
+			}
+		}
+	}
+
 	m.addLog(session, "system", ">> 开始自动战斗...", "#33ff33")
 	return true, nil
 }
@@ -1794,6 +1809,10 @@ func (m *BattleManager) ExecuteBattleTick(userID int, characters []*models.Chara
 				}
 				m.saveBattleStats(session, session.UserID, zoneID, monsterID, false, characters)
 
+				// 战斗失败时，战士的怒气归0
+				if char.ResourceType == "rage" {
+					char.Resource = 0
+				}
 				// 保存死亡数据（包括死亡标记、复活时间和怒气归0）
 				m.charRepo.UpdateAfterDeath(char.ID, char.HP, char.Resource, char.TotalDeaths, &reviveAt)
 

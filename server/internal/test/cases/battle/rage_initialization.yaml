@@ -1,0 +1,150 @@
+# 战斗系统 - 战士怒气初始化测试
+test_suite: "战斗系统 - 战士怒气初始化"
+description: "测试战士角色在战斗初始和结束时怒气的正确处理，确保怒气从0开始，战斗结束时归0"
+
+tests:
+  - name: "战斗开始时战士怒气为0测试"
+    description: "测试战斗开始时，战士角色的怒气应该为0，而不是100"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个战士角色，怒气=100/100"
+    steps:
+      - action: "开始战斗"
+        expected: "战士的怒气应该被重置为0/100"
+    assertions:
+      - type: "equals"
+        target: "character.resource"
+        expected: "0"
+        message: "战斗开始时，战士的怒气应该为0"
+      - type: "equals"
+        target: "character.max_resource"
+        expected: "100"
+        message: "战士的最大怒气应该为100"
+
+  - name: "战斗结束时战士怒气归0测试"
+    description: "测试战斗结束时，战士角色的怒气应该归0"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个战士角色，怒气=50/100"
+      - "创建一个怪物，HP=1"
+    steps:
+      - action: "开始战斗"
+        expected: "战斗开始，战士怒气重置为0"
+      - action: "角色攻击怪物"
+        expected: "怪物被击败，战斗结束，战士怒气归0"
+    assertions:
+      - type: "equals"
+        target: "character.resource"
+        expected: "0"
+        message: "战斗结束时，战士的怒气应该归0"
+      - type: "equals"
+        target: "character.max_resource"
+        expected: "100"
+        message: "战士的最大怒气应该保持为100"
+
+  - name: "战斗失败时战士怒气归0测试"
+    description: "测试战斗失败（角色死亡）时，战士角色的怒气应该归0"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个战士角色，HP=10，怒气=80/100"
+      - "创建一个怪物，HP=100，攻击力=20"
+    steps:
+      - action: "开始战斗"
+        expected: "战斗开始，战士怒气重置为0"
+      - action: "怪物攻击角色"
+        expected: "角色HP归零，战斗失败，战士怒气归0"
+    assertions:
+      - type: "equals"
+        target: "character.resource"
+        expected: "0"
+        message: "战斗失败时，战士的怒气应该归0"
+      - type: "equals"
+        target: "character.max_resource"
+        expected: "100"
+        message: "战士的最大怒气应该保持为100"
+
+  - name: "非战斗状态下战士怒气为0测试"
+    description: "测试非战斗状态下，战士角色的怒气应该为0（通过GetCharacter API）"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "创建一个战士角色，怒气=100/100"
+    steps:
+      - action: "获取角色数据（非战斗状态）"
+        expected: "战士的怒气应该为0"
+    assertions:
+      - type: "equals"
+        target: "character.resource"
+        expected: "0"
+        message: "非战斗状态下，战士的怒气应该为0"
+      - type: "equals"
+        target: "character.max_resource"
+        expected: "100"
+        message: "战士的最大怒气应该为100"
+
+  - name: "战斗过程中怒气正常获得测试"
+    description: "测试战斗过程中，战士可以通过攻击和受击获得怒气"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个战士角色，怒气=0/100"
+      - "创建一个怪物，HP=100"
+    steps:
+      - action: "开始战斗"
+        expected: "战斗开始，战士怒气为0"
+      - action: "角色攻击怪物"
+        expected: "战士攻击怪物，获得10点怒气"
+      - action: "怪物攻击角色"
+        expected: "战士受到伤害，获得5点怒气"
+    assertions:
+      - type: "greater_than"
+        target: "character.resource"
+        expected: "0"
+        message: "战斗过程中，战士应该能够获得怒气"
+      - type: "less_than_or_equal"
+        target: "character.resource"
+        expected: "100"
+        message: "战士的怒气不应该超过100"
+
+  - name: "多场战斗连续时怒气重置测试"
+    description: "测试连续进行多场战斗时，每场战斗开始时怒气都应该从0开始"
+    category: "integration"
+    priority: "medium"
+    setup:
+      - "创建一个战士角色，怒气=0/100"
+      - "创建一个怪物，HP=1"
+    steps:
+      - action: "开始战斗"
+        expected: "第一场战斗开始，战士怒气为0"
+      - action: "角色攻击怪物"
+        expected: "怪物被击败，战斗结束，怒气归0"
+      - action: "开始战斗"
+        expected: "第二场战斗开始，战士怒气重置为0"
+    assertions:
+      - type: "equals"
+        target: "character.resource"
+        expected: "0"
+        message: "新战斗开始时，战士的怒气应该为0"
+
+  - name: "非战斗状态下GetCharacter返回正确怒气值测试"
+    description: "测试GetCharacter API返回的角色数据中，非战斗状态下战士的怒气值应该为0"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个战士角色，怒气=100/100"
+    steps:
+      - action: "获取角色数据"
+        expected: "非战斗状态下，战士的怒气应该为0"
+    assertions:
+      - type: "equals"
+        target: "character.resource"
+        expected: "0"
+        message: "非战斗状态下，GetCharacter API返回的战士怒气应该为0"
+      - type: "equals"
+        target: "character.max_resource"
+        expected: "100"
+        message: "GetCharacter API返回的战士最大怒气应该为100"
+
