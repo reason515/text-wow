@@ -273,6 +273,21 @@ func (tr *TestRunner) executeInstruction(instruction string) error {
 		return tr.generateEquipmentFromMonster(instruction)
 	} else if strings.Contains(instruction, "连续") && strings.Contains(instruction, "装备") {
 		return tr.generateMultipleEquipments(instruction)
+	} else if strings.Contains(instruction, "获得") && (strings.Contains(instruction, "装备") || strings.Contains(instruction, "武器") || strings.Contains(instruction, "护甲") || strings.Contains(instruction, "饰品")) {
+		// 处理"获得一件X级武器，攻击力+X"这样的setup指令
+		return tr.generateEquipmentWithAttributes(instruction)
+	} else if strings.Contains(instruction, "穿戴") && (strings.Contains(instruction, "装备") || strings.Contains(instruction, "武器") || strings.Contains(instruction, "护甲") || strings.Contains(instruction, "饰品")) {
+		// 处理"角色穿戴武器"、"角色穿戴装备"等action
+		return tr.executeEquipItem(instruction)
+	} else if strings.Contains(instruction, "卸下") && (strings.Contains(instruction, "装备") || strings.Contains(instruction, "武器") || strings.Contains(instruction, "护甲") || strings.Contains(instruction, "饰品")) {
+		// 处理"角色卸下武器"、"角色卸下装备"等action
+		return tr.executeUnequipItem(instruction)
+	} else if strings.Contains(instruction, "尝试穿戴") || strings.Contains(instruction, "尝试装备") {
+		// 处理"角色尝试穿戴武器"等action（用于测试失败情况）
+		return tr.executeTryEquipItem(instruction)
+	} else if strings.Contains(instruction, "依次穿戴") && strings.Contains(instruction, "装备") {
+		// 处理"角色依次穿戴所有装备"
+		return tr.executeEquipAllItems(instruction)
 	} else if strings.Contains(instruction, "检查词缀") || strings.Contains(instruction, "检查词缀数值") || strings.Contains(instruction, "检查词缀类型") || strings.Contains(instruction, "检查词缀Tier") {
 		// 这些操作已经在updateAssertionContext中处理
 		return nil
@@ -435,93 +450,130 @@ func (tr *TestRunner) updateAssertionContext() {
 	}
 	
 	// 同步装备信息
-	if equipment, ok := tr.context.Variables["equipment"].(*models.EquipmentInstance); ok && equipment != nil {
-		tr.assertion.SetContext("equipment.id", equipment.ID)
-		tr.assertion.SetContext("equipment.item_id", equipment.ItemID)
-		tr.assertion.SetContext("equipment.quality", equipment.Quality)
-		tr.assertion.SetContext("equipment.slot", equipment.Slot)
-		
-		// 同步词缀ID
-		if equipment.PrefixID != nil {
-			tr.assertion.SetContext("equipment.prefix_id", *equipment.PrefixID)
-		} else {
-			tr.assertion.SetContext("equipment.prefix_id", nil)
+	tr.syncEquipmentToContext("equipment", tr.context.Variables["equipment"])
+	tr.syncEquipmentToContext("weapon", tr.context.Variables["weapon"])
+	tr.syncEquipmentToContext("old_weapon", tr.context.Variables["old_weapon"])
+	tr.syncEquipmentToContext("old_equipment", tr.context.Variables["old_equipment"])
+	tr.syncEquipmentToContext("new_weapon", tr.context.Variables["new_weapon"])
+	tr.syncEquipmentToContext("new_equipment", tr.context.Variables["new_equipment"])
+	
+	// 同步装备槽位计数（用于测试槽位冲突）
+	if char, ok := tr.context.Characters["character"]; ok {
+		equipmentRepo := repository.NewEquipmentRepository()
+		mainHandCount := 0
+		equippedEquipments, _ := equipmentRepo.GetByCharacterID(char.ID)
+		for _, eq := range equippedEquipments {
+			if eq.Slot == "main_hand" {
+				mainHandCount++
+			}
 		}
-		if equipment.SuffixID != nil {
-			tr.assertion.SetContext("equipment.suffix_id", *equipment.SuffixID)
-		} else {
-			tr.assertion.SetContext("equipment.suffix_id", nil)
-		}
-		
-		// 同步词缀数值
-		if equipment.PrefixValue != nil {
-			tr.assertion.SetContext("equipment.prefix_value", *equipment.PrefixValue)
-		}
-		if equipment.SuffixValue != nil {
-			tr.assertion.SetContext("equipment.suffix_value", *equipment.SuffixValue)
-		}
-		
-		// 同步额外词缀
-		if equipment.BonusAffix1 != nil {
-			tr.assertion.SetContext("equipment.bonus_affix_1", *equipment.BonusAffix1)
-		}
-		if equipment.BonusAffix2 != nil {
-			tr.assertion.SetContext("equipment.bonus_affix_2", *equipment.BonusAffix2)
-		}
-		
-		// 计算并同步词缀数量
-		affixCount := 0
-		if equipment.PrefixID != nil {
-			affixCount++
-		}
-		if equipment.SuffixID != nil {
-			affixCount++
-		}
-		if equipment.BonusAffix1 != nil {
-			affixCount++
-		}
-		if equipment.BonusAffix2 != nil {
-			affixCount++
-		}
-		tr.assertion.SetContext("equipment.affix_count", affixCount)
-		
-		// 同步词缀列表信息（用于contains断言）
-		affixesList := []string{}
-		if equipment.PrefixID != nil {
-			affixesList = append(affixesList, "prefix")
-		}
-		if equipment.SuffixID != nil {
-			affixesList = append(affixesList, "suffix")
-		}
-		affixesStr := strings.Join(affixesList, ",")
-		if affixesStr != "" {
-			tr.assertion.SetContext("equipment.affixes", affixesStr)
-		}
-		
-		// 获取装备等级（从角色等级或装备本身）
-		equipmentLevel := 1
-		if char, ok := tr.context.Characters["character"]; ok {
-			equipmentLevel = char.Level
-		}
-		
-		// 同步词缀类型和Tier信息（如果有词缀）
-		if equipment.PrefixID != nil {
-			tr.syncAffixInfo(*equipment.PrefixID, "prefix", equipmentLevel)
-		}
-		if equipment.SuffixID != nil {
-			tr.syncAffixInfo(*equipment.SuffixID, "suffix", equipmentLevel)
-		}
-		if equipment.BonusAffix1 != nil {
-			tr.syncAffixInfo(*equipment.BonusAffix1, "bonus_1", equipmentLevel)
-		}
-		if equipment.BonusAffix2 != nil {
-			tr.syncAffixInfo(*equipment.BonusAffix2, "bonus_2", equipmentLevel)
-		}
+		tr.assertion.SetContext("equipped_main_hand_count", mainHandCount)
 	}
 	
 	// 同步变量
 	for key, value := range tr.context.Variables {
 		tr.assertion.SetContext(key, value)
+	}
+}
+
+// syncEquipmentToContext 同步装备信息到断言上下文
+func (tr *TestRunner) syncEquipmentToContext(prefix string, equipment interface{}) {
+	if equipment == nil {
+		return
+	}
+	
+	eq, ok := equipment.(*models.EquipmentInstance)
+	if !ok || eq == nil {
+		return
+	}
+	
+	tr.assertion.SetContext(fmt.Sprintf("%s.id", prefix), eq.ID)
+	tr.assertion.SetContext(fmt.Sprintf("%s.item_id", prefix), eq.ItemID)
+	tr.assertion.SetContext(fmt.Sprintf("%s.quality", prefix), eq.Quality)
+	tr.assertion.SetContext(fmt.Sprintf("%s.slot", prefix), eq.Slot)
+	
+	// 同步character_id
+	if eq.CharacterID != nil {
+		tr.assertion.SetContext(fmt.Sprintf("%s.character_id", prefix), *eq.CharacterID)
+	} else {
+		tr.assertion.SetContext(fmt.Sprintf("%s.character_id", prefix), nil)
+	}
+	
+	// 同步词缀ID
+	if eq.PrefixID != nil {
+		tr.assertion.SetContext(fmt.Sprintf("%s.prefix_id", prefix), *eq.PrefixID)
+	} else {
+		tr.assertion.SetContext(fmt.Sprintf("%s.prefix_id", prefix), nil)
+	}
+	if eq.SuffixID != nil {
+		tr.assertion.SetContext(fmt.Sprintf("%s.suffix_id", prefix), *eq.SuffixID)
+	} else {
+		tr.assertion.SetContext(fmt.Sprintf("%s.suffix_id", prefix), nil)
+	}
+	
+	// 同步词缀数值
+	if eq.PrefixValue != nil {
+		tr.assertion.SetContext(fmt.Sprintf("%s.prefix_value", prefix), *eq.PrefixValue)
+	}
+	if eq.SuffixValue != nil {
+		tr.assertion.SetContext(fmt.Sprintf("%s.suffix_value", prefix), *eq.SuffixValue)
+	}
+	
+	// 同步额外词缀
+	if eq.BonusAffix1 != nil {
+		tr.assertion.SetContext(fmt.Sprintf("%s.bonus_affix_1", prefix), *eq.BonusAffix1)
+	}
+	if eq.BonusAffix2 != nil {
+		tr.assertion.SetContext(fmt.Sprintf("%s.bonus_affix_2", prefix), *eq.BonusAffix2)
+	}
+	
+	// 计算并同步词缀数量
+	affixCount := 0
+	if eq.PrefixID != nil {
+		affixCount++
+	}
+	if eq.SuffixID != nil {
+		affixCount++
+	}
+	if eq.BonusAffix1 != nil {
+		affixCount++
+	}
+	if eq.BonusAffix2 != nil {
+		affixCount++
+	}
+	tr.assertion.SetContext(fmt.Sprintf("%s.affix_count", prefix), affixCount)
+	
+	// 同步词缀列表信息（用于contains断言）
+	affixesList := []string{}
+	if eq.PrefixID != nil {
+		affixesList = append(affixesList, "prefix")
+	}
+	if eq.SuffixID != nil {
+		affixesList = append(affixesList, "suffix")
+	}
+	affixesStr := strings.Join(affixesList, ",")
+	if affixesStr != "" {
+		tr.assertion.SetContext(fmt.Sprintf("%s.affixes", prefix), affixesStr)
+	}
+	
+	// 获取装备等级（从角色等级或装备本身）
+	equipmentLevel := 1
+	if char, ok := tr.context.Characters["character"]; ok {
+		equipmentLevel = char.Level
+	}
+	
+	// 同步词缀类型和Tier信息（如果有词缀）
+	if eq.PrefixID != nil {
+		tr.syncAffixInfo(*eq.PrefixID, fmt.Sprintf("%s.prefix", prefix), equipmentLevel)
+	}
+	if eq.SuffixID != nil {
+		tr.syncAffixInfo(*eq.SuffixID, fmt.Sprintf("%s.suffix", prefix), equipmentLevel)
+	}
+	if eq.BonusAffix1 != nil {
+		tr.syncAffixInfo(*eq.BonusAffix1, fmt.Sprintf("%s.bonus_1", prefix), equipmentLevel)
+	}
+	if eq.BonusAffix2 != nil {
+		tr.syncAffixInfo(*eq.BonusAffix2, fmt.Sprintf("%s.bonus_2", prefix), equipmentLevel)
 	}
 }
 
