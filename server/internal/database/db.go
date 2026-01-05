@@ -61,8 +61,25 @@ func Close() {
 // initSchema 初始化数据库表结构
 func initSchema() error {
 	// 尝试从文件加载schema
-	schemaPath := filepath.Join("database", "schema.sql")
-	if _, err := os.Stat(schemaPath); err == nil {
+	// 尝试多个可能的路径
+	possiblePaths := []string{
+		filepath.Join("database", "schema.sql"),
+		filepath.Join("server", "database", "schema.sql"),
+		filepath.Join("..", "database", "schema.sql"),
+		filepath.Join("..", "..", "database", "schema.sql"),
+	}
+	
+	var schemaPath string
+	var found bool
+	for _, path := range possiblePaths {
+		if _, err := os.Stat(path); err == nil {
+			schemaPath = path
+			found = true
+			break
+		}
+	}
+	
+	if found {
 		content, err := ioutil.ReadFile(schemaPath)
 		if err != nil {
 			return fmt.Errorf("failed to read schema file: %w", err)
@@ -136,6 +153,7 @@ func createBasicTables() error {
 		phys_crit_damage REAL DEFAULT 1.5,
 		spell_crit_rate REAL DEFAULT 0.05,
 		spell_crit_damage REAL DEFAULT 1.5,
+		dodge_rate REAL DEFAULT 0.05,
 		total_kills INTEGER DEFAULT 0,
 		total_deaths INTEGER DEFAULT 0,
 		total_damage_dealt INTEGER DEFAULT 0,
@@ -233,6 +251,10 @@ func Transaction(fn func(*sql.Tx) error) error {
 
 // runMigrations 运行数据库迁移
 func runMigrations() error {
+	// 迁移0: 添加dodge_rate列到characters表
+	if err := migrateDodgeRate(); err != nil {
+		return fmt.Errorf("failed to migrate dodge_rate: %w", err)
+	}
 	// 迁移1: 更新 battle_strategies 表结构
 	if err := migrateBattleStrategies(); err != nil {
 		return fmt.Errorf("failed to migrate battle_strategies: %w", err)
@@ -245,6 +267,42 @@ func runMigrations() error {
 	if err := migrateConfigVersions(); err != nil {
 		return fmt.Errorf("failed to migrate config_versions: %w", err)
 	}
+	return nil
+}
+
+// migrateDodgeRate 添加dodge_rate列到characters表
+func migrateDodgeRate() error {
+	// 检查列是否已存在
+	rows, err := DB.Query("PRAGMA table_info(characters)")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	hasDodgeRate := false
+	for rows.Next() {
+		var cid int
+		var name, colType string
+		var notNull, pk int
+		var dfltValue sql.NullString
+		if err := rows.Scan(&cid, &name, &colType, &notNull, &dfltValue, &pk); err != nil {
+			return err
+		}
+		if name == "dodge_rate" {
+			hasDodgeRate = true
+			break
+		}
+	}
+
+	if !hasDodgeRate {
+		log.Println("🔄 Adding dodge_rate column to characters table...")
+		_, err := DB.Exec("ALTER TABLE characters ADD COLUMN dodge_rate REAL DEFAULT 0.05")
+		if err != nil {
+			return fmt.Errorf("failed to add dodge_rate column: %w", err)
+		}
+		log.Println("✅ dodge_rate column added successfully")
+	}
+
 	return nil
 }
 

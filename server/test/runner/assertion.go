@@ -83,7 +83,15 @@ func (ae *AssertionExecutor) getValue(path string) (interface{}, error) {
 
 	// 如果有测试上下文，尝试路径解析
 	if ae.testContext != nil {
-		return ae.resolvePath(path)
+		value, err := ae.resolvePath(path)
+		if err == nil {
+			return value, nil
+		}
+		// 如果路径解析失败，尝试作为简单键再次查找
+		if val, exists := ae.context[path]; exists {
+			return val, nil
+		}
+		return nil, fmt.Errorf("value not found: %s", path)
 	}
 
 	return nil, fmt.Errorf("value not found: %s", path)
@@ -121,11 +129,54 @@ func (ae *AssertionExecutor) resolvePath(path string) (interface{}, error) {
 		return ae.testContext.LastHealing, nil
 	case "battle_logs":
 		return strings.Join(ae.testContext.BattleLogs, "\n"), nil
+	case "team_alive_count":
+		return ae.countAliveCharacters(), nil
+	case "team_total_exp":
+		return ae.calculateTeamTotalExp(), nil
+	case "enemy_alive_count":
+		return ae.countAliveMonsters(), nil
+	case "battle_state":
+		return ae.getBattleState(), nil
+	case "battle_result":
+		return ae.getBattleResult(), nil
+	case "warrior", "priest", "mage", "rogue":
+		// 通过职业名称查找角色
+		current = ae.findCharacterByClass(root)
+	case "character_1", "character_2", "character_3", "character_4":
+		// 通过索引查找角色
+		idx := 0
+		if strings.HasPrefix(root, "character_") {
+			if parsedIdx, err := strconv.Atoi(strings.TrimPrefix(root, "character_")); err == nil {
+				idx = parsedIdx
+			}
+		}
+		if idx < len(ae.testContext.Team) {
+			current = ae.testContext.Team[idx]
+		}
+	case "monster_1", "monster_2", "monster_3":
+		// 通过索引查找怪物
+		idx := 0
+		if strings.HasPrefix(root, "monster_") {
+			if parsedIdx, err := strconv.Atoi(strings.TrimPrefix(root, "monster_")); err == nil {
+				idx = parsedIdx
+			}
+		}
+		keys := make([]string, 0, len(ae.testContext.Monsters))
+		for k := range ae.testContext.Monsters {
+			keys = append(keys, k)
+		}
+		if idx < len(keys) {
+			current = ae.testContext.Monsters[keys[idx]]
+		}
 	default:
 		// 尝试从简单上下文获取
 		if value, exists := ae.context[root]; exists {
 			current = value
 		} else {
+			// 尝试解析为数字
+			if num, err := strconv.Atoi(root); err == nil {
+				return num, nil
+			}
 			return nil, fmt.Errorf("unknown root object: %s", root)
 		}
 	}
@@ -181,9 +232,18 @@ func (ae *AssertionExecutor) resolvePath(path string) (interface{}, error) {
 			current = arr
 		} else {
 			// 普通属性访问
-			current = ae.getFieldValue(current, part)
-			if current == nil {
-				return nil, fmt.Errorf("field not found: %s in %s", part, strings.Join(parts[:i], "."))
+			// 如果是map类型，直接访问
+			if mapValue, ok := current.(map[string]interface{}); ok {
+				if val, exists := mapValue[part]; exists {
+					current = val
+				} else {
+					return nil, fmt.Errorf("field not found: %s in %s", part, strings.Join(parts[:i], "."))
+				}
+			} else {
+				current = ae.getFieldValue(current, part)
+				if current == nil {
+					return nil, fmt.Errorf("field not found: %s in %s", part, strings.Join(parts[:i], "."))
+				}
 			}
 		}
 	}
@@ -248,6 +308,28 @@ func (ae *AssertionExecutor) getCharacterField(char *models.Character, fieldName
 		return char.SpellCritDamage
 	case "dodge_rate", "dodgeRate":
 		return char.DodgeRate
+	case "is_dead", "isDead", "IsDead":
+		return char.IsDead
+	case "id", "ID":
+		return char.ID
+	case "name", "Name":
+		return char.Name
+	case "class_id", "classId", "ClassID":
+		return char.ClassID
+	case "threat", "Threat":
+		// 从战斗会话获取威胁值
+		if ae.testContext != nil && ae.testContext.UserID > 0 {
+			session := ae.testContext.BattleManager.GetSession(ae.testContext.UserID)
+			if session != nil && len(session.ThreatTable) > 0 {
+				// 查找该角色的威胁值
+				for _, threatMap := range session.ThreatTable {
+					if threat, exists := threatMap[char.ID]; exists {
+						return threat
+					}
+				}
+			}
+		}
+		return 0
 	default:
 		return nil
 	}
@@ -274,6 +356,30 @@ func (ae *AssertionExecutor) getMonsterField(monster *models.Monster, fieldName 
 		return monster.Speed
 	case "exp_reward", "expReward":
 		return monster.ExpReward
+	case "id", "ID":
+		return monster.ID
+	case "name", "Name":
+		return monster.Name
+	case "type", "Type":
+		return monster.Type
+	case "debuff_defense_modifier":
+		// 从Buff系统获取防御力Debuff
+		if ae.testContext != nil && ae.testContext.UserID > 0 {
+			session := ae.testContext.BattleManager.GetSession(ae.testContext.UserID)
+			if session != nil {
+				// 这里需要从BuffManager获取，暂时返回0
+				// TODO: 实现从BuffManager获取Debuff值
+			}
+		}
+		return 0.0
+	case "actual_defense":
+		// 实际防御力 = 基础防御力 * (1 + debuff_modifier)
+		baseDefense := monster.PhysicalDefense
+		debuffMod := 0.0
+		if ae.testContext != nil && ae.testContext.UserID > 0 {
+			// TODO: 从BuffManager获取debuff值
+		}
+		return int(float64(baseDefense) * (1.0 + debuffMod))
 	default:
 		return nil
 	}
@@ -524,6 +630,103 @@ func (ae *AssertionExecutor) SetContext(key string, value interface{}) {
 // ClearContext 清空测试上下文
 func (ae *AssertionExecutor) ClearContext() {
 	ae.context = make(map[string]interface{})
+}
+
+// countAliveCharacters 计算存活角色数量
+func (ae *AssertionExecutor) countAliveCharacters() int {
+	if ae.testContext == nil {
+		return 0
+	}
+	count := 0
+	for _, char := range ae.testContext.Team {
+		if char != nil && char.HP > 0 {
+			count++
+		}
+	}
+	return count
+}
+
+// calculateTeamTotalExp 计算队伍总经验值
+func (ae *AssertionExecutor) calculateTeamTotalExp() int {
+	if ae.testContext == nil {
+		return 0
+	}
+	total := 0
+	for _, char := range ae.testContext.Team {
+		if char != nil {
+			total += char.Exp
+		}
+	}
+	return total
+}
+
+// countAliveMonsters 计算存活怪物数量
+func (ae *AssertionExecutor) countAliveMonsters() int {
+	if ae.testContext == nil {
+		return 0
+	}
+	count := 0
+	for _, monster := range ae.testContext.Monsters {
+		if monster != nil && monster.HP > 0 {
+			count++
+		}
+	}
+	return count
+}
+
+// getBattleState 获取战斗状态
+func (ae *AssertionExecutor) getBattleState() string {
+	if ae.testContext == nil || ae.testContext.UserID == 0 {
+		return "idle"
+	}
+	session := ae.testContext.BattleManager.GetSession(ae.testContext.UserID)
+	if session == nil {
+		return "idle"
+	}
+	if session.IsRunning {
+		return "in_progress"
+	}
+	if session.IsResting {
+		return "resting"
+	}
+	return "idle"
+}
+
+// getBattleResult 获取战斗结果
+func (ae *AssertionExecutor) getBattleResult() map[string]interface{} {
+	result := make(map[string]interface{})
+	if ae.testContext == nil || ae.testContext.BattleResult == nil {
+		result["is_victory"] = false
+		return result
+	}
+	// 检查是否有存活的角色和怪物
+	aliveChars := ae.countAliveCharacters()
+	aliveMonsters := ae.countAliveMonsters()
+	result["is_victory"] = aliveChars > 0 && aliveMonsters == 0
+	return result
+}
+
+// findCharacterByClass 通过职业名称查找角色
+func (ae *AssertionExecutor) findCharacterByClass(className string) *models.Character {
+	if ae.testContext == nil {
+		return nil
+	}
+	classMap := map[string]string{
+		"warrior": "warrior",
+		"priest":  "priest",
+		"mage":    "mage",
+		"rogue":   "rogue",
+	}
+	targetClassID := classMap[className]
+	if targetClassID == "" {
+		return nil
+	}
+	for _, char := range ae.testContext.Team {
+		if char != nil && char.ClassID == targetClassID {
+			return char
+		}
+	}
+	return nil
 }
 
 

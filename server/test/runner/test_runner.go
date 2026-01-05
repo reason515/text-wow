@@ -221,7 +221,7 @@ func (tr *TestRunner) RunTestCase(testCase TestCase) TestResult {
 
 	// 更新上下文数据（从战斗会话中获取最新状态）
 	tr.updateContextFromBattle()
-	
+
 	// 执行断言
 	for _, assertion := range testCase.Assertions {
 		assertionResult := tr.assertion.Execute(assertion)
@@ -671,13 +671,23 @@ func (tr *TestRunner) executeStep(step TestStep) error {
 		return tr.executeUseSkill(skillName)
 	}
 	
-	// 计算伤害
+	// 计算基础伤害
+	if strings.Contains(action, "计算基础伤害") || (strings.Contains(action, "计算") && strings.Contains(action, "基础伤害")) {
+		return tr.executeCalculateBaseDamage()
+	}
+	
+	// 计算伤害（通用）
 	if strings.Contains(action, "计算") && strings.Contains(action, "伤害") {
 		return tr.executeCalculateDamage(action)
 	}
 	
-	// 应用防御减伤
+	// 应用防御减伤或计算防御减伤
 	if strings.Contains(action, "应用防御减伤") || strings.Contains(action, "计算防御减伤") {
+		return tr.executeCalculateDefenseReduction()
+	}
+	
+	// 计算减伤后伤害
+	if strings.Contains(action, "计算减伤后伤害") {
 		return tr.executeCalculateDefenseReduction()
 	}
 	
@@ -872,6 +882,24 @@ func (tr *TestRunner) executeUseSkill(skillName string) error {
 	return nil
 }
 
+// executeCalculateBaseDamage 计算基础伤害
+func (tr *TestRunner) executeCalculateBaseDamage() error {
+	if len(tr.context.Team) == 0 {
+		return fmt.Errorf("character not found")
+	}
+	
+	char := tr.context.Team[0]
+	// 基础伤害 = 攻击力 × 技能系数（默认1.0）
+	baseDamage := char.PhysicalAttack
+	
+	// 设置到断言上下文
+	tr.assertion.SetContext("base_damage", baseDamage)
+	// 同时设置到测试上下文（用于后续步骤）
+	tr.context.LastDamage = baseDamage
+	
+	return nil
+}
+
 // executeCalculateDamage 计算伤害
 func (tr *TestRunner) executeCalculateDamage(action string) error {
 	// 从上下文中获取角色和怪物
@@ -924,8 +952,14 @@ func (tr *TestRunner) executeCalculateDefenseReduction() error {
 		return fmt.Errorf("monster not found")
 	}
 	
-	// 计算基础伤害
-	baseDamage := char.PhysicalAttack
+	// 获取基础伤害（如果已计算）
+	baseDamage, ok := tr.assertion.context["base_damage"].(int)
+	if !ok {
+		// 如果没有基础伤害，使用攻击力
+		baseDamage = char.PhysicalAttack
+		tr.assertion.SetContext("base_damage", baseDamage)
+	}
+	
 	// 应用防御减伤（减法公式）
 	damageAfterDefense := baseDamage - monster.PhysicalDefense
 	if damageAfterDefense < 1 {
@@ -934,6 +968,10 @@ func (tr *TestRunner) executeCalculateDefenseReduction() error {
 	
 	tr.context.LastDamage = damageAfterDefense
 	tr.assertion.SetContext("damage_after_defense", damageAfterDefense)
+	// 如果没有最终伤害，使用减伤后伤害作为最终伤害
+	if _, exists := tr.assertion.context["final_damage"]; !exists {
+		tr.assertion.SetContext("final_damage", damageAfterDefense)
+	}
 	
 	return nil
 }
@@ -941,9 +979,26 @@ func (tr *TestRunner) executeCalculateDefenseReduction() error {
 // executeApplyCrit 应用暴击倍率
 func (tr *TestRunner) executeApplyCrit() error {
 	// 从上下文中获取伤害值
-	baseDamage, ok := tr.assertion.context["damage_after_defense"].(int)
+	var baseDamage int
+	var ok bool
+	if damage, exists := tr.assertion.context["damage_after_defense"]; exists {
+		baseDamage, ok = damage.(int)
+	}
 	if !ok {
 		baseDamage = tr.context.LastDamage
+		if baseDamage == 0 {
+			// 如果没有伤害值，尝试从角色和怪物计算
+			if len(tr.context.Team) > 0 && len(tr.context.Monsters) > 0 {
+				char := tr.context.Team[0]
+				monster := tr.context.Monsters["monster"]
+				if monster != nil {
+					baseDamage = char.PhysicalAttack - monster.PhysicalDefense
+					if baseDamage < 1 {
+						baseDamage = 1
+					}
+				}
+			}
+		}
 	}
 	
 	if len(tr.context.Team) == 0 {

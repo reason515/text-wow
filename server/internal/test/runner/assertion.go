@@ -85,10 +85,8 @@ func (ae *AssertionExecutor) getValue(path string) (interface{}, error) {
 	// 先尝试直接获取（包括已经设置的 turn_order[0].type 等键）
 	if value, exists := ae.context[path]; exists {
 		// 如果值是nil，返回nil而不是错误（这样断言可以正确处理）
-		fmt.Printf("[DEBUG] getValue: 直接获取 %s = %v (exists=%v)\n", path, value, exists)
 		return value, nil
 	}
-	fmt.Printf("[DEBUG] getValue: 未找到直接键 %s，尝试解析路径\n", path)
 	
 	// 尝试解析数组索引路径（如 "turn_order[0].type"）
 	// 注意：这个路径可能已经被设置为键（如 "turn_order[0].type"），也可能需要从数组中解析

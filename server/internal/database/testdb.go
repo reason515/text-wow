@@ -314,6 +314,7 @@ CREATE TABLE IF NOT EXISTS characters (
     phys_crit_damage REAL DEFAULT 1.5,
     spell_crit_rate REAL DEFAULT 0.05,
     spell_crit_damage REAL DEFAULT 1.5,
+    dodge_rate REAL DEFAULT 0.05,
     total_kills INTEGER DEFAULT 0,
     total_deaths INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,

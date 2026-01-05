@@ -244,8 +244,20 @@ func (tr *TestRunner) executeInstruction(instruction string) error {
 		return nil
 	} else if strings.Contains(instruction, "创建一个") && strings.Contains(instruction, "角色") {
 		return tr.createCharacter(instruction)
+	} else if strings.Contains(instruction, "创建一个") && strings.Contains(instruction, "怪物") {
+		return tr.createMonster(instruction)
 	} else if strings.Contains(instruction, "击败") && strings.Contains(instruction, "怪物") {
 		return tr.createMonster(instruction)
+	} else if strings.Contains(instruction, "计算基础伤害") {
+		return tr.executeCalculateBaseDamage()
+	} else if strings.Contains(instruction, "应用防御减伤") {
+		return tr.executeCalculateDefenseReduction()
+	} else if strings.Contains(instruction, "计算防御减伤") || strings.Contains(instruction, "计算减伤后伤害") {
+		return tr.executeCalculateDefenseReduction()
+	} else if strings.Contains(instruction, "如果触发暴击，应用暴击倍率") || strings.Contains(instruction, "应用暴击倍率") {
+		return tr.executeApplyCrit()
+	} else if strings.Contains(instruction, "计算伤害") {
+		return tr.executeCalculateDamage(instruction)
 	}
 	return nil
 }
@@ -610,6 +622,52 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 		MaxResource: 0,
 	}
 	
+	// 解析攻击力（如"攻击力=20"）
+	if strings.Contains(instruction, "攻击力=") {
+		parts := strings.Split(instruction, "攻击力=")
+		if len(parts) > 1 {
+			attackStr := strings.TrimSpace(strings.Split(parts[1], "，")[0])
+			attackStr = strings.TrimSpace(strings.Split(attackStr, "的")[0])
+			if attack, err := strconv.Atoi(attackStr); err == nil {
+				char.PhysicalAttack = attack
+			}
+		}
+	}
+	
+	// 解析防御力（如"防御力=10"）
+	if strings.Contains(instruction, "防御力=") {
+		parts := strings.Split(instruction, "防御力=")
+		if len(parts) > 1 {
+			defenseStr := strings.TrimSpace(strings.Split(parts[1], "，")[0])
+			defenseStr = strings.TrimSpace(strings.Split(defenseStr, "的")[0])
+			if defense, err := strconv.Atoi(defenseStr); err == nil {
+				char.PhysicalDefense = defense
+			}
+		}
+	}
+	
+	// 解析暴击率（如"物理暴击率=10%"）
+	if strings.Contains(instruction, "物理暴击率=") {
+		parts := strings.Split(instruction, "物理暴击率=")
+		if len(parts) > 1 {
+			critStr := strings.TrimSpace(strings.Split(parts[1], "%")[0])
+			if crit, err := strconv.ParseFloat(critStr, 64); err == nil {
+				char.PhysCritRate = crit / 100.0
+			}
+		}
+	}
+	
+	// 解析暴击伤害（如"物理暴击伤害=150%"）
+	if strings.Contains(instruction, "物理暴击伤害=") {
+		parts := strings.Split(instruction, "物理暴击伤害=")
+		if len(parts) > 1 {
+			critDmgStr := strings.TrimSpace(strings.Split(parts[1], "%")[0])
+			if critDmg, err := strconv.ParseFloat(critDmgStr, 64); err == nil {
+				char.PhysCritDamage = critDmg / 100.0
+			}
+		}
+	}
+	
 	// 解析等级
 	if strings.Contains(instruction, "30级") {
 		char.Level = 30
@@ -683,13 +741,49 @@ func (tr *TestRunner) createMonster(instruction string) error {
 		Name:            "测试怪物",
 		Type:            "normal",
 		Level:           1,
-		HP:              0, // 被击败
+		HP:              100, // 默认存活
 		MaxHP:           100,
 		PhysicalAttack:  10,
 		MagicAttack:     5,
 		PhysicalDefense: 5,
 		MagicDefense:    3,
 		DodgeRate:       0.05,
+	}
+	
+	// 解析防御力（如"防御力=10"）
+	if strings.Contains(instruction, "防御力=") {
+		parts := strings.Split(instruction, "防御力=")
+		if len(parts) > 1 {
+			defenseStr := strings.TrimSpace(strings.Split(parts[1], "，")[0])
+			defenseStr = strings.TrimSpace(strings.Split(defenseStr, "的")[0])
+			defenseStr = strings.TrimSpace(strings.Split(defenseStr, "（")[0])
+			if defense, err := strconv.Atoi(defenseStr); err == nil {
+				monster.PhysicalDefense = defense
+			}
+		}
+	}
+	
+	// 解析闪避率（如"闪避率=10%"）
+	if strings.Contains(instruction, "闪避率=") {
+		parts := strings.Split(instruction, "闪避率=")
+		if len(parts) > 1 {
+			dodgeStr := strings.TrimSpace(strings.Split(parts[1], "%")[0])
+			if dodge, err := strconv.ParseFloat(dodgeStr, 64); err == nil {
+				monster.DodgeRate = dodge / 100.0
+			}
+		}
+	}
+	
+	// 解析HP（如"HP=100"）
+	if strings.Contains(instruction, "HP=") {
+		parts := strings.Split(instruction, "HP=")
+		if len(parts) > 1 {
+			hpStr := strings.TrimSpace(strings.Split(parts[1], "，")[0])
+			if hp, err := strconv.Atoi(hpStr); err == nil {
+				monster.HP = hp
+				monster.MaxHP = hp
+			}
+		}
 	}
 	
 	tr.context.Monsters["monster"] = monster
@@ -767,5 +861,138 @@ func (tr *TestRunner) createTestCharacter(userID, level int) (*models.Character,
 		}
 	}
 	return char, nil
+}
+
+// executeCalculateBaseDamage 计算基础伤害
+func (tr *TestRunner) executeCalculateBaseDamage() error {
+	char, ok := tr.context.Characters["character"]
+	if !ok || char == nil {
+		return fmt.Errorf("character not found")
+	}
+	
+	// 基础伤害 = 攻击力 × 技能系数（默认1.0）
+	baseDamage := char.PhysicalAttack
+	
+	tr.assertion.SetContext("base_damage", baseDamage)
+	tr.context.Variables["base_damage"] = baseDamage
+	return nil
+}
+
+// executeCalculateDefenseReduction 计算防御减伤
+func (tr *TestRunner) executeCalculateDefenseReduction() error {
+	char, ok := tr.context.Characters["character"]
+	if !ok || char == nil {
+		return fmt.Errorf("character not found")
+	}
+	
+	monster, ok := tr.context.Monsters["monster"]
+	if !ok || monster == nil {
+		return fmt.Errorf("monster not found")
+	}
+	
+	// 获取基础伤害（如果已计算）
+	baseDamage := char.PhysicalAttack
+	if val, exists := tr.context.Variables["base_damage"]; exists {
+		if bd, ok := val.(int); ok {
+			baseDamage = bd
+		}
+	}
+	
+	// 应用防御减伤（减法公式）
+	damageAfterDefense := baseDamage - monster.PhysicalDefense
+	if damageAfterDefense < 1 {
+		damageAfterDefense = 1 // 至少1点伤害
+	}
+	
+	tr.assertion.SetContext("damage_after_defense", damageAfterDefense)
+	tr.context.Variables["damage_after_defense"] = damageAfterDefense
+	// 如果没有最终伤害，使用减伤后伤害作为最终伤害
+	if _, exists := tr.context.Variables["final_damage"]; !exists {
+		tr.assertion.SetContext("final_damage", damageAfterDefense)
+		tr.context.Variables["final_damage"] = damageAfterDefense
+	}
+	
+	return nil
+}
+
+// executeApplyCrit 应用暴击倍率
+func (tr *TestRunner) executeApplyCrit() error {
+	// 从上下文中获取伤害值
+	var baseDamage int
+	if val, exists := tr.context.Variables["damage_after_defense"]; exists {
+		if bd, ok := val.(int); ok {
+			baseDamage = bd
+		}
+	}
+	
+	if baseDamage == 0 {
+		// 如果没有伤害值，尝试从角色和怪物计算
+		char, ok := tr.context.Characters["character"]
+		if !ok || char == nil {
+			return fmt.Errorf("character not found")
+		}
+		monster, ok := tr.context.Monsters["monster"]
+		if !ok || monster == nil {
+			return fmt.Errorf("monster not found")
+		}
+		baseDamage = char.PhysicalAttack - monster.PhysicalDefense
+		if baseDamage < 1 {
+			baseDamage = 1
+		}
+		// 更新上下文
+		tr.assertion.SetContext("damage_after_defense", baseDamage)
+		tr.context.Variables["damage_after_defense"] = baseDamage
+	}
+	
+	char, ok := tr.context.Characters["character"]
+	if !ok || char == nil {
+		return fmt.Errorf("character not found")
+	}
+	
+	// 假设暴击（实际应该随机判断）
+	// 注意：PhysCritDamage是倍率，如1.5表示150%
+	finalDamage := int(float64(baseDamage) * char.PhysCritDamage)
+	
+	tr.assertion.SetContext("final_damage", finalDamage)
+	tr.context.Variables["final_damage"] = finalDamage
+	return nil
+}
+
+// executeCalculateDamage 计算伤害（通用）
+func (tr *TestRunner) executeCalculateDamage(instruction string) error {
+	char, ok := tr.context.Characters["character"]
+	if !ok || char == nil {
+		return fmt.Errorf("character not found")
+	}
+	
+	monster, ok := tr.context.Monsters["monster"]
+	if !ok || monster == nil {
+		return fmt.Errorf("monster not found")
+	}
+	
+	// 使用计算器计算伤害
+	defender := &models.Character{
+		PhysicalDefense: monster.PhysicalDefense,
+		MagicDefense:    monster.MagicDefense,
+		DodgeRate:       monster.DodgeRate,
+	}
+	
+	result := tr.calculator.CalculateDamage(
+		char,
+		defender,
+		char.PhysicalAttack,
+		1.0, // 技能倍率
+		"physical",
+		false, // 不忽略闪避
+	)
+	
+	tr.assertion.SetContext("base_damage", int(result.BaseDamage))
+	tr.assertion.SetContext("damage_after_defense", int(result.DamageAfterDefense))
+	tr.assertion.SetContext("final_damage", result.FinalDamage)
+	tr.context.Variables["base_damage"] = int(result.BaseDamage)
+	tr.context.Variables["damage_after_defense"] = int(result.DamageAfterDefense)
+	tr.context.Variables["final_damage"] = result.FinalDamage
+	
+	return nil
 }
 
