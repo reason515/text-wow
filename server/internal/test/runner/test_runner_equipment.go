@@ -22,7 +22,8 @@ func (tr *TestRunner) generateEquipmentWithAttributes(instruction string) error 
 	intellectRequired := 0
 	
 	// 解析等级要求：如"需要10级才能装备"或"需要10级才能装备的武器"
-	if strings.Contains(instruction, "需要") && strings.Contains(instruction, "级才能装备") {
+	// 注意：必须同时包含"需要"和"级才能装备"，且不包含"只有"（避免与职业要求混淆）
+	if strings.Contains(instruction, "需要") && strings.Contains(instruction, "级才能装备") && !strings.Contains(instruction, "只有") {
 		re := regexp.MustCompile(`需要(\d+)级才能装备`)
 		matches := re.FindStringSubmatch(instruction)
 		if len(matches) > 1 {
@@ -54,7 +55,8 @@ func (tr *TestRunner) generateEquipmentWithAttributes(instruction string) error 
 	}
 	
 	// 解析属性要求：如"需要力量15才能装备"
-	if strings.Contains(instruction, "需要") && (strings.Contains(instruction, "力量") || strings.Contains(instruction, "敏捷") || strings.Contains(instruction, "智力")) && strings.Contains(instruction, "才能装备") {
+	// 注意：必须包含"需要"和属性名称（力量/敏捷/智力）和"才能装备"，且不包含"级"（避免与等级要求混淆）
+	if strings.Contains(instruction, "需要") && (strings.Contains(instruction, "力量") || strings.Contains(instruction, "敏捷") || strings.Contains(instruction, "智力")) && strings.Contains(instruction, "才能装备") && !strings.Contains(instruction, "级") {
 		// 力量要求
 		if strings.Contains(instruction, "力量") {
 			re := regexp.MustCompile(`需要力量(\d+)才能装备`)
@@ -138,73 +140,6 @@ func (tr *TestRunner) generateEquipmentWithAttributes(instruction string) error 
 		quality = "epic"
 	} else if strings.Contains(instruction, "橙色") || strings.Contains(instruction, "legendary") {
 		quality = "legendary"
-	}
-	
-	
-	// 解析等级要求：如"需要10级才能装备"或"需要10级才能装备的武器"
-	if strings.Contains(instruction, "需要") && strings.Contains(instruction, "级才能装备") {
-		re := regexp.MustCompile(`需要(\d+)级才能装备`)
-		matches := re.FindStringSubmatch(instruction)
-		if len(matches) > 1 {
-			if l, err := strconv.Atoi(matches[1]); err == nil {
-				levelRequired = l
-				fmt.Fprintf(os.Stderr, "[DEBUG] generateEquipmentWithAttributes: parsed level_required=%d\n", levelRequired)
-			}
-		}
-	}
-	
-	// 解析职业要求：如"只有战士才能装备"
-	if strings.Contains(instruction, "只有") && strings.Contains(instruction, "才能装备") {
-		// 使用更宽泛的正则表达式匹配中文职业名称
-		re := regexp.MustCompile(`只有([^才]+)才能装备`)
-		matches := re.FindStringSubmatch(instruction)
-		if len(matches) > 1 {
-			classRequired = strings.TrimSpace(matches[1])
-			// 转换中文职业名称为ID
-			if classRequired == "战士" {
-				classRequired = "warrior"
-			} else if classRequired == "法师" {
-				classRequired = "mage"
-			} else if classRequired == "盗贼" {
-				classRequired = "rogue"
-			} else if classRequired == "牧师" {
-				classRequired = "priest"
-			}
-		}
-	}
-	
-	// 解析属性要求：如"需要力量15才能装备"
-	if strings.Contains(instruction, "需要") && (strings.Contains(instruction, "力量") || strings.Contains(instruction, "敏捷") || strings.Contains(instruction, "智力")) && strings.Contains(instruction, "才能装备") {
-		// 力量要求
-		if strings.Contains(instruction, "力量") {
-			re := regexp.MustCompile(`需要力量(\d+)才能装备`)
-			matches := re.FindStringSubmatch(instruction)
-			if len(matches) > 1 {
-				if s, err := strconv.Atoi(matches[1]); err == nil {
-					strengthRequired = s
-				}
-			}
-		}
-		// 敏捷要求
-		if strings.Contains(instruction, "敏捷") {
-			re := regexp.MustCompile(`需要敏捷(\d+)才能装备`)
-			matches := re.FindStringSubmatch(instruction)
-			if len(matches) > 1 {
-				if a, err := strconv.Atoi(matches[1]); err == nil {
-					agilityRequired = a
-				}
-			}
-		}
-		// 智力要求
-		if strings.Contains(instruction, "智力") {
-			re := regexp.MustCompile(`需要智力(\d+)才能装备`)
-			matches := re.FindStringSubmatch(instruction)
-			if len(matches) > 1 {
-				if i, err := strconv.Atoi(matches[1]); err == nil {
-					intellectRequired = i
-				}
-			}
-		}
 	}
 	
 	// 如果有特殊要求，创建或更新item配置

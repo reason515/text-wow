@@ -1109,6 +1109,11 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 		}
 		if existingChar != nil {
 			char.ID = existingChar.ID
+			// 更新已存在角色的ClassID（如果指令中指定了）
+			if char.ClassID != existingChar.ClassID {
+				existingChar.ClassID = char.ClassID
+			}
+			char = existingChar // 使用数据库中的角色，但更新ClassID
 			// 在设置ID之后，如果MaxHP为0或小于计算值，重新计算MaxHP（从数据库读取后可能被重置）
 			// 但是，如果HP已经被明确设置（通过"HP="指令），不要覆盖它
 			explicitHP := 0
