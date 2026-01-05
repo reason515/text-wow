@@ -43,3 +43,4 @@ CREATE INDEX IF NOT EXISTS idx_monster_ai_configs_monster_id ON monster_ai_confi
 
 
 
+

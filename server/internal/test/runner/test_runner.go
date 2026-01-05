@@ -2,6 +2,7 @@ package runner
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -173,20 +174,50 @@ func (tr *TestRunner) RunTestCase(testCase TestCase) TestResult {
 		result.Duration = time.Since(startTime)
 	}()
 
+	// 在每个测试用例开始时，清空上下文（确保测试用例之间不相互影响）
+	tr.context = &TestContext{
+		Characters: make(map[string]*models.Character),
+		Monsters:   make(map[string]*models.Monster),
+		Equipments: make(map[string]*models.EquipmentInstance),
+		Variables:  make(map[string]interface{}),
+	}
+	
 	// 执行前置条件
 	if err := tr.executeSetup(testCase.Setup); err != nil {
 		result.Status = "failed"
 		result.Error = fmt.Sprintf("setup failed: %v", err)
 		return result
 	}
+	
+	// 调试：检查setup后的上下文状态
+	fmt.Fprintf(os.Stderr, "[DEBUG] RunTestCase: after setup for '%s' - characters=%d, monsters=%d, variables=%d\n", 
+		testCase.Name, len(tr.context.Characters), len(tr.context.Monsters), len(tr.context.Variables))
+	if char, exists := tr.context.Characters["character"]; exists {
+		fmt.Fprintf(os.Stderr, "[DEBUG] RunTestCase: after setup, character.PhysicalAttack=%d, character pointer=%p\n", char.PhysicalAttack, char)
+		// 也检查Variables中的值
+		if attackVal, exists := tr.context.Variables["character_physical_attack"]; exists {
+			fmt.Fprintf(os.Stderr, "[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=%v\n", attackVal)
+		}
+	}
+	if ratio, exists := tr.context.Variables["skill_scaling_ratio"]; exists {
+		fmt.Fprintf(os.Stderr, "[DEBUG] RunTestCase: skill_scaling_ratio=%v\n", ratio)
+	}
 
 	// 执行测试步骤
 	for _, step := range testCase.Steps {
+		// 在执行步骤之前，检查上下文中的角色状态
+		if char, exists := tr.context.Characters["character"]; exists {
+			fmt.Fprintf(os.Stderr, "[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=%d, character pointer=%p\n", char.PhysicalAttack, char)
+		}
 		if err := tr.executeStep(step); err != nil {
 			result.Status = "failed"
 			result.Error = fmt.Sprintf("step failed: %v", err)
 			tr.executeTeardown(testCase.Teardown)
 			return result
+		}
+		// 在执行步骤之后，检查上下文中的角色状态
+		if char, exists := tr.context.Characters["character"]; exists {
+			fmt.Fprintf(os.Stderr, "[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=%d\n", char.PhysicalAttack)
 		}
 	}
 
@@ -669,8 +700,12 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 		if len(parts) > 1 {
 			attackStr := strings.TrimSpace(strings.Split(parts[1], "，")[0])
 			attackStr = strings.TrimSpace(strings.Split(attackStr, "的")[0])
+			attackStr = strings.TrimSpace(strings.Split(attackStr, "的")[0])
 			if attack, err := strconv.Atoi(attackStr); err == nil {
 				char.PhysicalAttack = attack
+				// 也存储到上下文，以便后续使用
+				tr.context.Variables["character_physical_attack"] = attack
+				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: set PhysicalAttack=%d\n", attack)
 			}
 		}
 	}
@@ -776,6 +811,12 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 		}
 	}
 	
+	// 设置默认资源值（如果未指定）
+	if char.Resource == 0 && char.MaxResource == 0 {
+		char.Resource = 100
+		char.MaxResource = 100
+	}
+	
 	// 确保用户存在
 	if char.UserID == 0 {
 		user, err := tr.createTestUser()
@@ -819,26 +860,87 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 		}
 		if existingChar != nil {
 			char.ID = existingChar.ID
+			// 在设置ID之后，检查PhysicalAttack是否被重置
+			fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=%d\n", char.PhysicalAttack)
+			// 如果PhysicalAttack为0，从Variables恢复
+			if char.PhysicalAttack == 0 {
+				if attackVal, exists := tr.context.Variables["character_physical_attack"]; exists {
+					if attack, ok := attackVal.(int); ok && attack > 0 {
+						char.PhysicalAttack = attack
+						fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: restored PhysicalAttack=%d from Variables before Update\n", attack)
+					}
+				}
+			}
+			// 保存PhysicalAttack和Resource值，以防数据库更新时丢失
+			savedPhysicalAttack := char.PhysicalAttack
+			savedResource := char.Resource
+			savedMaxResource := char.MaxResource
+			fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: before Update, char.PhysicalAttack=%d, Resource=%d/%d\n", char.PhysicalAttack, char.Resource, char.MaxResource)
 			if err := charRepo.Update(char); err != nil {
 				return fmt.Errorf("failed to update existing character in DB: %w", err)
 			}
+			// 恢复PhysicalAttack值（如果它被数据库更新覆盖了）
+			if savedPhysicalAttack > 0 {
+				char.PhysicalAttack = savedPhysicalAttack
+				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after Update, restored PhysicalAttack=%d\n", char.PhysicalAttack)
+			} else {
+				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after Update, char.PhysicalAttack=%d (not restored)\n", char.PhysicalAttack)
+			}
+			// 恢复Resource值（如果它被数据库更新覆盖了）
+			if savedResource > 0 {
+				char.Resource = savedResource
+				char.MaxResource = savedMaxResource
+				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after Update, restored Resource=%d/%d\n", char.Resource, char.MaxResource)
+				// 再次更新数据库，确保Resource被保存
+				if err := charRepo.Update(char); err != nil {
+					fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: failed to update Resource in DB: %v\n", err)
+				}
+			}
 		} else {
+			// 保存PhysicalAttack和Resource值，以防Create后丢失
+			savedPhysicalAttack := char.PhysicalAttack
+			savedResource := char.Resource
+			savedMaxResource := char.MaxResource
 			createdChar, err := charRepo.Create(char)
 			if err != nil {
 				return fmt.Errorf("failed to create character in DB: %w", err)
 			}
 			char = createdChar
+			// 恢复PhysicalAttack值（如果它被Create覆盖了）
+			if savedPhysicalAttack > 0 {
+				char.PhysicalAttack = savedPhysicalAttack
+				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after Create, restored PhysicalAttack=%d\n", char.PhysicalAttack)
+			} else {
+				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after Create, char.PhysicalAttack=%d (not restored)\n", char.PhysicalAttack)
+			}
+			// 恢复Resource值（如果它被Create覆盖了）
+			if savedResource > 0 {
+				char.Resource = savedResource
+				char.MaxResource = savedMaxResource
+				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after Create, restored Resource=%d/%d\n", char.Resource, char.MaxResource)
+				// 再次更新数据库，确保Resource被保存
+				if err := charRepo.Update(char); err != nil {
+					fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: failed to update Resource in DB: %v\n", err)
+				}
+			}
 		}
 	}
 	
-	// 存储到上下文
+	// 存储到上下文（确保PhysicalAttack正确）
 	tr.context.Characters["character"] = char
+	fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: stored character to context, PhysicalAttack=%d\n", char.PhysicalAttack)
+	// 也存储到Variables，以防角色对象被修改
+	if char.PhysicalAttack > 0 {
+		tr.context.Variables["character_physical_attack"] = char.PhysicalAttack
+		fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: also stored PhysicalAttack=%d to Variables\n", char.PhysicalAttack)
+	}
 	
 	return nil
 }
 
 // createMonster 创建怪物
 func (tr *TestRunner) createMonster(instruction string) error {
+	fmt.Fprintf(os.Stderr, "[DEBUG] createMonster: called with instruction: %s\n", instruction)
 	// 解析数量（如"创建3个怪物"）
 	count := 1
 	if strings.Contains(instruction, "个") {
@@ -928,7 +1030,9 @@ func (tr *TestRunner) createMonster(instruction string) error {
 			key = "monster" // 单个怪物使用monster作为key
 		}
 		tr.context.Monsters[key] = monster
+		fmt.Fprintf(os.Stderr, "[DEBUG] createMonster: stored monster[%s] with PhysicalDefense=%d, HP=%d\n", key, monster.PhysicalDefense, monster.HP)
 	}
+	fmt.Fprintf(os.Stderr, "[DEBUG] createMonster: total monsters in context: %d\n", len(tr.context.Monsters))
 	
 	return nil
 }
@@ -1178,21 +1282,37 @@ func (tr *TestRunner) createSkill(instruction string) error {
 	}
 	
 	// 解析伤害倍率（如"伤害倍率为150%"或"伤害倍率150%"）
+	fmt.Fprintf(os.Stderr, "[DEBUG] createSkill: checking for damage multiplier in instruction: %s\n", instruction)
 	if strings.Contains(instruction, "伤害倍率") {
 		parts := strings.Split(instruction, "伤害倍率")
+		fmt.Fprintf(os.Stderr, "[DEBUG] createSkill: found damage multiplier, parts=%v\n", parts)
 		if len(parts) > 1 {
-			multiplierStr := strings.TrimSpace(strings.Split(parts[1], "，")[0])
-			multiplierStr = strings.TrimSpace(strings.Split(multiplierStr, "的")[0])
+			multiplierStr := parts[1]
+			fmt.Fprintf(os.Stderr, "[DEBUG] createSkill: multiplierStr before processing: %s\n", multiplierStr)
 			// 移除百分号
 			multiplierStr = strings.ReplaceAll(multiplierStr, "%", "")
+			// 移除逗号和其他分隔符
+			multiplierStr = strings.TrimSpace(strings.Split(multiplierStr, "，")[0])
+			multiplierStr = strings.TrimSpace(strings.Split(multiplierStr, "的")[0])
+			// 处理"为"字
 			if strings.Contains(multiplierStr, "为") {
 				multParts := strings.Split(multiplierStr, "为")
 				if len(multParts) > 1 {
 					multiplierStr = strings.TrimSpace(multParts[1])
 				}
 			}
-			if multiplier, err := strconv.ParseFloat(multiplierStr, 64); err == nil {
-				skill.ScalingRatio = multiplier / 100.0 // 转换为小数（150% -> 1.5）
+			// 移除所有非数字字符（除了小数点）
+			cleanStr := ""
+			for _, r := range multiplierStr {
+				if (r >= '0' && r <= '9') || r == '.' {
+					cleanStr += string(r)
+				}
+			}
+			if cleanStr != "" {
+				if multiplier, err := strconv.ParseFloat(cleanStr, 64); err == nil {
+					skill.ScalingRatio = multiplier / 100.0 // 转换为小数（150% -> 1.5）
+					fmt.Fprintf(os.Stderr, "[DEBUG] createSkill: parsed damage multiplier %f -> %f\n", multiplier, skill.ScalingRatio)
+				}
 			}
 		}
 	}
@@ -1262,8 +1382,10 @@ func (tr *TestRunner) createSkill(instruction string) error {
 	
 	// 存储到上下文
 	tr.context.Variables["skill"] = skill
-	// 也存储技能类型到上下文，以便executeUseSkill可以访问
+	// 也存储技能类型和伤害倍率到上下文，以便executeUseSkill可以访问
 	tr.context.Variables["skill_type"] = skill.Type
+	tr.context.Variables["skill_scaling_ratio"] = skill.ScalingRatio
+	fmt.Fprintf(os.Stderr, "[DEBUG] createSkill: stored skill, ScalingRatio=%f\n", skill.ScalingRatio)
 	return nil
 }
 
@@ -1274,11 +1396,79 @@ func (tr *TestRunner) executeUseSkill(instruction string) error {
 		return fmt.Errorf("character not found")
 	}
 	
+	// 确保使用最新的角色对象（从上下文重新获取，以防有更新）
+	if latestChar, exists := tr.context.Characters["character"]; exists && latestChar != nil {
+		fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: re-fetched char from context, PhysicalAttack=%d\n", latestChar.PhysicalAttack)
+		char = latestChar
+	}
+	
+	// 在开始时检查Variables中是否存在character_physical_attack
+	if attackVal, exists := tr.context.Variables["character_physical_attack"]; exists {
+		fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: at start, Variables[character_physical_attack]=%v\n", attackVal)
+		// 如果角色的PhysicalAttack为0，从Variables恢复
+		if char.PhysicalAttack == 0 {
+			if attack, ok := attackVal.(int); ok && attack > 0 {
+				char.PhysicalAttack = attack
+				fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: restored PhysicalAttack=%d from Variables\n", attack)
+				tr.context.Characters["character"] = char
+			}
+		}
+	} else {
+		fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: at start, character_physical_attack NOT in Variables!\n")
+		// 如果Variables中没有character_physical_attack，但角色的PhysicalAttack不为0，则存储到Variables中
+		if char.PhysicalAttack > 0 {
+			tr.context.Variables["character_physical_attack"] = char.PhysicalAttack
+			fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: stored PhysicalAttack=%d to Variables (from char object)\n", char.PhysicalAttack)
+		} else {
+			// 如果角色的PhysicalAttack也为0，尝试从数据库重新加载角色
+			fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: char.PhysicalAttack=0, trying to reload from database...\n")
+			charRepo := repository.NewCharacterRepository()
+			if reloadedChar, err := charRepo.GetByID(char.ID); err == nil && reloadedChar != nil {
+				char = reloadedChar
+				fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: reloaded char from database, PhysicalAttack=%d\n", char.PhysicalAttack)
+				// 如果重新加载后的PhysicalAttack不为0，存储到Variables和上下文
+				if char.PhysicalAttack > 0 {
+					tr.context.Variables["character_physical_attack"] = char.PhysicalAttack
+					tr.context.Characters["character"] = char
+					fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: stored PhysicalAttack=%d to Variables and context (from database)\n", char.PhysicalAttack)
+				}
+			} else {
+				fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: failed to reload char from database: %v\n", err)
+			}
+		}
+	}
+	
+	fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: char.PhysicalAttack=%d (after restore check)\n", char.PhysicalAttack)
+	
+	// 在获取技能之前，确保上下文中的角色是最新的（包含恢复的PhysicalAttack）
+	tr.context.Characters["character"] = char
+	
 	// 获取技能（从上下文或创建默认技能）
 	var skill *models.Skill
 	if skillVal, exists := tr.context.Variables["skill"]; exists {
 		if s, ok := skillVal.(*models.Skill); ok {
 			skill = s
+			fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: loaded skill from Variables, initial ScalingRatio=%f\n", skill.ScalingRatio)
+			// 强制从上下文获取ScalingRatio（createSkill中存储的值更准确）
+			if ratioVal, exists := tr.context.Variables["skill_scaling_ratio"]; exists {
+				fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: found skill_scaling_ratio in Variables: %v (type: %T)\n", ratioVal, ratioVal)
+				if ratio, ok := ratioVal.(float64); ok {
+					if ratio > 0 {
+						skill.ScalingRatio = ratio
+						fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: restored ScalingRatio=%f from Variables\n", ratio)
+					} else {
+						fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: skill_scaling_ratio is 0 in Variables\n")
+					}
+				}
+			} else {
+				fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: skill_scaling_ratio NOT found in Variables\n")
+			}
+			fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: after restore, skill.ScalingRatio=%f\n", skill.ScalingRatio)
+			// 立即更新上下文，确保值不会丢失
+			tr.context.Variables["skill"] = skill
+			if skill.ScalingRatio > 0 {
+				tr.context.Variables["skill_scaling_ratio"] = skill.ScalingRatio
+			}
 		}
 	}
 	
@@ -1290,27 +1480,104 @@ func (tr *TestRunner) executeUseSkill(instruction string) error {
 			Type:        "attack",
 			ResourceCost: 30,
 			Cooldown:    0,
+			ScalingRatio: 1.0,
+		}
+	}
+	
+	// 在消耗资源之前，再次确保使用最新的角色对象（从上下文重新获取，以防有更新）
+	if latestChar, exists := tr.context.Characters["character"]; exists && latestChar != nil {
+		char = latestChar
+		fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: before resource consumption, re-fetched char, PhysicalAttack=%d\n", char.PhysicalAttack)
+		// 检查Variables中是否存在character_physical_attack
+		if attackVal, exists := tr.context.Variables["character_physical_attack"]; exists {
+			fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: before resource consumption, Variables[character_physical_attack]=%v\n", attackVal)
+		} else {
+			fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: before resource consumption, character_physical_attack NOT in Variables!\n")
+		}
+		// 如果PhysicalAttack为0，再次尝试从上下文获取
+		if char.PhysicalAttack == 0 {
+			if attackVal, exists := tr.context.Variables["character_physical_attack"]; exists {
+				if attack, ok := attackVal.(int); ok && attack > 0 {
+					char.PhysicalAttack = attack
+					fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: restored PhysicalAttack=%d before resource consumption\n", attack)
+					tr.context.Characters["character"] = char
+				}
+			}
 		}
 	}
 	
 	// 检查资源是否足够
+	fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: checking resource, char.Resource=%d, skill.ResourceCost=%d\n", char.Resource, skill.ResourceCost)
 	if char.Resource < skill.ResourceCost {
+		fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: RESOURCE INSUFFICIENT, returning early\n")
 		tr.assertion.SetContext("skill_used", false)
 		tr.assertion.SetContext("error_message", fmt.Sprintf("资源不足: 需要%d，当前%d", skill.ResourceCost, char.Resource))
 		// 不返回错误，让测试继续执行，这样断言可以检查 skill_used = false
 		return nil
 	}
+	fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: resource sufficient, continuing...\n")
 	
 	// 消耗资源
 	char.Resource -= skill.ResourceCost
 	if char.Resource < 0 {
 		char.Resource = 0
 	}
+	// 消耗资源后，立即检查并恢复PhysicalAttack（如果被重置为0）
+	if char.PhysicalAttack == 0 {
+		fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: PhysicalAttack=0 after resource consumption, checking Variables...\n")
+		if attackVal, exists := tr.context.Variables["character_physical_attack"]; exists {
+			fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: found character_physical_attack in Variables: %v\n", attackVal)
+			if attack, ok := attackVal.(int); ok && attack > 0 {
+				char.PhysicalAttack = attack
+				fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: restored PhysicalAttack=%d after resource consumption\n", attack)
+			} else {
+				fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: failed to restore PhysicalAttack, attackVal=%v, ok=%v\n", attackVal, ok)
+			}
+		} else {
+			fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: character_physical_attack not found in Variables\n")
+		}
+	}
+	// 消耗资源后，立即更新上下文，确保值不会丢失
+	tr.context.Characters["character"] = char
+	fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: after resource consumption, char.PhysicalAttack=%d, skill.ScalingRatio=%f\n", char.PhysicalAttack, skill.ScalingRatio)
+	
+	// 在调用LoadCharacterSkills之前，再次确保使用最新的角色对象（从上下文重新获取，以防有更新）
+	if latestChar, exists := tr.context.Characters["character"]; exists && latestChar != nil {
+		char = latestChar
+		fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: before LoadCharacterSkills, re-fetched char, PhysicalAttack=%d\n", char.PhysicalAttack)
+		// 如果PhysicalAttack为0，再次尝试从上下文获取
+		if char.PhysicalAttack == 0 {
+			if attackVal, exists := tr.context.Variables["character_physical_attack"]; exists {
+				if attack, ok := attackVal.(int); ok && attack > 0 {
+					char.PhysicalAttack = attack
+					fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: restored PhysicalAttack=%d before LoadCharacterSkills\n", attack)
+					tr.context.Characters["character"] = char
+				}
+			}
+		}
+	}
 	
 	// 使用 SkillManager 使用技能（如果角色有技能）
 	skillManager := game.NewSkillManager()
 	var skillState *game.CharacterSkillState
+	fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: before LoadCharacterSkills, char.PhysicalAttack=%d, skill.ScalingRatio=%f\n", char.PhysicalAttack, skill.ScalingRatio)
 	if err := skillManager.LoadCharacterSkills(char.ID); err == nil {
+		fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: after LoadCharacterSkills, char.PhysicalAttack=%d, skill.ScalingRatio=%f\n", char.PhysicalAttack, skill.ScalingRatio)
+		// 在UseSkill之后，再次确保使用最新的角色对象（从上下文重新获取，以防有更新）
+		if latestChar, exists := tr.context.Characters["character"]; exists && latestChar != nil {
+			char = latestChar
+			fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: after LoadCharacterSkills, re-fetched char, PhysicalAttack=%d\n", char.PhysicalAttack)
+			// 如果PhysicalAttack为0，再次尝试从上下文获取
+			if char.PhysicalAttack == 0 {
+				if attackVal, exists := tr.context.Variables["character_physical_attack"]; exists {
+					if attack, ok := attackVal.(int); ok && attack > 0 {
+						char.PhysicalAttack = attack
+						fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: restored PhysicalAttack=%d after LoadCharacterSkills\n", attack)
+						tr.context.Characters["character"] = char
+					}
+				}
+			}
+		}
 		// 尝试使用技能
 		skillState, err = skillManager.UseSkill(char.ID, skill.ID)
 		if err != nil {
@@ -1346,6 +1613,24 @@ func (tr *TestRunner) executeUseSkill(instruction string) error {
 		}
 	}
 	
+	// 在 UseSkill 之后，确保 skill.ScalingRatio 正确（优先使用上下文中的值）
+	// 如果 skill.ScalingRatio 为 0，从上下文恢复
+	if skill.ScalingRatio == 0 {
+		if ratioVal, exists := tr.context.Variables["skill_scaling_ratio"]; exists {
+			if ratio, ok := ratioVal.(float64); ok && ratio > 0 {
+				skill.ScalingRatio = ratio
+				fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: restored ScalingRatio=%f after UseSkill\n", skill.ScalingRatio)
+			}
+		}
+	}
+	// 如果 skillState 存在且包含 Skill，确保 skillState.Skill 也使用正确的 ScalingRatio
+	if skillState != nil && skillState.Skill != nil {
+		if skill.ScalingRatio > 0 {
+			skillState.Skill.ScalingRatio = skill.ScalingRatio
+			fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: updated skillState.Skill.ScalingRatio to %f\n", skill.ScalingRatio)
+		}
+	}
+	
 	// 如果技能类型仍未设置，根据指令内容推断
 	if skill.Type == "" || skill.Type == "attack" {
 		// 检查是否是治疗技能
@@ -1368,37 +1653,202 @@ func (tr *TestRunner) executeUseSkill(instruction string) error {
 		}
 	}
 	
+	// 调试输出
+	fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: skill.Type=%s, instruction=%s\n", skill.Type, instruction)
+	
+	// 在调用handleAttackSkill之前，再次确保使用最新的角色对象（从上下文重新获取，以防有更新）
+	if latestChar, exists := tr.context.Characters["character"]; exists && latestChar != nil {
+		char = latestChar
+		fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: before restore, re-fetched char, PhysicalAttack=%d\n", char.PhysicalAttack)
+		// 如果PhysicalAttack为0，再次尝试从上下文获取
+		if char.PhysicalAttack == 0 {
+			if attackVal, exists := tr.context.Variables["character_physical_attack"]; exists {
+				if attack, ok := attackVal.(int); ok && attack > 0 {
+					char.PhysicalAttack = attack
+					fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: restored PhysicalAttack=%d before restore check\n", attack)
+					tr.context.Characters["character"] = char
+				}
+			}
+		}
+	}
+	
+	// 在调用handleAttackSkill之前，确保角色的PhysicalAttack和技能的ScalingRatio正确
+	// 从上下文恢复PhysicalAttack（如果为0）
+	fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: before restore, char.PhysicalAttack=%d, skill.ScalingRatio=%f\n", char.PhysicalAttack, skill.ScalingRatio)
+	if char.PhysicalAttack == 0 {
+		if attackVal, exists := tr.context.Variables["character_physical_attack"]; exists {
+			if attack, ok := attackVal.(int); ok && attack > 0 {
+				char.PhysicalAttack = attack
+				fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: restored PhysicalAttack=%d before handleAttackSkill\n", attack)
+			} else {
+				fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: failed to restore PhysicalAttack, attackVal=%v, ok=%v\n", attackVal, ok)
+			}
+		} else {
+			fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: character_physical_attack not found in Variables\n")
+		}
+	}
+	// 从上下文恢复ScalingRatio（如果为0，说明可能没有正确设置）
+	if skill.ScalingRatio == 0 {
+		if ratioVal, exists := tr.context.Variables["skill_scaling_ratio"]; exists {
+			if ratio, ok := ratioVal.(float64); ok && ratio > 0 {
+				skill.ScalingRatio = ratio
+				fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: restored ScalingRatio=%f before handleAttackSkill\n", ratio)
+			} else {
+				fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: failed to restore ScalingRatio, ratioVal=%v, ok=%v\n", ratioVal, ok)
+			}
+		} else {
+			fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: skill_scaling_ratio not found in Variables\n")
+		}
+	}
+	fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: after restore, char.PhysicalAttack=%d, skill.ScalingRatio=%f\n", char.PhysicalAttack, skill.ScalingRatio)
+	
+	// 在调用handleAttackSkill之前，立即更新上下文（确保值不会丢失）
+	// 更新上下文中的角色（使用当前的char对象，确保PhysicalAttack正确）
+	tr.context.Characters["character"] = char
+	// 更新上下文中的技能（使用当前的skill对象，确保ScalingRatio正确）
+	tr.context.Variables["skill"] = skill
+	// 在调用 handleAttackSkill 之前，最后一次确保 skill_scaling_ratio 正确
+	// 优先从 Variables 恢复，确保值正确
+	if ratioVal, exists := tr.context.Variables["skill_scaling_ratio"]; exists {
+		if ratio, ok := ratioVal.(float64); ok && ratio > 0 {
+			skill.ScalingRatio = ratio
+			fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: FINAL sync ScalingRatio=%f from Variables\n", ratio)
+			// 确保 Variables 中的值也是正确的
+			tr.context.Variables["skill_scaling_ratio"] = ratio
+		}
+	} else if skill.ScalingRatio > 0 {
+		// 如果 Variables 中没有，但 skill.ScalingRatio 有值，更新到 Variables
+		tr.context.Variables["skill_scaling_ratio"] = skill.ScalingRatio
+		fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: updated skill_scaling_ratio in Variables to %f\n", skill.ScalingRatio)
+	} else {
+		fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: WARNING - skill.ScalingRatio is 0 and Variables has no value\n")
+	}
+	fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: updated context before handleAttackSkill - char.PhysicalAttack=%d, skill.ScalingRatio=%f, monsters=%d\n", 
+		char.PhysicalAttack, skill.ScalingRatio, len(tr.context.Monsters))
+	
+	// 在调用handleAttackSkill之前，打印上下文状态（用于调试）
+	fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: BEFORE handleAttackSkill - context state: characters=%d, monsters=%d, variables=%d\n", 
+		len(tr.context.Characters), len(tr.context.Monsters), len(tr.context.Variables))
+	if charFromCtx, exists := tr.context.Characters["character"]; exists {
+		fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: context character.PhysicalAttack=%d\n", charFromCtx.PhysicalAttack)
+	}
+	for key := range tr.context.Monsters {
+		fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: context monster[%s] exists\n", key)
+	}
+	if ratio, exists := tr.context.Variables["skill_scaling_ratio"]; exists {
+		fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: context skill_scaling_ratio=%v\n", ratio)
+		// 如果 Variables 中的值不为 0，确保 skill.ScalingRatio 也使用这个值
+		if r, ok := ratio.(float64); ok && r > 0 {
+			if skill.ScalingRatio != r {
+				skill.ScalingRatio = r
+				fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: synced skill.ScalingRatio=%f from Variables before switch\n", r)
+			}
+		}
+	}
+	
 	switch skill.Type {
 	case "attack":
 		// 攻击技能：计算伤害（如果有怪物或指令包含"攻击"）
-		// 总是调用handleAttackSkill，因为它会检查是否有怪物
+		// 在调用 handleAttackSkill 之前，最后一次确保 skill.ScalingRatio 正确
+		// 优先从 Variables 恢复（因为 setup 中设置的值可能更准确）
+		if ratioVal, exists := tr.context.Variables["skill_scaling_ratio"]; exists {
+			if ratio, ok := ratioVal.(float64); ok && ratio > 0 {
+				skill.ScalingRatio = ratio
+				tr.context.Variables["skill_scaling_ratio"] = ratio
+				fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: FINAL restore ScalingRatio=%f from Variables before calling handleAttackSkill\n", ratio)
+			}
+		}
+		// 如果 Variables 中没有，但 skill.ScalingRatio 有值，更新到 Variables
+		if skill.ScalingRatio > 0 {
+			tr.context.Variables["skill_scaling_ratio"] = skill.ScalingRatio
+		}
+		// 在调用前最后一次检查并修复 skill.ScalingRatio
+		if skill.ScalingRatio == 0 {
+			if ratioVal, exists := tr.context.Variables["skill_scaling_ratio"]; exists {
+				if ratio, ok := ratioVal.(float64); ok && ratio > 0 {
+					skill.ScalingRatio = ratio
+					fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: LAST CHANCE restore ScalingRatio=%f right before call\n", ratio)
+				}
+			}
+		}
+		fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: BEFORE handleAttackSkill, char.PhysicalAttack=%d, skill.ScalingRatio=%f, skill pointer=%p\n", char.PhysicalAttack, skill.ScalingRatio, skill)
+		fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: context pointer before call=%p\n", tr.context)
 		tr.handleAttackSkill(char, skill, skillState, instruction)
 	case "heal":
 		// 治疗技能：恢复HP
+		fmt.Fprintf(os.Stderr, "[DEBUG] Calling handleHealSkill\n")
 		tr.handleHealSkill(char, skill)
 	case "buff":
 		// Buff技能：应用Buff效果
+		fmt.Fprintf(os.Stderr, "[DEBUG] Calling handleBuffSkill\n")
 		tr.handleBuffSkill(char, skill)
 	default:
 		// 如果类型未设置，默认当作攻击技能处理
+		fmt.Fprintf(os.Stderr, "[DEBUG] Skill type is '%s', defaulting to attack\n", skill.Type)
 		skill.Type = "attack"
 		tr.handleAttackSkill(char, skill, skillState, instruction)
 	}
 	
-	// 更新角色到数据库
+	// 更新角色到数据库（但不要覆盖PhysicalAttack，如果它已经在上下文中设置）
+	// 保存当前的PhysicalAttack值，以防数据库更新时丢失
+	savedPhysicalAttack := char.PhysicalAttack
 	charRepo := repository.NewCharacterRepository()
 	if err := charRepo.Update(char); err != nil {
 		return fmt.Errorf("failed to update character: %w", err)
 	}
+	// 恢复PhysicalAttack值（如果它被数据库更新覆盖了）
+	if savedPhysicalAttack > 0 {
+		char.PhysicalAttack = savedPhysicalAttack
+	}
 	
-	// 更新上下文中的角色
+	// 更新上下文中的角色（确保使用更新后的角色对象）
 	tr.context.Characters["character"] = char
+	fmt.Fprintf(os.Stderr, "[DEBUG] executeUseSkill: updated character, PhysicalAttack=%d\n", char.PhysicalAttack)
 	
 	return nil
 }
 
 // handleAttackSkill 处理攻击技能
 func (tr *TestRunner) handleAttackSkill(char *models.Character, skill *models.Skill, skillState *game.CharacterSkillState, instruction string) {
+	// 在开始时，立即从上下文恢复 skill_scaling_ratio（如果 skill.ScalingRatio 为 0）
+	// 同时确保 Variables 中的值也是正确的
+	if skill.ScalingRatio == 0 {
+		if ratioVal, exists := tr.context.Variables["skill_scaling_ratio"]; exists {
+			if ratio, ok := ratioVal.(float64); ok && ratio > 0 {
+				skill.ScalingRatio = ratio
+				fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: restored ScalingRatio=%f at start from Variables\n", ratio)
+			} else {
+				fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: Variables has skill_scaling_ratio but value is 0 or invalid: %v\n", ratioVal)
+			}
+		} else {
+			fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: skill_scaling_ratio NOT in Variables at start\n")
+		}
+	} else {
+		// 如果 skill.ScalingRatio 不为 0，确保 Variables 中的值也是正确的
+		tr.context.Variables["skill_scaling_ratio"] = skill.ScalingRatio
+		fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: synced skill_scaling_ratio=%f to Variables at start\n", skill.ScalingRatio)
+	}
+	fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: ENTERED, char.PhysicalAttack=%d, skill.ScalingRatio=%f\n", char.PhysicalAttack, skill.ScalingRatio)
+	fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: context pointer=%p, context has %d characters, %d monsters, %d variables\n", 
+		tr.context, len(tr.context.Characters), len(tr.context.Monsters), len(tr.context.Variables))
+	for key, monster := range tr.context.Monsters {
+		fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: monster[%s] exists, HP=%d\n", key, monster.HP)
+	}
+	// 确保使用最新的角色对象（从上下文重新获取，以防有更新）
+	if latestChar, exists := tr.context.Characters["character"]; exists && latestChar != nil {
+		char = latestChar
+		fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: after re-fetch, char.PhysicalAttack=%d\n", char.PhysicalAttack)
+	}
+	// 如果PhysicalAttack为0，尝试从上下文获取
+	if char.PhysicalAttack == 0 {
+		if attackVal, exists := tr.context.Variables["character_physical_attack"]; exists {
+			if attack, ok := attackVal.(int); ok && attack > 0 {
+				char.PhysicalAttack = attack
+				fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: restored PhysicalAttack=%d from context\n", attack)
+			}
+		}
+	}
+	
 	// 检查是否是AOE技能
 	isAOE := false
 	if aoeVal, exists := tr.context.Variables["skill_is_aoe"]; exists {
@@ -1407,20 +1857,59 @@ func (tr *TestRunner) handleAttackSkill(char *models.Character, skill *models.Sk
 		}
 	}
 	
-	// 获取伤害倍率
-	damageMultiplier := skill.ScalingRatio
-	if damageMultiplier == 0 {
-		damageMultiplier = 1.0 // 默认100%
+	// 获取伤害倍率（强制从 Variables 获取，因为传入的 skill.ScalingRatio 可能不可靠）
+	damageMultiplier := 0.0
+	fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: checking Variables for skill_scaling_ratio, skill.ScalingRatio=%f\n", skill.ScalingRatio)
+	if ratioVal, exists := tr.context.Variables["skill_scaling_ratio"]; exists {
+		fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: found skill_scaling_ratio in Variables: %v (type: %T)\n", ratioVal, ratioVal)
+		if ratio, ok := ratioVal.(float64); ok {
+			if ratio > 0 {
+				damageMultiplier = ratio
+				skill.ScalingRatio = ratio
+				fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: using skill_scaling_ratio from Variables: %f\n", damageMultiplier)
+			} else {
+				fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: skill_scaling_ratio in Variables is 0, trying skill.ScalingRatio\n")
+			}
+		} else {
+			fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: failed to convert skill_scaling_ratio, ok=%v\n", ok)
+		}
+	} else {
+		fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: skill_scaling_ratio NOT found in Variables\n")
 	}
 	
-	// 获取基础攻击力
+	// 如果 Variables 中没有或为0，尝试使用 skill.ScalingRatio
+	if damageMultiplier == 0 && skill.ScalingRatio > 0 {
+		damageMultiplier = skill.ScalingRatio
+		fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: using skill.ScalingRatio: %f\n", damageMultiplier)
+	}
+	
+	// 如果仍然为0，使用默认值
+	if damageMultiplier == 0 {
+		damageMultiplier = 1.0 // 默认100%
+		fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: using default damageMultiplier: %f\n", damageMultiplier)
+	}
+	fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: final damageMultiplier=%f (from context: %v, from skill: %f)\n", damageMultiplier, damageMultiplier > 0 && damageMultiplier != skill.ScalingRatio, skill.ScalingRatio)
+	
+	// 获取基础攻击力（优先使用设置的攻击力，而不是计算值）
+	// 也尝试从上下文获取，因为createCharacter中可能存储了值
 	baseAttack := char.PhysicalAttack
 	if baseAttack == 0 {
-		baseAttack = tr.calculator.CalculatePhysicalAttack(char)
+		// 尝试从上下文获取
+		if attackVal, exists := tr.context.Variables["character_physical_attack"]; exists {
+			if attack, ok := attackVal.(int); ok && attack > 0 {
+				baseAttack = attack
+			}
+		}
+		// 如果仍然为0，使用计算值
+		if baseAttack == 0 {
+			baseAttack = tr.calculator.CalculatePhysicalAttack(char)
+		}
 	}
+	fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: char.PhysicalAttack=%d, baseAttack=%d, damageMultiplier=%f\n", char.PhysicalAttack, baseAttack, damageMultiplier)
 	
 	// 计算基础伤害
 	baseDamage := float64(baseAttack) * damageMultiplier
+	fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: baseAttack=%d, damageMultiplier=%f, baseDamage=%f\n", baseAttack, damageMultiplier, baseDamage)
 	
 	// 创建临时Character对象表示怪物（用于Calculator）
 	createMonsterAsCharacter := func(monster *models.Monster) *models.Character {
@@ -1457,7 +1946,7 @@ func (tr *TestRunner) handleAttackSkill(char *models.Character, skill *models.Sk
 					actualDamage = damageResult.FinalDamage
 				} else {
 					// 如果Calculator返回无效结果，手动计算
-					actualDamage = int(baseDamage) - monster.PhysicalDefense
+					actualDamage = int(math.Round(baseDamage)) - monster.PhysicalDefense
 					if actualDamage < 1 {
 						actualDamage = 1
 					}
@@ -1496,6 +1985,8 @@ func (tr *TestRunner) handleAttackSkill(char *models.Character, skill *models.Sk
 		}
 		
 		if targetMonster != nil {
+			fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: targetMonster.PhysicalDefense=%d\n", targetMonster.PhysicalDefense)
+			fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: BEFORE CalculateDamage - baseAttack=%d, damageMultiplier=%f, baseDamage=%f\n", baseAttack, damageMultiplier, baseDamage)
 			// 使用Calculator计算伤害
 			monsterChar := createMonsterAsCharacter(targetMonster)
 			damageResult := tr.calculator.CalculateDamage(
@@ -1507,12 +1998,18 @@ func (tr *TestRunner) handleAttackSkill(char *models.Character, skill *models.Sk
 				false,
 			)
 			
+			fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: CalculateDamage result: BaseDamage=%f, DamageAfterDefense=%f, FinalDamage=%d, IsCrit=%v\n", 
+				damageResult.BaseDamage, damageResult.DamageAfterDefense, damageResult.FinalDamage, damageResult.IsCrit)
+			
 			actualDamage := 1
 			if damageResult != nil && damageResult.FinalDamage > 0 {
 				actualDamage = damageResult.FinalDamage
+				fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: using CalculateDamage result: %d\n", actualDamage)
 			} else {
 				// 如果Calculator返回无效结果，手动计算
-				actualDamage = int(baseDamage) - targetMonster.PhysicalDefense
+				// 基础伤害 = 攻击力 × 倍率
+				actualDamage = int(math.Round(baseDamage)) - targetMonster.PhysicalDefense
+				fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: manual calculation: baseDamage=%f, defense=%d, actualDamage=%d\n", baseDamage, targetMonster.PhysicalDefense, actualDamage)
 				if actualDamage < 1 {
 					actualDamage = 1
 				}
@@ -1538,10 +2035,14 @@ func (tr *TestRunner) handleAttackSkill(char *models.Character, skill *models.Sk
 					defense = d
 				}
 			}
-			actualDamage := int(baseDamage) - defense
+			fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: NO MONSTER - baseAttack=%d, damageMultiplier=%f, baseDamage=%f, defense=%d\n", baseAttack, damageMultiplier, baseDamage, defense)
+			// 基础伤害 = 攻击力 × 倍率，然后减去防御
+			actualDamage := int(math.Round(baseDamage)) - defense
+			fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: NO MONSTER calculation: actualDamage=%d (before clamp)\n", actualDamage)
 			if actualDamage < 1 {
 				actualDamage = 1
 			}
+			fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: NO MONSTER final damage: %d\n", actualDamage)
 			tr.assertion.SetContext("skill_damage_dealt", actualDamage)
 			tr.context.Variables["skill_damage_dealt"] = actualDamage
 		}
@@ -1558,11 +2059,25 @@ func (tr *TestRunner) handleHealSkill(char *models.Character, skill *models.Skil
 		}
 	}
 	
+	fmt.Fprintf(os.Stderr, "[DEBUG] handleHealSkill: healAmount=%d, char.HP before=%d\n", healAmount, char.HP)
+	
 	// 恢复HP
 	char.HP += healAmount
 	if char.HP > char.MaxHP {
 		char.HP = char.MaxHP
 	}
+	
+	fmt.Fprintf(os.Stderr, "[DEBUG] handleHealSkill: char.HP after=%d\n", char.HP)
+	
+	// 更新角色到数据库
+	charRepo := repository.NewCharacterRepository()
+	if err := charRepo.Update(char); err != nil {
+		// 如果更新失败，记录错误但不中断测试
+		fmt.Fprintf(os.Stderr, "Warning: failed to update character HP after heal: %v\n", err)
+	}
+	
+	// 更新上下文中的角色
+	tr.context.Characters["character"] = char
 	
 	// 设置治疗量到上下文
 	tr.assertion.SetContext("skill_healing_done", healAmount)

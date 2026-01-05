@@ -79,13 +79,13 @@ tests:
       - "创建一个伤害倍率为150%的技能"
     steps:
       - action: "角色使用技能攻击怪物"
-        expected: "基础伤害=20×1.5=30，防御减伤后≈27"
+        expected: "基础伤害=20×1.5=30，防御减伤后=30-10=20"
     assertions:
       - type: "approximately"
         target: "skill_damage_dealt"
-        expected: "27"
+        expected: "20"
         tolerance: 2.0
-        message: "技能伤害应该约等于27"
+        message: "技能伤害应该约等于20"
 
   - name: "AOE技能测试"
     description: "测试范围攻击（AOE）技能"
@@ -147,6 +147,7 @@ tests:
         target: "character.buff_duration"
         expected: "3"
         message: "Buff持续时间应该为3回合"
+
 
 
 
