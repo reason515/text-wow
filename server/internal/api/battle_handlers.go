@@ -197,7 +197,11 @@ func (h *BattleHandler) GetBattleStatus(c *gin.Context) {
 	
 	status := h.battleMgr.GetBattleStatus(userID)
 	
-	// 为每个角色添加buff信息，并确保战士的怒气正确
+	// 获取计算器和职业信息
+	calculator := game.NewCalculator()
+	gameRepo := repository.NewGameRepository()
+	
+	// 为每个角色添加buff信息，并确保战士的怒气正确，同时重新计算属性
 	for _, char := range characters {
 		buffs := h.battleMgr.GetCharacterBuffs(char.ID)
 		char.Buffs = buffs
@@ -209,6 +213,52 @@ func (h *BattleHandler) GetBattleStatus(c *gin.Context) {
 			if !status.IsRunning {
 				char.Resource = 0
 			}
+		}
+		
+		// 重新计算所有属性（如果为0或需要修复）
+		needsUpdate := false
+		if char.PhysicalAttack == 0 {
+			char.PhysicalAttack = calculator.CalculatePhysicalAttack(char)
+			needsUpdate = true
+		}
+		if char.MagicAttack == 0 {
+			char.MagicAttack = calculator.CalculateMagicAttack(char)
+			needsUpdate = true
+		}
+		if char.PhysicalDefense == 0 {
+			char.PhysicalDefense = calculator.CalculatePhysicalDefense(char)
+			needsUpdate = true
+		}
+		if char.MagicDefense == 0 {
+			char.MagicDefense = calculator.CalculateMagicDefense(char)
+			needsUpdate = true
+		}
+		if char.PhysCritRate == 0 {
+			char.PhysCritRate = calculator.CalculatePhysCritRate(char)
+			needsUpdate = true
+		}
+		if char.PhysCritDamage == 0 {
+			char.PhysCritDamage = calculator.CalculatePhysCritDamage(char)
+			needsUpdate = true
+		}
+		if char.SpellCritRate == 0 {
+			char.SpellCritRate = calculator.CalculateSpellCritRate(char)
+			needsUpdate = true
+		}
+		if char.SpellCritDamage == 0 {
+			char.SpellCritDamage = calculator.CalculateSpellCritDamage(char)
+			needsUpdate = true
+		}
+		if char.DodgeRate == 0 {
+			char.DodgeRate = calculator.CalculateDodgeRate(char)
+			needsUpdate = true
+		}
+		
+		// 如果属性被修复，更新数据库
+		if needsUpdate {
+			h.charRepo.UpdateAfterBattle(char.ID, char.HP, char.Resource, char.Exp, char.Level,
+				char.ExpToNext, char.MaxHP, char.MaxResource, char.PhysicalAttack, char.MagicAttack, char.PhysicalDefense, char.MagicDefense,
+				char.Strength, char.Agility, char.Intellect, char.Stamina, char.Spirit, char.UnspentPoints, char.TotalKills)
 		}
 	}
 	

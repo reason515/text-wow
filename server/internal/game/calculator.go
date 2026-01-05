@@ -88,6 +88,36 @@ func (c *Calculator) CalculateMP(char *models.Character, baseMP int) int {
 	return result
 }
 
+// CalculatePhysicalDefense 计算物理防御力
+// 公式: (力量 × 0.1) + (耐力 × 0.3) + 装备加成
+// 边界处理: 确保返回值至少为0
+func (c *Calculator) CalculatePhysicalDefense(char *models.Character) int {
+	if char == nil {
+		return 0
+	}
+	baseDefense := float64(char.Strength)*0.1 + float64(char.Stamina)*0.3
+	result := int(math.Round(baseDefense))
+	if result < 0 {
+		result = 0
+	}
+	return result
+}
+
+// CalculateMagicDefense 计算魔法防御力
+// 公式: (智力 × 0.2) + (精神 × 0.3) + 装备加成
+// 边界处理: 确保返回值至少为0
+func (c *Calculator) CalculateMagicDefense(char *models.Character) int {
+	if char == nil {
+		return 0
+	}
+	baseDefense := float64(char.Intellect)*0.2 + float64(char.Spirit)*0.3
+	result := int(math.Round(baseDefense))
+	if result < 0 {
+		result = 0
+	}
+	return result
+}
+
 // CalculatePhysCritRate 计算物理暴击率
 // 公式: 5% (基础) + (敏捷 / 20)% + 装备加成
 // 上限: 50%

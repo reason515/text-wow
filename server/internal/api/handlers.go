@@ -482,23 +482,76 @@ func (h *Handler) GetCharacter(c *gin.Context) {
 	if len(characters) > 0 {
 		char := characters[0]
 		
+		// 获取职业信息和计算器
+		gameRepo := repository.NewGameRepository()
+		class, err := gameRepo.GetClassByID(char.ClassID)
+		calculator := game.NewCalculator()
+		needsUpdate := false
+		
 		// 如果MaxHP为0，重新计算MaxHP（修复数据问题）
 		if char.MaxHP == 0 {
-			// 获取职业信息以获取BaseHP
-			gameRepo := repository.NewGameRepository()
-			class, err := gameRepo.GetClassByID(char.ClassID)
 			if err == nil && class != nil {
-				calculator := game.NewCalculator()
 				char.MaxHP = calculator.CalculateHP(char, class.BaseHP)
 				// 如果HP也是0，设置为MaxHP
 				if char.HP == 0 && char.MaxHP > 0 {
 					char.HP = char.MaxHP
-					// 更新数据库
-					h.charRepo.UpdateAfterBattle(char.ID, char.HP, char.Resource, char.Exp, char.Level,
-						char.ExpToNext, char.MaxHP, char.MaxResource, char.PhysicalAttack, char.MagicAttack, char.PhysicalDefense, char.MagicDefense,
-						char.Strength, char.Agility, char.Intellect, char.Stamina, char.Spirit, char.UnspentPoints, char.TotalKills)
 				}
+				needsUpdate = true
 			}
+		}
+		
+		// 重新计算所有属性（如果为0或需要修复）
+		// 物理攻击 = 力量×0.4 + 敏捷×0.2
+		if char.PhysicalAttack == 0 {
+			char.PhysicalAttack = calculator.CalculatePhysicalAttack(char)
+			needsUpdate = true
+		}
+		// 魔法攻击 = 智力×1.0 + 精神×0.2
+		if char.MagicAttack == 0 {
+			char.MagicAttack = calculator.CalculateMagicAttack(char)
+			needsUpdate = true
+		}
+		// 物理防御 = 力量×0.1 + 耐力×0.3
+		if char.PhysicalDefense == 0 {
+			char.PhysicalDefense = calculator.CalculatePhysicalDefense(char)
+			needsUpdate = true
+		}
+		// 魔法防御 = 智力×0.2 + 精神×0.3
+		if char.MagicDefense == 0 {
+			char.MagicDefense = calculator.CalculateMagicDefense(char)
+			needsUpdate = true
+		}
+		// 物理暴击率 = 基础5% + 敏捷/20
+		if char.PhysCritRate == 0 {
+			char.PhysCritRate = calculator.CalculatePhysCritRate(char)
+			needsUpdate = true
+		}
+		// 物理暴击伤害 = 150% + 力量×0.3%
+		if char.PhysCritDamage == 0 {
+			char.PhysCritDamage = calculator.CalculatePhysCritDamage(char)
+			needsUpdate = true
+		}
+		// 法术暴击率 = 基础5% + 精神/20
+		if char.SpellCritRate == 0 {
+			char.SpellCritRate = calculator.CalculateSpellCritRate(char)
+			needsUpdate = true
+		}
+		// 法术暴击伤害 = 150% + 智力×0.3%
+		if char.SpellCritDamage == 0 {
+			char.SpellCritDamage = calculator.CalculateSpellCritDamage(char)
+			needsUpdate = true
+		}
+		// 闪避率 = 基础5% + 敏捷/20
+		if char.DodgeRate == 0 {
+			char.DodgeRate = calculator.CalculateDodgeRate(char)
+			needsUpdate = true
+		}
+		
+		// 如果属性被修复，更新数据库
+		if needsUpdate {
+			h.charRepo.UpdateAfterBattle(char.ID, char.HP, char.Resource, char.Exp, char.Level,
+				char.ExpToNext, char.MaxHP, char.MaxResource, char.PhysicalAttack, char.MagicAttack, char.PhysicalDefense, char.MagicDefense,
+				char.Strength, char.Agility, char.Intellect, char.Stamina, char.Spirit, char.UnspentPoints, char.TotalKills)
 		}
 		
 		// 确保战士的怒气上限为100（如果不在战斗中，怒气应该为0）

@@ -1,0 +1,242 @@
+# 属性计算系统 - 角色属性计算测试
+test_suite: "属性计算系统 - 角色属性计算"
+description: "测试角色所有属性（物理攻击、魔法攻击、物理防御、魔法防御、物理暴击、物爆伤害、法术暴击、法爆伤害、闪避率）是否基于角色属性正确计算"
+
+tests:
+  - name: "物理攻击力计算测试"
+    description: "测试物理攻击力是否正确计算：物理攻击 = 力量×0.4 + 敏捷×0.2"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个战士角色，力量=20，敏捷=10"
+    steps:
+      - action: "计算物理攻击力"
+    assertions:
+      - type: "equals"
+        target: "physical_attack"
+        expected: "10"
+        message: "物理攻击力应该为 20×0.4 + 10×0.2 = 10"
+
+  - name: "魔法攻击力计算测试"
+    description: "测试魔法攻击力是否正确计算：魔法攻击 = 智力×1.0 + 精神×0.2"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个法师角色，智力=15，精神=10"
+    steps:
+      - action: "计算法术攻击力"
+    assertions:
+      - type: "equals"
+        target: "magic_attack"
+        expected: "17"
+        message: "魔法攻击力应该为 15×1.0 + 10×0.2 = 17"
+
+  - name: "物理防御力计算测试"
+    description: "测试物理防御力是否正确计算：物理防御 = 力量×0.1 + 耐力×0.3"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个战士角色，力量=20，耐力=15"
+    steps:
+      - action: "计算物理防御力"
+    assertions:
+      - type: "equals"
+        target: "physical_defense"
+        expected: "7"
+        message: "物理防御力应该为 20×0.1 + 15×0.3 = 7"
+
+  - name: "魔法防御力计算测试"
+    description: "测试魔法防御力是否正确计算：魔法防御 = 智力×0.2 + 精神×0.3"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个法师角色，智力=15，精神=10"
+    steps:
+      - action: "计算魔法防御力"
+    assertions:
+      - type: "equals"
+        target: "magic_defense"
+        expected: "6"
+        message: "魔法防御力应该为 15×0.2 + 10×0.3 = 6"
+
+  - name: "物理暴击率计算测试"
+    description: "测试物理暴击率是否正确计算：物理暴击率 = 基础5% + 敏捷/20"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个战士角色，敏捷=20"
+    steps:
+      - action: "计算物理暴击率"
+    assertions:
+      - type: "approximately"
+        target: "phys_crit_rate"
+        expected: "0.06"
+        tolerance: 0.001
+        message: "物理暴击率应该为 0.05 + 20/20/100 = 0.06 (6%)"
+
+  - name: "物理暴击伤害计算测试"
+    description: "测试物理暴击伤害是否正确计算：物理暴击伤害 = 150% + 力量×0.3%"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个战士角色，力量=20"
+    steps:
+      - action: "计算物理暴击伤害倍率"
+    assertions:
+      - type: "approximately"
+        target: "phys_crit_damage"
+        expected: "1.56"
+        tolerance: 0.001
+        message: "物理暴击伤害应该为 1.5 + 20×0.003 = 1.56 (156%)"
+
+  - name: "法术暴击率计算测试"
+    description: "测试法术暴击率是否正确计算：法术暴击率 = 基础5% + 精神/20"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个法师角色，精神=20"
+    steps:
+      - action: "计算法术暴击率"
+    assertions:
+      - type: "approximately"
+        target: "spell_crit_rate"
+        expected: "0.06"
+        tolerance: 0.001
+        message: "法术暴击率应该为 0.05 + 20/20/100 = 0.06 (6%)"
+
+  - name: "法术暴击伤害计算测试"
+    description: "测试法术暴击伤害是否正确计算：法术暴击伤害 = 150% + 智力×0.3%"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个法师角色，智力=20"
+    steps:
+      - action: "计算法术暴击伤害倍率"
+    assertions:
+      - type: "approximately"
+        target: "spell_crit_damage"
+        expected: "1.56"
+        tolerance: 0.001
+        message: "法术暴击伤害应该为 1.5 + 20×0.003 = 1.56 (156%)"
+
+  - name: "闪避率计算测试"
+    description: "测试闪避率是否正确计算：闪避率 = 基础5% + 敏捷/20"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个战士角色，敏捷=20"
+    steps:
+      - action: "计算闪避率"
+    assertions:
+      - type: "approximately"
+        target: "dodge_rate"
+        expected: "0.06"
+        tolerance: 0.001
+        message: "闪避率应该为 0.05 + 20/20/100 = 0.06 (6%)"
+
+  - name: "属性为0时自动修复测试"
+    description: "测试当角色属性为0时，GetCharacter API是否自动重新计算并修复"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个战士角色，力量=20，敏捷=10，智力=5，精神=5，耐力=15"
+    steps:
+      - action: "检查角色属性"
+        expected: "所有属性都应该基于角色属性正确计算，不应该为0"
+    assertions:
+      - type: "greater_than"
+        target: "character.physical_attack"
+        expected: "0"
+        message: "物理攻击力应该大于0"
+      - type: "greater_than"
+        target: "character.magic_attack"
+        expected: "0"
+        message: "魔法攻击力应该大于0"
+      - type: "greater_than"
+        target: "character.physical_defense"
+        expected: "0"
+        message: "物理防御力应该大于0"
+      - type: "greater_than"
+        target: "character.magic_defense"
+        expected: "0"
+        message: "魔法防御力应该大于0"
+      - type: "greater_than"
+        target: "character.phys_crit_rate"
+        expected: "0"
+        message: "物理暴击率应该大于0"
+      - type: "greater_than"
+        target: "character.phys_crit_damage"
+        expected: "0"
+        message: "物理暴击伤害应该大于0"
+      - type: "greater_than"
+        target: "character.spell_crit_rate"
+        expected: "0"
+        message: "法术暴击率应该大于0"
+      - type: "greater_than"
+        target: "character.spell_crit_damage"
+        expected: "0"
+        message: "法术暴击伤害应该大于0"
+      - type: "greater_than"
+        target: "character.dodge_rate"
+        expected: "0"
+        message: "闪避率应该大于0"
+
+  - name: "综合属性计算测试"
+    description: "测试角色所有属性综合计算是否正确"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个战士角色，力量=30，敏捷=25，智力=10，精神=10，耐力=20"
+    steps:
+      - action: "计算物理攻击力"
+      - action: "计算法术攻击力"
+      - action: "计算物理防御力"
+      - action: "计算魔法防御力"
+      - action: "计算物理暴击率"
+      - action: "计算物理暴击伤害倍率"
+      - action: "计算法术暴击率"
+      - action: "计算法术暴击伤害倍率"
+      - action: "计算闪避率"
+    assertions:
+      - type: "equals"
+        target: "physical_attack"
+        expected: "17"
+        message: "物理攻击力应该为 30×0.4 + 25×0.2 = 17"
+      - type: "equals"
+        target: "magic_attack"
+        expected: "12"
+        message: "魔法攻击力应该为 10×1.0 + 10×0.2 = 12"
+      - type: "equals"
+        target: "physical_defense"
+        expected: "9"
+        message: "物理防御力应该为 30×0.1 + 20×0.3 = 9"
+      - type: "equals"
+        target: "magic_defense"
+        expected: "5"
+        message: "魔法防御力应该为 10×0.2 + 10×0.3 = 5"
+      - type: "approximately"
+        target: "phys_crit_rate"
+        expected: "0.0625"
+        tolerance: 0.001
+        message: "物理暴击率应该为 0.05 + 25/20/100 = 0.0625 (6.25%)"
+      - type: "approximately"
+        target: "phys_crit_damage"
+        expected: "1.59"
+        tolerance: 0.001
+        message: "物理暴击伤害应该为 1.5 + 30×0.003 = 1.59 (159%)"
+      - type: "approximately"
+        target: "spell_crit_rate"
+        expected: "0.055"
+        tolerance: 0.001
+        message: "法术暴击率应该为 0.05 + 10/20/100 = 0.055 (5.5%)"
+      - type: "approximately"
+        target: "spell_crit_damage"
+        expected: "1.53"
+        tolerance: 0.001
+        message: "法术暴击伤害应该为 1.5 + 10×0.003 = 1.53 (153%)"
+      - type: "approximately"
+        target: "dodge_rate"
+        expected: "0.0625"
+        tolerance: 0.001
+        message: "闪避率应该为 0.05 + 25/20/100 = 0.0625 (6.25%)"
+

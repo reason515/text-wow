@@ -300,6 +300,12 @@ func (tr *TestRunner) executeInstruction(instruction string) error {
 		return tr.executeCalculateSpellCritRate()
 	} else if strings.Contains(instruction, "计算物理暴击伤害倍率") {
 		return tr.executeCalculatePhysCritDamage()
+	} else if strings.Contains(instruction, "计算物理防御力") {
+		return tr.executeCalculatePhysicalDefense()
+	} else if strings.Contains(instruction, "计算魔法防御力") {
+		return tr.executeCalculateMagicDefense()
+	} else if strings.Contains(instruction, "计算法术暴击伤害倍率") {
+		return tr.executeCalculateSpellCritDamage()
 	} else if strings.Contains(instruction, "计算闪避率") {
 		return tr.executeCalculateDodgeRate()
 	} else if strings.Contains(instruction, "角色对怪物进行") && strings.Contains(instruction, "次攻击") {
@@ -339,6 +345,9 @@ func (tr *TestRunner) executeInstruction(instruction string) error {
 	} else if strings.Contains(instruction, "获取角色数据") || strings.Contains(instruction, "获取战斗状态") {
 		// 获取角色数据或战斗状态，确保战士怒气正确
 		return tr.executeGetCharacterData()
+	} else if strings.Contains(instruction, "检查角色属性") || strings.Contains(instruction, "检查角色") {
+		// 检查角色属性，确保所有属性都基于角色属性正确计算
+		return tr.executeCheckCharacterAttributes()
 	}
 	return nil
 }
@@ -389,6 +398,11 @@ func (tr *TestRunner) updateAssertionContext() {
 		tr.assertion.SetContext("character.magic_attack", char.MagicAttack)
 		tr.assertion.SetContext("character.physical_defense", char.PhysicalDefense)
 		tr.assertion.SetContext("character.magic_defense", char.MagicDefense)
+		tr.assertion.SetContext("character.phys_crit_rate", char.PhysCritRate)
+		tr.assertion.SetContext("character.phys_crit_damage", char.PhysCritDamage)
+		tr.assertion.SetContext("character.spell_crit_rate", char.SpellCritRate)
+		tr.assertion.SetContext("character.spell_crit_damage", char.SpellCritDamage)
+		tr.assertion.SetContext("character.dodge_rate", char.DodgeRate)
 		
 		// 同步Buff信息（从上下文获取）
 		if buffModifier, exists := tr.context.Variables["character_buff_attack_modifier"]; exists {
@@ -904,6 +918,8 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 	}
 	
 	// 解析HP（如"HP=100/100"或"HP=100"）
+	// 保存明确设置的HP值，以便后续使用
+	explicitHP := 0
 	if strings.Contains(instruction, "HP=") {
 		parts := strings.Split(instruction, "HP=")
 		if len(parts) > 1 {
@@ -915,6 +931,7 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 				if len(hpParts) >= 1 {
 					if hp, err := strconv.Atoi(strings.TrimSpace(hpParts[0])); err == nil {
 						char.HP = hp
+						explicitHP = hp
 					}
 				}
 				if len(hpParts) >= 2 {
@@ -926,12 +943,18 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 				// 处理 "100" 格式
 				if hp, err := strconv.Atoi(hpStr); err == nil {
 					char.HP = hp
+					explicitHP = hp
 					if char.MaxHP == 0 {
 						char.MaxHP = hp
 					}
 				}
 			}
 		}
+	}
+	// 将明确设置的HP值存储到Variables，以便后续恢复
+	if explicitHP > 0 {
+		tr.context.Variables["character_explicit_hp"] = explicitHP
+		fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: set explicitHP=%d\n", explicitHP)
 	}
 	
 	// 设置默认资源值（如果未指定）
@@ -941,6 +964,16 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 	}
 	
 	// 如果MaxHP为0，自动计算MaxHP（使用Calculator）
+	// 但是，如果HP已经被明确设置（通过"HP="指令），不要覆盖它
+	savedHP := char.HP
+	// 检查是否有明确设置的HP值
+	if explicitHPVal, exists := tr.context.Variables["character_explicit_hp"]; exists {
+		if explicitHP, ok := explicitHPVal.(int); ok && explicitHP > 0 {
+			savedHP = explicitHP
+			char.HP = explicitHP
+			fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: using explicitHP=%d from Variables\n", explicitHP)
+		}
+	}
 	if char.MaxHP == 0 {
 		// 获取基础HP（从Variables或使用默认值）
 		baseHP := 35 // 默认战士基础HP
@@ -951,10 +984,21 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 		}
 		char.MaxHP = tr.calculator.CalculateHP(char, baseHP)
 		// 如果HP也为0，设置为MaxHP
-		if char.HP == 0 {
+		// 但是，如果HP已经被明确设置（通过"HP="指令），不要覆盖它
+		if savedHP == 0 {
 			char.HP = char.MaxHP
+		} else {
+			// HP已经被明确设置，保持HP不变，但确保MaxHP至少等于HP
+			if char.MaxHP < savedHP {
+				char.MaxHP = savedHP
+			}
+			char.HP = savedHP
 		}
-		fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: auto-calculated MaxHP=%d, HP=%d\n", char.MaxHP, char.HP)
+		fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: auto-calculated MaxHP=%d, HP=%d (savedHP=%d)\n", char.MaxHP, char.HP, savedHP)
+	} else if savedHP > 0 && savedHP < char.MaxHP {
+		// 如果MaxHP已经被设置，但HP被明确设置为小于MaxHP的值，保持HP不变
+		char.HP = savedHP
+		fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: MaxHP=%d already set, keeping HP=%d\n", char.MaxHP, char.HP)
 	}
 	
 	// 确保用户存在
@@ -1001,6 +1045,13 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 		if existingChar != nil {
 			char.ID = existingChar.ID
 			// 在设置ID之后，如果MaxHP为0或小于计算值，重新计算MaxHP（从数据库读取后可能被重置）
+			// 但是，如果HP已经被明确设置（通过"HP="指令），不要覆盖它
+			explicitHP := 0
+			if explicitHPVal, exists := tr.context.Variables["character_explicit_hp"]; exists {
+				if hp, ok := explicitHPVal.(int); ok && hp > 0 {
+					explicitHP = hp
+				}
+			}
 			baseHP := 35 // 默认战士基础HP
 			if baseHPVal, exists := tr.context.Variables["character_base_hp"]; exists {
 				if hp, ok := baseHPVal.(int); ok {
@@ -1010,10 +1061,20 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 			calculatedMaxHP := tr.calculator.CalculateHP(char, baseHP)
 			if char.MaxHP == 0 || char.MaxHP < calculatedMaxHP {
 				char.MaxHP = calculatedMaxHP
-				if char.HP == 0 || char.HP < char.MaxHP {
+				// 如果HP已经被明确设置，保持HP不变
+				if explicitHP > 0 {
+					char.HP = explicitHP
+					if char.MaxHP < explicitHP {
+						char.MaxHP = explicitHP
+					}
+				} else if char.HP == 0 || char.HP < char.MaxHP {
 					char.HP = char.MaxHP
 				}
-				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after setting ID, re-calculated MaxHP=%d, HP=%d\n", char.MaxHP, char.HP)
+				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after setting ID, re-calculated MaxHP=%d, HP=%d (explicitHP=%d)\n", char.MaxHP, char.HP, explicitHP)
+			} else if explicitHP > 0 {
+				// 如果MaxHP已经被设置，但HP被明确设置为小于MaxHP的值，保持HP不变
+				char.HP = explicitHP
+				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after setting ID, MaxHP=%d already set, keeping explicitHP=%d\n", char.MaxHP, explicitHP)
 			}
 			// 在设置ID之后，检查PhysicalAttack是否被重置
 			fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=%d\n", char.PhysicalAttack)
@@ -1193,6 +1254,18 @@ func (tr *TestRunner) createMonster(instruction string) error {
 				dodgeStr := strings.TrimSpace(strings.Split(parts[1], "%")[0])
 				if dodge, err := strconv.ParseFloat(dodgeStr, 64); err == nil {
 					monster.DodgeRate = dodge / 100.0
+				}
+			}
+		}
+		
+		// 解析攻击力（如"攻击力=20"）
+		if strings.Contains(instruction, "攻击力=") {
+			parts := strings.Split(instruction, "攻击力=")
+			if len(parts) > 1 {
+				attackStr := strings.TrimSpace(strings.Split(parts[1], "，")[0])
+				attackStr = strings.TrimSpace(strings.Split(attackStr, "的")[0])
+				if attack, err := strconv.Atoi(attackStr); err == nil {
+					monster.PhysicalAttack = attack
 				}
 			}
 		}
@@ -1396,6 +1469,45 @@ func (tr *TestRunner) executeCalculatePhysCritDamage() error {
 	critDamage := tr.calculator.CalculatePhysCritDamage(char)
 	tr.assertion.SetContext("phys_crit_damage", critDamage)
 	tr.context.Variables["phys_crit_damage"] = critDamage
+	return nil
+}
+
+// executeCalculatePhysicalDefense 计算物理防御力
+func (tr *TestRunner) executeCalculatePhysicalDefense() error {
+	char, ok := tr.context.Characters["character"]
+	if !ok || char == nil {
+		return fmt.Errorf("character not found")
+	}
+	
+	defense := tr.calculator.CalculatePhysicalDefense(char)
+	tr.assertion.SetContext("physical_defense", defense)
+	tr.context.Variables["physical_defense"] = defense
+	return nil
+}
+
+// executeCalculateMagicDefense 计算魔法防御力
+func (tr *TestRunner) executeCalculateMagicDefense() error {
+	char, ok := tr.context.Characters["character"]
+	if !ok || char == nil {
+		return fmt.Errorf("character not found")
+	}
+	
+	defense := tr.calculator.CalculateMagicDefense(char)
+	tr.assertion.SetContext("magic_defense", defense)
+	tr.context.Variables["magic_defense"] = defense
+	return nil
+}
+
+// executeCalculateSpellCritDamage 计算法术暴击伤害倍率
+func (tr *TestRunner) executeCalculateSpellCritDamage() error {
+	char, ok := tr.context.Characters["character"]
+	if !ok || char == nil {
+		return fmt.Errorf("character not found")
+	}
+	
+	critDamage := tr.calculator.CalculateSpellCritDamage(char)
+	tr.assertion.SetContext("spell_crit_damage", critDamage)
+	tr.context.Variables["spell_crit_damage"] = critDamage
 	return nil
 }
 
@@ -2838,11 +2950,16 @@ func (tr *TestRunner) executeMonsterAttack() error {
 	// 保存当前怒气（用于调试）
 	originalResource := char.Resource
 	
+	fmt.Fprintf(os.Stderr, "[DEBUG] executeMonsterAttack: before attack - char.HP=%d, char.Resource=%d, monster.Attack=%d, char.Defense=%d, damage=%d\n", 
+		char.HP, char.Resource, attackerMonster.PhysicalAttack, char.PhysicalDefense, damage)
+	
 	// 应用伤害
 	char.HP -= damage
 	if char.HP < 0 {
 		char.HP = 0
 	}
+	
+	fmt.Fprintf(os.Stderr, "[DEBUG] executeMonsterAttack: after damage - char.HP=%d, char.Resource=%d\n", char.HP, char.Resource)
 	
 	// 如果角色HP为0，战斗失败，战士怒气归0（在获得怒气之前检查）
 	// 注意：必须在应用伤害后立即检查，不能先获得怒气
@@ -2896,6 +3013,66 @@ func (tr *TestRunner) executeGetCharacterData() error {
 			char.Strength, char.Agility, char.Intellect, char.Stamina, char.Spirit, char.UnspentPoints, char.TotalKills)
 		tr.context.Characters["character"] = char
 	}
+	
+	return nil
+}
+
+// executeCheckCharacterAttributes 检查角色属性，确保所有属性都基于角色属性正确计算
+func (tr *TestRunner) executeCheckCharacterAttributes() error {
+	char, ok := tr.context.Characters["character"]
+	if !ok || char == nil {
+		return fmt.Errorf("character not found")
+	}
+	
+	// 重新计算所有属性（如果为0）
+	needsUpdate := false
+	if char.PhysicalAttack == 0 {
+		char.PhysicalAttack = tr.calculator.CalculatePhysicalAttack(char)
+		needsUpdate = true
+	}
+	if char.MagicAttack == 0 {
+		char.MagicAttack = tr.calculator.CalculateMagicAttack(char)
+		needsUpdate = true
+	}
+	if char.PhysicalDefense == 0 {
+		char.PhysicalDefense = tr.calculator.CalculatePhysicalDefense(char)
+		needsUpdate = true
+	}
+	if char.MagicDefense == 0 {
+		char.MagicDefense = tr.calculator.CalculateMagicDefense(char)
+		needsUpdate = true
+	}
+	if char.PhysCritRate == 0 {
+		char.PhysCritRate = tr.calculator.CalculatePhysCritRate(char)
+		needsUpdate = true
+	}
+	if char.PhysCritDamage == 0 {
+		char.PhysCritDamage = tr.calculator.CalculatePhysCritDamage(char)
+		needsUpdate = true
+	}
+	if char.SpellCritRate == 0 {
+		char.SpellCritRate = tr.calculator.CalculateSpellCritRate(char)
+		needsUpdate = true
+	}
+	if char.SpellCritDamage == 0 {
+		char.SpellCritDamage = tr.calculator.CalculateSpellCritDamage(char)
+		needsUpdate = true
+	}
+	if char.DodgeRate == 0 {
+		char.DodgeRate = tr.calculator.CalculateDodgeRate(char)
+		needsUpdate = true
+	}
+	
+	// 如果属性被修复，更新数据库
+	if needsUpdate {
+		charRepo := repository.NewCharacterRepository()
+		charRepo.UpdateAfterBattle(char.ID, char.HP, char.Resource, char.Exp, char.Level,
+			char.ExpToNext, char.MaxHP, char.MaxResource, char.PhysicalAttack, char.MagicAttack, char.PhysicalDefense, char.MagicDefense,
+			char.Strength, char.Agility, char.Intellect, char.Stamina, char.Spirit, char.UnspentPoints, char.TotalKills)
+	}
+	
+	// 更新上下文
+	tr.context.Characters["character"] = char
 	
 	return nil
 }
