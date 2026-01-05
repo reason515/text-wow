@@ -3,6 +3,7 @@ package runner
 import (
 	"fmt"
 	"math"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -192,12 +193,14 @@ func (tr *TestRunner) RunTestCase(testCase TestCase) TestResult {
 	// 调试：检查setup后的上下文状态
 	fmt.Fprintf(os.Stderr, "[DEBUG] RunTestCase: after setup for '%s' - characters=%d, monsters=%d, variables=%d\n", 
 		testCase.Name, len(tr.context.Characters), len(tr.context.Monsters), len(tr.context.Variables))
-	if char, exists := tr.context.Characters["character"]; exists {
+	if char, exists := tr.context.Characters["character"]; exists && char != nil {
 		fmt.Fprintf(os.Stderr, "[DEBUG] RunTestCase: after setup, character.PhysicalAttack=%d, character pointer=%p\n", char.PhysicalAttack, char)
 		// 也检查Variables中的值
 		if attackVal, exists := tr.context.Variables["character_physical_attack"]; exists {
 			fmt.Fprintf(os.Stderr, "[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=%v\n", attackVal)
 		}
+	} else if exists {
+		fmt.Fprintf(os.Stderr, "[DEBUG] RunTestCase: after setup, character is nil\n")
 	}
 	if ratio, exists := tr.context.Variables["skill_scaling_ratio"]; exists {
 		fmt.Fprintf(os.Stderr, "[DEBUG] RunTestCase: skill_scaling_ratio=%v\n", ratio)
@@ -206,7 +209,7 @@ func (tr *TestRunner) RunTestCase(testCase TestCase) TestResult {
 	// 执行测试步骤
 	for _, step := range testCase.Steps {
 		// 在执行步骤之前，检查上下文中的角色状态
-		if char, exists := tr.context.Characters["character"]; exists {
+		if char, exists := tr.context.Characters["character"]; exists && char != nil {
 			fmt.Fprintf(os.Stderr, "[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=%d, character pointer=%p\n", char.PhysicalAttack, char)
 		}
 		if err := tr.executeStep(step); err != nil {
@@ -216,7 +219,7 @@ func (tr *TestRunner) RunTestCase(testCase TestCase) TestResult {
 			return result
 		}
 		// 在执行步骤之后，检查上下文中的角色状态
-		if char, exists := tr.context.Characters["character"]; exists {
+		if char, exists := tr.context.Characters["character"]; exists && char != nil {
 			fmt.Fprintf(os.Stderr, "[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=%d\n", char.PhysicalAttack)
 		}
 	}
@@ -295,8 +298,12 @@ func (tr *TestRunner) executeInstruction(instruction string) error {
 		return tr.executeCalculatePhysCritRate()
 	} else if strings.Contains(instruction, "计算法术暴击率") {
 		return tr.executeCalculateSpellCritRate()
+	} else if strings.Contains(instruction, "计算物理暴击伤害倍率") {
+		return tr.executeCalculatePhysCritDamage()
 	} else if strings.Contains(instruction, "计算闪避率") {
 		return tr.executeCalculateDodgeRate()
+	} else if strings.Contains(instruction, "角色对怪物进行") && strings.Contains(instruction, "次攻击") {
+		return tr.executeMultipleAttacks(instruction)
 	} else if strings.Contains(instruction, "计算速度") {
 		return tr.executeCalculateSpeed()
 	} else if strings.Contains(instruction, "计算资源回复") || strings.Contains(instruction, "计算法力回复") || strings.Contains(instruction, "计算法力恢复") || strings.Contains(instruction, "计算怒气获得") || strings.Contains(instruction, "计算能量回复") || strings.Contains(instruction, "计算能量恢复") {
@@ -357,6 +364,7 @@ func (tr *TestRunner) RunAllTests(testDir string) ([]*TestSuiteResult, error) {
 func (tr *TestRunner) updateAssertionContext() {
 	// 同步角色信息
 	if char, ok := tr.context.Characters["character"]; ok && char != nil {
+		// 确保char不是nil指针
 		tr.assertion.SetContext("character.hp", char.HP)
 		tr.assertion.SetContext("character.max_hp", char.MaxHP)
 		tr.assertion.SetContext("character.level", char.Level)
@@ -717,11 +725,23 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 	}
 	
 	// 解析主属性（如"力量=20"、"敏捷=10"等）
+	parseAttribute := func(value string) string {
+		value = strings.TrimSpace(strings.Split(value, "，")[0])
+		value = strings.TrimSpace(strings.Split(value, ",")[0])
+		// 去掉括号和注释（如"1000（理论上暴击率会超过50%）"）
+		if idx := strings.Index(value, "（"); idx >= 0 {
+			value = value[:idx]
+		}
+		if idx := strings.Index(value, "("); idx >= 0 {
+			value = value[:idx]
+		}
+		return strings.TrimSpace(value)
+	}
+	
 	if strings.Contains(instruction, "力量=") {
 		parts := strings.Split(instruction, "力量=")
 		if len(parts) > 1 {
-			strStr := strings.TrimSpace(strings.Split(parts[1], "，")[0])
-			strStr = strings.TrimSpace(strings.Split(strStr, ",")[0])
+			strStr := parseAttribute(parts[1])
 			if str, err := strconv.Atoi(strStr); err == nil {
 				char.Strength = str
 				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: set Strength=%d\n", str)
@@ -731,8 +751,7 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 	if strings.Contains(instruction, "敏捷=") {
 		parts := strings.Split(instruction, "敏捷=")
 		if len(parts) > 1 {
-			agiStr := strings.TrimSpace(strings.Split(parts[1], "，")[0])
-			agiStr = strings.TrimSpace(strings.Split(agiStr, ",")[0])
+			agiStr := parseAttribute(parts[1])
 			if agi, err := strconv.Atoi(agiStr); err == nil {
 				char.Agility = agi
 				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: set Agility=%d\n", agi)
@@ -742,8 +761,7 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 	if strings.Contains(instruction, "智力=") {
 		parts := strings.Split(instruction, "智力=")
 		if len(parts) > 1 {
-			intStr := strings.TrimSpace(strings.Split(parts[1], "，")[0])
-			intStr = strings.TrimSpace(strings.Split(intStr, ",")[0])
+			intStr := parseAttribute(parts[1])
 			if intel, err := strconv.Atoi(intStr); err == nil {
 				char.Intellect = intel
 				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: set Intellect=%d\n", intel)
@@ -753,8 +771,7 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 	if strings.Contains(instruction, "精神=") {
 		parts := strings.Split(instruction, "精神=")
 		if len(parts) > 1 {
-			spiStr := strings.TrimSpace(strings.Split(parts[1], "，")[0])
-			spiStr = strings.TrimSpace(strings.Split(spiStr, ",")[0])
+			spiStr := parseAttribute(parts[1])
 			if spi, err := strconv.Atoi(spiStr); err == nil {
 				char.Spirit = spi
 				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: set Spirit=%d\n", spi)
@@ -764,8 +781,7 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 	if strings.Contains(instruction, "耐力=") {
 		parts := strings.Split(instruction, "耐力=")
 		if len(parts) > 1 {
-			staStr := strings.TrimSpace(strings.Split(parts[1], "，")[0])
-			staStr = strings.TrimSpace(strings.Split(staStr, ",")[0])
+			staStr := parseAttribute(parts[1])
 			if sta, err := strconv.Atoi(staStr); err == nil {
 				char.Stamina = sta
 				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: set Stamina=%d\n", sta)
@@ -1290,6 +1306,84 @@ func (tr *TestRunner) executeCalculateDodgeRate() error {
 	dodgeRate := tr.calculator.CalculateDodgeRate(char)
 	tr.assertion.SetContext("dodge_rate", dodgeRate)
 	tr.context.Variables["dodge_rate"] = dodgeRate
+	return nil
+}
+
+// executeCalculatePhysCritDamage 计算物理暴击伤害倍率
+func (tr *TestRunner) executeCalculatePhysCritDamage() error {
+	char, ok := tr.context.Characters["character"]
+	if !ok || char == nil {
+		return fmt.Errorf("character not found")
+	}
+	
+	critDamage := tr.calculator.CalculatePhysCritDamage(char)
+	tr.assertion.SetContext("phys_crit_damage", critDamage)
+	tr.context.Variables["phys_crit_damage"] = critDamage
+	return nil
+}
+
+// executeMultipleAttacks 执行多次攻击（用于统计暴击率和闪避率）
+func (tr *TestRunner) executeMultipleAttacks(instruction string) error {
+	char, ok := tr.context.Characters["character"]
+	if !ok || char == nil {
+		return fmt.Errorf("character not found")
+	}
+	
+	monster, ok := tr.context.Monsters["monster"]
+	if !ok || monster == nil {
+		return fmt.Errorf("monster not found")
+	}
+	
+	// 解析攻击次数（如"角色对怪物进行100次攻击"）
+	attackCount := 100
+	if strings.Contains(instruction, "进行") && strings.Contains(instruction, "次攻击") {
+		parts := strings.Split(instruction, "进行")
+		if len(parts) > 1 {
+			countStr := strings.TrimSpace(strings.Split(parts[1], "次")[0])
+			if count, err := strconv.Atoi(countStr); err == nil {
+				attackCount = count
+			}
+		}
+	}
+	
+	// 统计暴击和闪避
+	critCount := 0
+	dodgeCount := 0
+	
+	// 获取暴击率和闪避率
+	critRate := tr.calculator.CalculatePhysCritRate(char)
+	// 如果角色有物理暴击率属性，使用它
+	if char.PhysCritRate > 0 {
+		critRate = char.PhysCritRate
+	}
+	dodgeRate := monster.DodgeRate
+	
+	// 使用随机数判定（模拟CalculateDamage中的逻辑）
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	
+	// 执行多次攻击
+	for i := 0; i < attackCount; i++ {
+		// 判定暴击（使用随机数）
+		roll := rng.Float64()
+		if roll < critRate {
+			critCount++
+		}
+		// 判定闪避（使用随机数）
+		roll = rng.Float64()
+		if roll < dodgeRate {
+			dodgeCount++
+		}
+	}
+	
+	// 计算实际暴击率和闪避率
+	critRateActual := float64(critCount) / float64(attackCount)
+	dodgeRateActual := float64(dodgeCount) / float64(attackCount)
+	
+	tr.assertion.SetContext("crit_rate_actual", critRateActual)
+	tr.context.Variables["crit_rate_actual"] = critRateActual
+	tr.assertion.SetContext("dodge_rate_actual", dodgeRateActual)
+	tr.context.Variables["dodge_rate_actual"] = dodgeRateActual
+	
 	return nil
 }
 
@@ -2464,15 +2558,27 @@ func (tr *TestRunner) handleHealSkill(char *models.Character, skill *models.Skil
 		}
 	}
 	
-	fmt.Fprintf(os.Stderr, "[DEBUG] handleHealSkill: healAmount=%d, char.HP before=%d\n", healAmount, char.HP)
+	fmt.Fprintf(os.Stderr, "[DEBUG] handleHealSkill: healAmount=%d, char.HP before=%d, MaxHP=%d\n", healAmount, char.HP, char.MaxHP)
 	
-	// 恢复HP
+	// 计算实际治疗量和过量治疗
+	initialHP := char.HP
 	char.HP += healAmount
+	actualHeal := 0
+	overhealing := 0
 	if char.HP > char.MaxHP {
+		actualHeal = char.MaxHP - initialHP
+		overhealing = healAmount - actualHeal
 		char.HP = char.MaxHP
+	} else {
+		actualHeal = healAmount
+		overhealing = 0
 	}
 	
-	fmt.Fprintf(os.Stderr, "[DEBUG] handleHealSkill: char.HP after=%d\n", char.HP)
+	fmt.Fprintf(os.Stderr, "[DEBUG] handleHealSkill: char.HP after=%d, actualHeal=%d, overhealing=%d\n", char.HP, actualHeal, overhealing)
+	
+	// 设置过量治疗到上下文
+	tr.assertion.SetContext("overhealing", overhealing)
+	tr.context.Variables["overhealing"] = overhealing
 	
 	// 更新角色到数据库
 	charRepo := repository.NewCharacterRepository()
