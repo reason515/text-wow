@@ -14,10 +14,83 @@ import (
 // generateEquipmentWithAttributes 生成带指定属性的装备
 // 例如："获得一件10级武器，攻击力+10"
 func (tr *TestRunner) generateEquipmentWithAttributes(instruction string) error {
-	// 解析等级
+	// 先解析装备要求（等级、职业、属性），再确定level
+	levelRequired := 0
+	classRequired := ""
+	strengthRequired := 0
+	agilityRequired := 0
+	intellectRequired := 0
+	
+	// 解析等级要求：如"需要10级才能装备"或"需要10级才能装备的武器"
+	if strings.Contains(instruction, "需要") && strings.Contains(instruction, "级才能装备") {
+		re := regexp.MustCompile(`需要(\d+)级才能装备`)
+		matches := re.FindStringSubmatch(instruction)
+		if len(matches) > 1 {
+			if l, err := strconv.Atoi(matches[1]); err == nil {
+				levelRequired = l
+				fmt.Fprintf(os.Stderr, "[DEBUG] generateEquipmentWithAttributes: parsed level_required=%d\n", levelRequired)
+			}
+		}
+	}
+	
+	// 解析职业要求：如"只有战士才能装备"
+	if strings.Contains(instruction, "只有") && strings.Contains(instruction, "才能装备") {
+		// 使用更宽泛的正则表达式匹配中文职业名称
+		re := regexp.MustCompile(`只有([^才]+)才能装备`)
+		matches := re.FindStringSubmatch(instruction)
+		if len(matches) > 1 {
+			classRequired = strings.TrimSpace(matches[1])
+			// 转换中文职业名称为ID
+			if classRequired == "战士" {
+				classRequired = "warrior"
+			} else if classRequired == "法师" {
+				classRequired = "mage"
+			} else if classRequired == "盗贼" {
+				classRequired = "rogue"
+			} else if classRequired == "牧师" {
+				classRequired = "priest"
+			}
+		}
+	}
+	
+	// 解析属性要求：如"需要力量15才能装备"
+	if strings.Contains(instruction, "需要") && (strings.Contains(instruction, "力量") || strings.Contains(instruction, "敏捷") || strings.Contains(instruction, "智力")) && strings.Contains(instruction, "才能装备") {
+		// 力量要求
+		if strings.Contains(instruction, "力量") {
+			re := regexp.MustCompile(`需要力量(\d+)才能装备`)
+			matches := re.FindStringSubmatch(instruction)
+			if len(matches) > 1 {
+				if s, err := strconv.Atoi(matches[1]); err == nil {
+					strengthRequired = s
+				}
+			}
+		}
+		// 敏捷要求
+		if strings.Contains(instruction, "敏捷") {
+			re := regexp.MustCompile(`需要敏捷(\d+)才能装备`)
+			matches := re.FindStringSubmatch(instruction)
+			if len(matches) > 1 {
+				if a, err := strconv.Atoi(matches[1]); err == nil {
+					agilityRequired = a
+				}
+			}
+		}
+		// 智力要求
+		if strings.Contains(instruction, "智力") {
+			re := regexp.MustCompile(`需要智力(\d+)才能装备`)
+			matches := re.FindStringSubmatch(instruction)
+			if len(matches) > 1 {
+				if i, err := strconv.Atoi(matches[1]); err == nil {
+					intellectRequired = i
+				}
+			}
+		}
+	}
+	
+	// 解析等级（用于生成装备，如果有职业或属性要求但没有等级要求，使用角色当前等级）
 	level := 1
-	if strings.Contains(instruction, "级") {
-		// 提取数字，如"10级"
+	if strings.Contains(instruction, "级") && !strings.Contains(instruction, "需要") {
+		// 提取数字，如"10级"（但不是"需要10级才能装备"）
 		re := regexp.MustCompile(`(\d+)级`)
 		matches := re.FindStringSubmatch(instruction)
 		if len(matches) > 1 {
@@ -27,6 +100,13 @@ func (tr *TestRunner) generateEquipmentWithAttributes(instruction string) error 
 		}
 	} else if char, ok := tr.context.Characters["character"]; ok {
 		level = char.Level
+	}
+	
+	// 如果有职业要求或属性要求但没有等级要求，使用角色当前等级（避免等级检查失败）
+	if (classRequired != "" || strengthRequired > 0 || agilityRequired > 0 || intellectRequired > 0) && levelRequired == 0 {
+		if char, ok := tr.context.Characters["character"]; ok {
+			level = char.Level
+		}
 	}
 	
 	// 解析装备类型和槽位
@@ -60,12 +140,6 @@ func (tr *TestRunner) generateEquipmentWithAttributes(instruction string) error 
 		quality = "legendary"
 	}
 	
-	// 解析装备要求（等级、职业、属性）
-	levelRequired := 0
-	classRequired := ""
-	strengthRequired := 0
-	agilityRequired := 0
-	intellectRequired := 0
 	
 	// 解析等级要求：如"需要10级才能装备"或"需要10级才能装备的武器"
 	if strings.Contains(instruction, "需要") && strings.Contains(instruction, "级才能装备") {
