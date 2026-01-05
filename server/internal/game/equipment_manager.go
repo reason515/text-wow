@@ -492,12 +492,15 @@ func (em *EquipmentManager) EquipItem(characterID int, equipmentID int) error {
 	}
 
 	// 卸下同槽位的旧装备（如果有）
+	// 注意：不能调用UnequipItem，因为已经持有锁，会导致死锁
 	oldEquipment, err := em.equipmentRepo.GetByCharacterAndSlot(characterID, equipment.Slot)
 	if err != nil {
 		return fmt.Errorf("failed to check existing equipment: %w", err)
 	}
 	if oldEquipment != nil {
-		if err := em.UnequipItem(characterID, oldEquipment.ID); err != nil {
+		// 直接卸下旧装备（不调用UnequipItem，避免死锁）
+		oldEquipment.CharacterID = nil
+		if err := em.equipmentRepo.Update(oldEquipment); err != nil {
 			return fmt.Errorf("failed to unequip old equipment: %w", err)
 		}
 	}
