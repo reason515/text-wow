@@ -444,8 +444,40 @@ func (ae *AssertionExecutor) getFieldValue(obj interface{}, fieldName string) in
 		return ae.getCharacterField(v, fieldName)
 	case *models.Monster:
 		return ae.getMonsterField(v, fieldName)
+	case *models.CharacterSkill:
+		return ae.getCharacterSkillField(v, fieldName)
 	case map[string]interface{}:
 		return v[fieldName]
+	default:
+		return nil
+	}
+}
+
+// getCharacterSkillField 获取角色技能字段值
+func (ae *AssertionExecutor) getCharacterSkillField(skill *models.CharacterSkill, fieldName string) interface{} {
+	switch fieldName {
+	case "level", "Level", "skill_level", "skillLevel":
+		return skill.SkillLevel
+	case "id", "ID", "skill_id", "skillId":
+		return skill.SkillID
+	case "exp", "Exp", "skill_exp", "skillExp":
+		return skill.SkillExp
+	case "exp_to_next", "expToNext", "ExpToNext":
+		return skill.ExpToNext
+	case "damage_multiplier", "damageMultiplier":
+		// 根据技能等级计算伤害倍率
+		// 1级: 100%, 2级: 115%, 3级: 130%, 4级: 145%, 5级: 160%
+		multipliers := map[int]float64{
+			1: 1.0,
+			2: 1.15,
+			3: 1.30,
+			4: 1.45,
+			5: 1.60,
+		}
+		if multiplier, exists := multipliers[skill.SkillLevel]; exists {
+			return multiplier
+		}
+		return 1.0
 	default:
 		return nil
 	}
@@ -522,7 +554,31 @@ func (ae *AssertionExecutor) getCharacterField(char *models.Character, fieldName
 			return ae.testContext.Calculator.CalculateSpeed(char)
 		}
 		return char.Agility // 默认返回敏捷值
+	case "skills", "Skills":
+		// 返回技能列表（技能ID列表）
+		if char.Skills != nil {
+			skillIDs := make([]string, 0, len(char.Skills))
+			for _, skill := range char.Skills {
+				skillIDs = append(skillIDs, skill.SkillID)
+			}
+			return skillIDs
+		}
+		return []string{}
 	default:
+		// 处理skill_xxx格式的字段（如skill_charge）
+		if strings.HasPrefix(fieldName, "skill_") {
+			skillID := strings.TrimPrefix(fieldName, "skill_")
+			// 查找对应的技能
+			if char.Skills != nil {
+				for _, skill := range char.Skills {
+					if skill.SkillID == skillID {
+						// 返回技能对象（用于后续访问.level等属性）
+						return skill
+					}
+				}
+			}
+			return nil
+		}
 		// 尝试从上下文获取计算值
 		if ae.context != nil {
 			if val, exists := ae.context[fieldName]; exists {

@@ -288,6 +288,16 @@ func (tr *TestRunner) parseAndExecuteSetupInstruction(instruction string) error 
 		return nil
 	}
 	
+	// 创建/准备技能指令
+	if strings.Contains(instruction, "技能") && (strings.Contains(instruction, "创建") || strings.Contains(instruction, "准备")) {
+		return tr.createSkillFromInstruction(instruction)
+	}
+	
+	// 学习技能指令（在setup中）
+	if strings.Contains(instruction, "学习") && strings.Contains(instruction, "技能") {
+		return tr.learnSkillFromInstruction(instruction)
+	}
+	
 	return fmt.Errorf("unknown setup instruction: %s", instruction)
 }
 
@@ -763,6 +773,11 @@ func (tr *TestRunner) executeStep(step TestStep) error {
 		return tr.executeUseSkill(skillName)
 	}
 	
+	// 角色学习技能
+	if strings.Contains(action, "学习技能") || strings.Contains(action, "角色学习技能") {
+		return tr.learnSkillFromInstruction(action)
+	}
+	
 	// 计算基础伤害
 	if strings.Contains(action, "计算基础伤害") || (strings.Contains(action, "计算") && strings.Contains(action, "基础伤害")) {
 		return tr.executeCalculateBaseDamage()
@@ -1019,8 +1034,84 @@ func (tr *TestRunner) checkCondition(condition string) bool {
 
 // executeUseSkill 执行使用技能
 func (tr *TestRunner) executeUseSkill(skillName string) error {
-	// 这里需要实现技能使用逻辑
-	// 暂时返回nil，因为技能系统可能需要更复杂的集成
+	if len(tr.context.Team) == 0 {
+		return fmt.Errorf("character not found")
+	}
+	
+	char := tr.context.Team[0]
+	
+	// 获取技能ID（从技能名称或ID）
+	skillID := skillName
+	if skillName == "" {
+		// 如果没有指定技能名称，尝试使用第一个可用技能
+		skillRepo := repository.NewSkillRepository()
+		characterSkills, err := skillRepo.GetCharacterSkills(char.ID)
+		if err != nil || len(characterSkills) == 0 {
+			return fmt.Errorf("no skills available")
+		}
+		skillID = characterSkills[0].SkillID
+	}
+	
+	// 通过BattleManager使用技能
+	if tr.context.BattleManager == nil {
+		return fmt.Errorf("battle manager not initialized")
+	}
+	
+	// 确保战斗会话存在
+	if tr.context.UserID == 0 {
+		user, err := tr.createTestUser()
+		if err != nil {
+			return err
+		}
+		tr.context.UserID = user.ID
+		tr.context.User = user
+	}
+	
+	// 确保战斗已开始
+	session := tr.context.BattleManager.GetSession(tr.context.UserID)
+	if session == nil {
+		// 如果没有战斗会话，创建一个简单的战斗会话用于测试
+		if len(tr.context.Monsters) == 0 {
+			// 创建一个测试怪物
+			monster := &models.Monster{
+				ID:             1,
+				Name:           "测试怪物",
+				HP:             100,
+				MaxHP:          100,
+				PhysicalAttack: 10,
+				PhysicalDefense: 5,
+			}
+			tr.context.Monsters["monster"] = monster
+		}
+		// 开始战斗
+		if err := tr.executeStartBattle(); err != nil {
+			return fmt.Errorf("failed to start battle: %w", err)
+		}
+		session = tr.context.BattleManager.GetSession(tr.context.UserID)
+	}
+	
+	// 使用技能
+	result, err := tr.context.BattleManager.UseSkill(tr.context.UserID, skillID)
+	if err != nil {
+		tr.assertion.SetContext("skill_used", false)
+		tr.assertion.SetContext("error_message", err.Error())
+		return err
+	}
+	
+	// 存储技能使用结果
+	tr.assertion.SetContext("skill_used", true)
+	if result != nil {
+		if result.DamageDealt > 0 {
+			tr.assertion.SetContext("skill_damage_dealt", result.DamageDealt)
+		}
+		if result.HealingDone > 0 {
+			tr.assertion.SetContext("skill_healing_done", result.HealingDone)
+		}
+	}
+	
+	// 更新上下文
+	tr.updateContextFromBattle()
+	
 	return nil
 }
 
@@ -1490,5 +1581,195 @@ func (tr *TestRunner) RunAllTests(testDir string) ([]*TestSuiteResult, error) {
 	})
 
 	return results, err
+}
+
+// createSkillFromInstruction 从指令创建/准备技能
+// 示例: "准备一个可学习的技能：冲锋（Charge）"
+// 示例: "创建一个消耗30点怒气的技能"
+// 示例: "创建一个冷却时间为3回合的技能"
+func (tr *TestRunner) createSkillFromInstruction(instruction string) error {
+	// 解析技能名称
+	skillName := ""
+	skillID := ""
+	
+	// 提取技能名称（如"冲锋"、"Charge"）
+	if strings.Contains(instruction, "：") {
+		parts := strings.Split(instruction, "：")
+		if len(parts) > 1 {
+			skillName = strings.TrimSpace(parts[1])
+			// 提取括号中的ID
+			if strings.Contains(skillName, "（") && strings.Contains(skillName, "）") {
+				start := strings.Index(skillName, "（")
+				end := strings.Index(skillName, "）")
+				if start < end {
+					skillID = strings.ToLower(strings.TrimSpace(skillName[start+3 : end]))
+					skillName = strings.TrimSpace(skillName[:start])
+				}
+			}
+		}
+	}
+	
+	// 如果没有指定名称，生成一个默认的
+	if skillID == "" {
+		skillID = "test_skill_" + fmt.Sprintf("%d", len(tr.context.Team)+1)
+	}
+	if skillName == "" {
+		skillName = "测试技能"
+	}
+	
+	// 解析技能属性
+	resourceCost := 0
+	cooldown := 0
+	baseValue := 0
+	skillType := "attack"
+	targetType := "enemy"
+	
+	// 解析资源消耗
+	if strings.Contains(instruction, "消耗") && strings.Contains(instruction, "点") {
+		costStr := extractValueAfter(instruction, "消耗")
+		if parsedCost, err := strconv.Atoi(costStr); err == nil {
+			resourceCost = parsedCost
+		}
+	}
+	
+	// 解析冷却时间
+	if strings.Contains(instruction, "冷却时间") {
+		cooldownStr := extractValueAfter(instruction, "冷却时间")
+		if parsedCooldown, err := strconv.Atoi(cooldownStr); err == nil {
+			cooldown = parsedCooldown
+		}
+	}
+	
+	// 解析伤害倍率
+	if strings.Contains(instruction, "伤害倍率") {
+		multiplierStr := extractValueAfter(instruction, "伤害倍率")
+		multiplierStr = strings.TrimSuffix(multiplierStr, "%")
+		if parsedMultiplier, err := strconv.ParseFloat(multiplierStr, 64); err == nil {
+			baseValue = int(parsedMultiplier)
+		}
+	}
+	
+	// 解析治疗量
+	if strings.Contains(instruction, "治疗量") {
+		healStr := extractValueAfter(instruction, "治疗量")
+		if parsedHeal, err := strconv.Atoi(healStr); err == nil {
+			baseValue = parsedHeal
+			skillType = "heal"
+			targetType = "self"
+		}
+	}
+	
+	// 解析AOE技能
+	if strings.Contains(instruction, "AOE") {
+		targetType = "enemy_all"
+	}
+	
+	// 解析Buff技能
+	if strings.Contains(instruction, "Buff") {
+		skillType = "buff"
+		targetType = "self"
+	}
+	
+	// 创建技能（存储在测试上下文中，不写入数据库）
+	// 这里我们只是准备技能，实际学习需要调用learnSkillFromInstruction
+	// 将技能信息存储到上下文中，供后续使用
+	skillKey := "prepared_skill_" + skillID
+	tr.assertion.SetContext(skillKey, map[string]interface{}{
+		"id":            skillID,
+		"name":          skillName,
+		"resource_cost": resourceCost,
+		"cooldown":      cooldown,
+		"base_value":    baseValue,
+		"type":          skillType,
+		"target_type":   targetType,
+	})
+	
+	return nil
+}
+
+// learnSkillFromInstruction 从指令学习技能
+// 示例: "角色学习技能：冲锋"
+func (tr *TestRunner) learnSkillFromInstruction(instruction string) error {
+	if len(tr.context.Team) == 0 {
+		return fmt.Errorf("character not found")
+	}
+	
+	char := tr.context.Team[0]
+	
+	// 提取技能名称
+	skillName := ""
+	if strings.Contains(instruction, "：") {
+		parts := strings.Split(instruction, "：")
+		if len(parts) > 1 {
+			skillName = strings.TrimSpace(parts[1])
+		}
+	}
+	
+	// 如果没有指定技能名称，尝试从上下文中获取准备的技能
+	skillID := ""
+	if skillName != "" {
+		// 尝试从技能名称转换为ID
+		skillID = strings.ToLower(skillName)
+		// 如果是中文名称，尝试映射到ID
+		skillNameMap := map[string]string{
+			"冲锋":   "charge",
+			"charge": "charge",
+		}
+		if mappedID, exists := skillNameMap[skillName]; exists {
+			skillID = mappedID
+		}
+	}
+	
+	// 如果还是没有ID，尝试从准备的技能中获取
+	if skillID == "" {
+		// 查找第一个准备的技能
+		for key, value := range tr.assertion.context {
+			if strings.HasPrefix(key, "prepared_skill_") {
+				if skillMap, ok := value.(map[string]interface{}); ok {
+					if id, exists := skillMap["id"].(string); exists {
+						skillID = id
+						break
+					}
+				}
+			}
+		}
+	}
+	
+	if skillID == "" {
+		return fmt.Errorf("skill ID not found")
+	}
+	
+	// 检查技能是否存在
+	skillRepo := repository.NewSkillRepository()
+	skill, err := skillRepo.GetSkillByID(skillID)
+	if err != nil {
+		// 如果技能不存在，创建一个临时技能用于测试
+		skill = &models.Skill{
+			ID:           skillID,
+			Name:         skillName,
+			Type:         "attack",
+			TargetType:   "enemy",
+			BaseValue:    0,
+			ResourceCost: 0,
+			Cooldown:     0,
+			ClassID:      char.ClassID,
+		}
+	}
+	
+	// 学习技能
+	err = skillRepo.AddCharacterSkill(char.ID, skillID, 1)
+	if err != nil {
+		tr.assertion.SetContext("skill_learned", false)
+		tr.assertion.SetContext("error_message", err.Error())
+		return err
+	}
+	
+	tr.assertion.SetContext("skill_learned", true)
+	
+	// 重新加载角色技能
+	characterSkills, _ := skillRepo.GetCharacterSkills(char.ID)
+	char.Skills = characterSkills
+	
+	return nil
 }
 
