@@ -1117,6 +1117,14 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 					return fmt.Errorf("failed to update character class: %w", err)
 				}
 			}
+			// 如果指令中指定了不同的职业，更新数据库中的ClassID
+			if char.ClassID != existingChar.ClassID {
+				existingChar.ClassID = char.ClassID
+				// 更新数据库中的ClassID
+				if err := charRepo.Update(existingChar); err != nil {
+					return fmt.Errorf("failed to update character class: %w", err)
+				}
+			}
 			char = existingChar // 使用数据库中的角色，但更新ClassID
 			// 在设置ID之后，如果MaxHP为0或小于计算值，重新计算MaxHP（从数据库读取后可能被重置）
 			// 但是，如果HP已经被明确设置（通过"HP="指令），不要覆盖它
