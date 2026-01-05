@@ -9,7 +9,8 @@ import (
 
 // AssertionExecutor 断言执行器
 type AssertionExecutor struct {
-	context map[string]interface{} // 测试上下文（存储测试数据）
+	context      map[string]interface{} // 测试上下文（存储测试数据）
+	testContext  *TestContext            // 测试上下文引用
 }
 
 // NewAssertionExecutor 创建断言执行器
@@ -17,6 +18,11 @@ func NewAssertionExecutor() *AssertionExecutor {
 	return &AssertionExecutor{
 		context: make(map[string]interface{}),
 	}
+}
+
+// SetTestContext 设置测试上下文引用
+func (ae *AssertionExecutor) SetTestContext(ctx *TestContext) {
+	ae.testContext = ctx
 }
 
 // Execute 执行断言
@@ -65,8 +71,7 @@ func (ae *AssertionExecutor) Execute(assertion Assertion) AssertionResult {
 
 // getValue 获取值（从上下文或通过路径）
 func (ae *AssertionExecutor) getValue(path string) (interface{}, error) {
-	// 简化实现：从上下文获取
-	// TODO: 实现路径解析（如 "character.hp"）
+	// 首先尝试从简单上下文获取
 	if value, exists := ae.context[path]; exists {
 		return value, nil
 	}
@@ -76,15 +81,300 @@ func (ae *AssertionExecutor) getValue(path string) (interface{}, error) {
 		return num, nil
 	}
 
+	// 如果有测试上下文，尝试路径解析
+	if ae.testContext != nil {
+		return ae.resolvePath(path)
+	}
+
 	return nil, fmt.Errorf("value not found: %s", path)
 }
 
-// assertEquals 断言相等
+// resolvePath 解析路径，支持点号分隔和数组索引
+func (ae *AssertionExecutor) resolvePath(path string) (interface{}, error) {
+	parts := strings.Split(path, ".")
+	if len(parts) == 0 {
+		return nil, fmt.Errorf("invalid path: %s", path)
+	}
+
+	// 处理根对象
+	var current interface{}
+	root := parts[0]
+
+	switch root {
+	case "character", "character_0":
+		if len(ae.testContext.Characters) > 0 {
+			if char, exists := ae.testContext.Characters["character"]; exists {
+				current = char
+			} else if len(ae.testContext.Team) > 0 {
+				current = ae.testContext.Team[0]
+			}
+		}
+	case "monster", "monster_0":
+		if len(ae.testContext.Monsters) > 0 {
+			if monster, exists := ae.testContext.Monsters["monster"]; exists {
+				current = monster
+			}
+		}
+	case "last_damage":
+		return ae.testContext.LastDamage, nil
+	case "last_healing":
+		return ae.testContext.LastHealing, nil
+	case "battle_logs":
+		return strings.Join(ae.testContext.BattleLogs, "\n"), nil
+	default:
+		// 尝试从简单上下文获取
+		if value, exists := ae.context[root]; exists {
+			current = value
+		} else {
+			return nil, fmt.Errorf("unknown root object: %s", root)
+		}
+	}
+
+	if current == nil {
+		return nil, fmt.Errorf("object not found: %s", root)
+	}
+
+	// 处理嵌套路径
+	for i := 1; i < len(parts); i++ {
+		part := parts[i]
+		
+		// 检查是否是数组索引
+		if strings.Contains(part, "[") && strings.Contains(part, "]") {
+			// 解析数组索引，如 "characters[0]"
+			idxStart := strings.Index(part, "[")
+			idxEnd := strings.Index(part, "]")
+			if idxStart == -1 || idxEnd == -1 {
+				return nil, fmt.Errorf("invalid array index: %s", part)
+			}
+			
+			arrayName := part[:idxStart]
+			idxStr := part[idxStart+1 : idxEnd]
+			idx, err := strconv.Atoi(idxStr)
+			if err != nil {
+				return nil, fmt.Errorf("invalid array index: %s", idxStr)
+			}
+			
+			// 获取数组
+			var arr interface{}
+			switch arrayName {
+			case "characters":
+				if idx < len(ae.testContext.Team) {
+					arr = ae.testContext.Team[idx]
+				}
+			case "monsters":
+				// 从monsters map中获取
+				keys := make([]string, 0, len(ae.testContext.Monsters))
+				for k := range ae.testContext.Monsters {
+					keys = append(keys, k)
+				}
+				if idx < len(keys) {
+					arr = ae.testContext.Monsters[keys[idx]]
+				}
+			default:
+				return nil, fmt.Errorf("unknown array: %s", arrayName)
+			}
+			
+			if arr == nil {
+				return nil, fmt.Errorf("array index out of range: %s[%d]", arrayName, idx)
+			}
+			
+			current = arr
+		} else {
+			// 普通属性访问
+			current = ae.getFieldValue(current, part)
+			if current == nil {
+				return nil, fmt.Errorf("field not found: %s in %s", part, strings.Join(parts[:i], "."))
+			}
+		}
+	}
+
+	return current, nil
+}
+
+// getFieldValue 获取结构体字段值（使用反射或类型断言）
+func (ae *AssertionExecutor) getFieldValue(obj interface{}, fieldName string) interface{} {
+	switch v := obj.(type) {
+	case *models.Character:
+		return ae.getCharacterField(v, fieldName)
+	case *models.Monster:
+		return ae.getMonsterField(v, fieldName)
+	case map[string]interface{}:
+		return v[fieldName]
+	default:
+		return nil
+	}
+}
+
+// getCharacterField 获取角色字段值
+func (ae *AssertionExecutor) getCharacterField(char *models.Character, fieldName string) interface{} {
+	switch fieldName {
+	case "hp", "HP":
+		return char.HP
+	case "max_hp", "maxHp", "MaxHP":
+		return char.MaxHP
+	case "resource", "Resource":
+		return char.Resource
+	case "max_resource", "maxResource", "MaxResource":
+		return char.MaxResource
+	case "level", "Level":
+		return char.Level
+	case "exp", "Exp":
+		return char.Exp
+	case "physical_attack", "physicalAttack", "PhysicalAttack":
+		return char.PhysicalAttack
+	case "magic_attack", "magicAttack", "MagicAttack":
+		return char.MagicAttack
+	case "physical_defense", "physicalDefense", "PhysicalDefense":
+		return char.PhysicalDefense
+	case "magic_defense", "magicDefense", "MagicDefense":
+		return char.MagicDefense
+	case "strength", "Strength":
+		return char.Strength
+	case "agility", "Agility":
+		return char.Agility
+	case "intellect", "Intellect":
+		return char.Intellect
+	case "stamina", "Stamina":
+		return char.Stamina
+	case "spirit", "Spirit":
+		return char.Spirit
+	case "phys_crit_rate", "physCritRate":
+		return char.PhysCritRate
+	case "phys_crit_damage", "physCritDamage":
+		return char.PhysCritDamage
+	case "spell_crit_rate", "spellCritRate":
+		return char.SpellCritRate
+	case "spell_crit_damage", "spellCritDamage":
+		return char.SpellCritDamage
+	case "dodge_rate", "dodgeRate":
+		return char.DodgeRate
+	default:
+		return nil
+	}
+}
+
+// getMonsterField 获取怪物字段值
+func (ae *AssertionExecutor) getMonsterField(monster *models.Monster, fieldName string) interface{} {
+	switch fieldName {
+	case "hp", "HP":
+		return monster.HP
+	case "max_hp", "maxHp", "MaxHP":
+		return monster.MaxHP
+	case "level", "Level":
+		return monster.Level
+	case "physical_attack", "physicalAttack", "PhysicalAttack":
+		return monster.PhysicalAttack
+	case "magic_attack", "magicAttack", "MagicAttack":
+		return monster.MagicAttack
+	case "physical_defense", "physicalDefense", "PhysicalDefense":
+		return monster.PhysicalDefense
+	case "magic_defense", "magicDefense", "MagicDefense":
+		return monster.MagicDefense
+	case "speed", "Speed":
+		return monster.Speed
+	case "exp_reward", "expReward":
+		return monster.ExpReward
+	default:
+		return nil
+	}
+}
+
+// assertEquals 断言相等（支持比较运算符如 "> 0", "< 100" 等）
 func (ae *AssertionExecutor) assertEquals(actual interface{}, expected string) string {
 	actualStr := fmt.Sprintf("%v", actual)
+	
+	// 如果期望值是纯字符串，直接比较
 	if actualStr == expected {
 		return "passed"
 	}
+	
+	// 检查是否包含比较运算符
+	expected = strings.TrimSpace(expected)
+	if strings.HasPrefix(expected, ">") {
+		// 大于比较
+		expectedNum, err := strconv.ParseFloat(strings.TrimSpace(expected[1:]), 64)
+		if err != nil {
+			return "failed"
+		}
+		actualNum, err := ae.toNumber(actual)
+		if err != nil {
+			return "failed"
+		}
+		if actualNum > expectedNum {
+			return "passed"
+		}
+		return "failed"
+	} else if strings.HasPrefix(expected, "<") {
+		// 小于比较
+		expectedNum, err := strconv.ParseFloat(strings.TrimSpace(expected[1:]), 64)
+		if err != nil {
+			return "failed"
+		}
+		actualNum, err := ae.toNumber(actual)
+		if err != nil {
+			return "failed"
+		}
+		if actualNum < expectedNum {
+			return "passed"
+		}
+		return "failed"
+	} else if strings.HasPrefix(expected, ">=") {
+		// 大于等于比较
+		expectedNum, err := strconv.ParseFloat(strings.TrimSpace(expected[2:]), 64)
+		if err != nil {
+			return "failed"
+		}
+		actualNum, err := ae.toNumber(actual)
+		if err != nil {
+			return "failed"
+		}
+		if actualNum >= expectedNum {
+			return "passed"
+		}
+		return "failed"
+	} else if strings.HasPrefix(expected, "<=") {
+		// 小于等于比较
+		expectedNum, err := strconv.ParseFloat(strings.TrimSpace(expected[2:]), 64)
+		if err != nil {
+			return "failed"
+		}
+		actualNum, err := ae.toNumber(actual)
+		if err != nil {
+			return "failed"
+		}
+		if actualNum <= expectedNum {
+			return "passed"
+		}
+		return "failed"
+	} else if strings.HasPrefix(expected, "!=") {
+		// 不等于比较
+		expectedNum, err := strconv.ParseFloat(strings.TrimSpace(expected[2:]), 64)
+		if err != nil {
+			// 如果不是数字，按字符串比较
+			if actualStr != strings.TrimSpace(expected[2:]) {
+				return "passed"
+			}
+			return "failed"
+		}
+		actualNum, err := ae.toNumber(actual)
+		if err != nil {
+			return "failed"
+		}
+		if actualNum != expectedNum {
+			return "passed"
+		}
+		return "failed"
+	}
+	
+	// 尝试数字比较
+	expectedNum, err := strconv.ParseFloat(expected, 64)
+	if err == nil {
+		actualNum, err := ae.toNumber(actual)
+		if err == nil && actualNum == expectedNum {
+			return "passed"
+		}
+	}
+	
 	return "failed"
 }
 
