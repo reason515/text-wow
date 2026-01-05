@@ -1,0 +1,153 @@
+# 属性计算系统 - HP为0修复测试
+test_suite: "属性计算系统 - HP为0修复"
+description: "测试角色HP为0时的修复逻辑，包括创建时、获取时、休息恢复时、复活时的MaxHP和HP修复"
+
+tests:
+  - name: "角色创建时MaxHP为0修复测试"
+    description: "测试创建角色时，如果BaseHP为0，MaxHP应该被正确计算为至少1"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个角色，职业=warrior，基础HP=0，耐力=0"
+    steps:
+      - action: "计算最大生命值"
+        expected: "MaxHP应该至少为1（即使BaseHP和Stamina都为0）"
+    assertions:
+      - type: "greater_than_or_equal"
+        target: "max_hp"
+        expected: "1"
+        message: "MaxHP应该至少为1，即使BaseHP和Stamina都为0"
+
+  - name: "角色创建时HP初始化测试"
+    description: "测试创建角色时，HP应该被初始化为MaxHP"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个角色，职业=warrior，基础HP=35，耐力=10"
+    steps:
+      - action: "计算最大生命值"
+        expected: "MaxHP = 35 + 10*2 = 55"
+    assertions:
+      - type: "equals"
+        target: "max_hp"
+        expected: "55"
+        message: "MaxHP应该等于55"
+      - type: "equals"
+        target: "character.hp"
+        expected: "55"
+        message: "HP应该等于MaxHP（55）"
+
+  - name: "角色HP为0时创建修复测试"
+    description: "测试创建角色时，如果MaxHP为0，应该自动重新计算并修复"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色，职业=warrior，基础HP=35，耐力=10，HP=0/0"
+    steps:
+      - action: "计算最大生命值"
+        expected: "系统应该检测到MaxHP为0，重新计算MaxHP并修复HP"
+    assertions:
+      - type: "equals"
+        target: "max_hp"
+        expected: "55"
+        message: "MaxHP应该被修复为55"
+      - type: "equals"
+        target: "character.hp"
+        expected: "55"
+        message: "HP应该被修复为55（等于MaxHP）"
+
+  - name: "角色死亡后休息恢复HP测试"
+    description: "测试角色死亡后，休息系统应该能够正确恢复HP（即使MaxHP为0也会先修复）"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色，职业=warrior，基础HP=35，耐力=10，MaxHP=0，HP=0，死亡状态=true"
+      - "设置复活时间已到"
+    steps:
+      - action: "开始休息恢复"
+        expected: "系统应该先修复MaxHP，然后恢复HP"
+      - action: "等待休息恢复"
+        expected: "HP应该逐渐恢复"
+    assertions:
+      - type: "greater_than"
+        target: "character.max_hp"
+        expected: "0"
+        message: "MaxHP应该被修复为大于0"
+      - type: "greater_than"
+        target: "character.hp"
+        expected: "0"
+        message: "休息后HP应该大于0"
+
+  - name: "角色创建时MaxHP自动计算测试"
+    description: "测试创建角色时，MaxHP应该自动计算（即使未显式设置）"
+    category: "unit"
+    priority: "high"
+    setup:
+      - "创建一个角色，职业=warrior，基础HP=35，耐力=10"
+    steps:
+      - action: "计算最大生命值"
+        expected: "MaxHP应该自动计算为55"
+    assertions:
+      - type: "equals"
+        target: "character.max_hp"
+        expected: "55"
+        message: "MaxHP应该自动计算为55"
+      - type: "equals"
+        target: "character.hp"
+        expected: "55"
+        message: "HP应该等于MaxHP（55）"
+
+  - name: "休息系统MaxHP为0修复测试"
+    description: "测试休息系统在处理MaxHP为0的角色时，应该先修复MaxHP再恢复HP"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色，职业=warrior，基础HP=35，耐力=10，MaxHP=0，HP=0"
+      - "开始休息"
+    steps:
+      - action: "处理休息恢复"
+        expected: "系统应该先修复MaxHP，然后恢复HP"
+    assertions:
+      - type: "greater_than"
+        target: "character.max_hp"
+        expected: "0"
+        message: "MaxHP应该被修复为大于0"
+      - type: "greater_than"
+        target: "character.hp"
+        expected: "0"
+        message: "休息后HP应该大于0"
+
+  - name: "极端情况：BaseHP为0且Stamina为0测试"
+    description: "测试极端情况：BaseHP=0且Stamina=0时，MaxHP应该至少为1"
+    category: "edge"
+    priority: "medium"
+    setup:
+      - "创建一个角色，职业=warrior，基础HP=0，耐力=0"
+    steps:
+      - action: "计算最大生命值"
+        expected: "MaxHP应该至少为1（Calculator的边界保护）"
+    assertions:
+      - type: "equals"
+        target: "max_hp"
+        expected: "1"
+        message: "MaxHP应该等于1（Calculator确保至少为1）"
+
+  - name: "角色创建后MaxHP和HP一致性测试"
+    description: "测试创建角色后，MaxHP和HP应该一致"
+    category: "integration"
+    priority: "high"
+    setup:
+      - "创建一个角色，职业=warrior，基础HP=35，耐力=10"
+    steps:
+      - action: "计算最大生命值"
+        expected: "MaxHP应该正确计算"
+    assertions:
+      - type: "equals"
+        target: "character.max_hp"
+        expected: "55"
+        message: "MaxHP应该等于55"
+      - type: "equals"
+        target: "character.hp"
+        expected: "55"
+        message: "HP应该等于MaxHP（55）"
+

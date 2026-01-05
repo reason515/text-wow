@@ -2789,8 +2789,23 @@ func (m *BattleManager) processRest(session *BattleSession, char *models.Charact
 	// 检查角色是否已经复活（如果角色死亡且有复活时间）
 	if char.IsDead && char.ReviveAt != nil {
 		if now.After(*char.ReviveAt) || now.Equal(*char.ReviveAt) {
+			// 如果MaxHP为0，先重新计算MaxHP
+			if char.MaxHP == 0 {
+				// 获取职业信息以获取BaseHP
+				class, err := m.gameRepo.GetClassByID(char.ClassID)
+				if err == nil && class != nil {
+					char.MaxHP = m.calculator.CalculateHP(char, class.BaseHP)
+				}
+				// 如果仍然为0，使用默认值
+				if char.MaxHP == 0 {
+					char.MaxHP = 100 // 默认值
+				}
+			}
 			// 复活时间到了，恢复角色到一半HP
 			char.HP = char.MaxHP / 2
+			if char.HP < 1 {
+				char.HP = 1 // 至少1点HP
+			}
 			char.IsDead = false
 			char.ReviveAt = nil
 
@@ -2846,6 +2861,19 @@ func (m *BattleManager) processRest(session *BattleSession, char *models.Charact
 		// 计算经过的秒数
 		elapsedSeconds := elapsed.Seconds()
 
+		// 如果MaxHP为0，先重新计算MaxHP
+		if char.MaxHP == 0 {
+			// 获取职业信息以获取BaseHP
+			class, err := m.gameRepo.GetClassByID(char.ClassID)
+			if err == nil && class != nil {
+				char.MaxHP = m.calculator.CalculateHP(char, class.BaseHP)
+			}
+			// 如果仍然为0，使用默认值
+			if char.MaxHP == 0 {
+				char.MaxHP = 100 // 默认值
+			}
+		}
+		
 		// 如果角色已经死亡但还没到复活时间，不恢复HP
 		if char.IsDead && char.ReviveAt != nil && now.Before(*char.ReviveAt) {
 			// 只恢复资源（如果适用），不恢复HP

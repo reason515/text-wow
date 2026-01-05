@@ -384,7 +384,9 @@ func (h *Handler) CreateCharacter(c *gin.Context) {
 
 	// 计算HP和资源
 	// 最大HP = 职业基础HP + 耐力×2
-	char.MaxHP = class.BaseHP + char.Stamina*2
+	// 使用Calculator确保MaxHP至少为1
+	calculator := game.NewCalculator()
+	char.MaxHP = calculator.CalculateHP(char, class.BaseHP)
 	char.HP = char.MaxHP
 
 	// 战士的怒气最大值固定为100，初始值为0
@@ -479,6 +481,26 @@ func (h *Handler) GetCharacter(c *gin.Context) {
 	// 返回第一个角色（即使死亡也会返回，以便显示复活状态）
 	if len(characters) > 0 {
 		char := characters[0]
+		
+		// 如果MaxHP为0，重新计算MaxHP（修复数据问题）
+		if char.MaxHP == 0 {
+			// 获取职业信息以获取BaseHP
+			gameRepo := repository.NewGameRepository()
+			class, err := gameRepo.GetClassByID(char.ClassID)
+			if err == nil && class != nil {
+				calculator := game.NewCalculator()
+				char.MaxHP = calculator.CalculateHP(char, class.BaseHP)
+				// 如果HP也是0，设置为MaxHP
+				if char.HP == 0 && char.MaxHP > 0 {
+					char.HP = char.MaxHP
+					// 更新数据库
+					h.charRepo.UpdateAfterBattle(char.ID, char.HP, char.Resource, char.Exp, char.Level,
+						char.ExpToNext, char.MaxHP, char.MaxResource, char.PhysicalAttack, char.MagicAttack, char.PhysicalDefense, char.MagicDefense,
+						char.Strength, char.Agility, char.Intellect, char.Stamina, char.Spirit, char.UnspentPoints, char.TotalKills)
+				}
+			}
+		}
+		
 		// 添加buff信息
 		battleMgr := game.GetBattleManager()
 		char.Buffs = battleMgr.GetCharacterBuffs(char.ID)

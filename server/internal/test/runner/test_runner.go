@@ -925,6 +925,23 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 		char.MaxResource = 100
 	}
 	
+	// 如果MaxHP为0，自动计算MaxHP（使用Calculator）
+	if char.MaxHP == 0 {
+		// 获取基础HP（从Variables或使用默认值）
+		baseHP := 35 // 默认战士基础HP
+		if baseHPVal, exists := tr.context.Variables["character_base_hp"]; exists {
+			if hp, ok := baseHPVal.(int); ok {
+				baseHP = hp
+			}
+		}
+		char.MaxHP = tr.calculator.CalculateHP(char, baseHP)
+		// 如果HP也为0，设置为MaxHP
+		if char.HP == 0 {
+			char.HP = char.MaxHP
+		}
+		fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: auto-calculated MaxHP=%d, HP=%d\n", char.MaxHP, char.HP)
+	}
+	
 	// 确保用户存在
 	if char.UserID == 0 {
 		user, err := tr.createTestUser()
@@ -968,6 +985,21 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 		}
 		if existingChar != nil {
 			char.ID = existingChar.ID
+			// 在设置ID之后，如果MaxHP为0或小于计算值，重新计算MaxHP（从数据库读取后可能被重置）
+			baseHP := 35 // 默认战士基础HP
+			if baseHPVal, exists := tr.context.Variables["character_base_hp"]; exists {
+				if hp, ok := baseHPVal.(int); ok {
+					baseHP = hp
+				}
+			}
+			calculatedMaxHP := tr.calculator.CalculateHP(char, baseHP)
+			if char.MaxHP == 0 || char.MaxHP < calculatedMaxHP {
+				char.MaxHP = calculatedMaxHP
+				if char.HP == 0 || char.HP < char.MaxHP {
+					char.HP = char.MaxHP
+				}
+				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after setting ID, re-calculated MaxHP=%d, HP=%d\n", char.MaxHP, char.HP)
+			}
 			// 在设置ID之后，检查PhysicalAttack是否被重置
 			fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=%d\n", char.PhysicalAttack)
 			// 如果PhysicalAttack为0，从Variables恢复
@@ -979,11 +1011,27 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 					}
 				}
 			}
-			// 保存PhysicalAttack和Resource值，以防数据库更新时丢失
+			// 如果MaxHP为0，重新计算MaxHP（从数据库读取后可能被重置）
+			if char.MaxHP == 0 {
+				baseHP := 35 // 默认战士基础HP
+				if baseHPVal, exists := tr.context.Variables["character_base_hp"]; exists {
+					if hp, ok := baseHPVal.(int); ok {
+						baseHP = hp
+					}
+				}
+				char.MaxHP = tr.calculator.CalculateHP(char, baseHP)
+				if char.HP == 0 {
+					char.HP = char.MaxHP
+				}
+				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: re-calculated MaxHP=%d, HP=%d after reading from DB\n", char.MaxHP, char.HP)
+			}
+			// 保存PhysicalAttack、Resource和MaxHP值，以防数据库更新时丢失
 			savedPhysicalAttack := char.PhysicalAttack
 			savedResource := char.Resource
 			savedMaxResource := char.MaxResource
-			fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: before Update, char.PhysicalAttack=%d, Resource=%d/%d\n", char.PhysicalAttack, char.Resource, char.MaxResource)
+			savedMaxHP := char.MaxHP
+			savedHP := char.HP
+			fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: before Update, char.PhysicalAttack=%d, Resource=%d/%d, MaxHP=%d, HP=%d\n", char.PhysicalAttack, char.Resource, char.MaxResource, char.MaxHP, char.HP)
 			if err := charRepo.Update(char); err != nil {
 				return fmt.Errorf("failed to update existing character in DB: %w", err)
 			}
@@ -999,16 +1047,24 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 				char.Resource = savedResource
 				char.MaxResource = savedMaxResource
 				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after Update, restored Resource=%d/%d\n", char.Resource, char.MaxResource)
-				// 再次更新数据库，确保Resource被保存
+			}
+			// 恢复MaxHP和HP值（如果它们被数据库更新覆盖了）
+			if savedMaxHP > 0 {
+				char.MaxHP = savedMaxHP
+				char.HP = savedHP
+				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after Update, restored MaxHP=%d, HP=%d\n", char.MaxHP, char.HP)
+				// 再次更新数据库，确保MaxHP和HP被保存
 				if err := charRepo.Update(char); err != nil {
-					fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: failed to update Resource in DB: %v\n", err)
+					fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: failed to update MaxHP/HP in DB: %v\n", err)
 				}
 			}
 		} else {
-			// 保存PhysicalAttack和Resource值，以防Create后丢失
+			// 保存PhysicalAttack、Resource和MaxHP值，以防Create后丢失
 			savedPhysicalAttack := char.PhysicalAttack
 			savedResource := char.Resource
 			savedMaxResource := char.MaxResource
+			savedMaxHP := char.MaxHP
+			savedHP := char.HP
 			createdChar, err := charRepo.Create(char)
 			if err != nil {
 				return fmt.Errorf("failed to create character in DB: %w", err)
@@ -1026,9 +1082,15 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 				char.Resource = savedResource
 				char.MaxResource = savedMaxResource
 				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after Create, restored Resource=%d/%d\n", char.Resource, char.MaxResource)
-				// 再次更新数据库，确保Resource被保存
+			}
+			// 恢复MaxHP和HP值（如果它们被Create覆盖了）
+			if savedMaxHP > 0 {
+				char.MaxHP = savedMaxHP
+				char.HP = savedHP
+				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after Create, restored MaxHP=%d, HP=%d\n", char.MaxHP, char.HP)
+				// 再次更新数据库，确保MaxHP和HP被保存
 				if err := charRepo.Update(char); err != nil {
-					fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: failed to update Resource in DB: %v\n", err)
+					fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: failed to update MaxHP/HP in DB: %v\n", err)
 				}
 			}
 		}
