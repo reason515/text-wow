@@ -3,6 +3,7 @@ package runner
 import (
 	"fmt"
 	"math"
+	"reflect"
 	"strconv"
 	"strings"
 )
@@ -37,9 +38,76 @@ func (ae *AssertionExecutor) Execute(assertion Assertion) AssertionResult {
 
 	// 获取实际值
 	actual, err := ae.getValue(assertion.Target)
+	
 	if err != nil {
 		result.Status = "failed"
 		result.Error = fmt.Sprintf("failed to get value: %v", err)
+		result.Actual = nil
+		return result
+	}
+
+	// 检查值是否为nil（使用反射来正确处理interface{}类型的nil）
+	// 首先检查简单的nil比较
+	if actual == nil {
+		result.Status = "failed"
+		teamLen := 0
+		hasCalculator := false
+		if ae.testContext != nil {
+			teamLen = len(ae.testContext.Team)
+			hasCalculator = ae.testContext.Calculator != nil
+		}
+		result.Error = fmt.Sprintf("value is nil for path: %s (context keys: %v, testContext: %v, team: %d, calculator: %v, actual type: %T)", 
+			assertion.Target, getMapKeys(ae.context), ae.testContext != nil, teamLen, hasCalculator, actual)
+		result.Actual = nil
+		return result
+	}
+	
+	// 使用反射检查interface{}类型的nil（即使在actual != nil时也要检查，因为可能是interface{}(nil)）
+	rv := reflect.ValueOf(actual)
+	if !rv.IsValid() || (rv.Kind() == reflect.Interface && rv.IsNil()) {
+		result.Status = "failed"
+		teamLen := 0
+		hasCalculator := false
+		if ae.testContext != nil {
+			teamLen = len(ae.testContext.Team)
+			hasCalculator = ae.testContext.Calculator != nil
+		}
+		result.Error = fmt.Sprintf("value is nil (interface{}) for path: %s (context keys: %v, testContext: %v, team: %d, calculator: %v)", 
+			assertion.Target, getMapKeys(ae.context), ae.testContext != nil, teamLen, hasCalculator)
+		result.Actual = nil
+		return result
+	}
+	
+	// 检查其他类型的nil
+	if rv.IsValid() && (rv.Kind() == reflect.Ptr || rv.Kind() == reflect.Slice || rv.Kind() == reflect.Map || rv.Kind() == reflect.Chan || rv.Kind() == reflect.Func) {
+		if rv.IsNil() {
+			result.Status = "failed"
+			teamLen := 0
+			hasCalculator := false
+			if ae.testContext != nil {
+				teamLen = len(ae.testContext.Team)
+				hasCalculator = ae.testContext.Calculator != nil
+			}
+			result.Error = fmt.Sprintf("value is nil (pointer/slice/map) for path: %s (context keys: %v, testContext: %v, team: %d, calculator: %v)", 
+				assertion.Target, getMapKeys(ae.context), ae.testContext != nil, teamLen, hasCalculator)
+			result.Actual = nil
+			return result
+		}
+	}
+
+	// 在设置 result.Actual 之前，再次检查 actual 是否为 nil
+	// 这应该不会发生，因为前面的检查应该已经捕获了这种情况
+	if actual == nil {
+		result.Status = "failed"
+		teamLen := 0
+		hasCalculator := false
+		if ae.testContext != nil {
+			teamLen = len(ae.testContext.Team)
+			hasCalculator = ae.testContext.Calculator != nil
+		}
+		result.Error = fmt.Sprintf("actual is nil before setting result.Actual for path: %s (context keys: %v, testContext: %v, team: %d, calculator: %v)", 
+			assertion.Target, getMapKeys(ae.context), ae.testContext != nil, teamLen, hasCalculator)
+		result.Actual = nil
 		return result
 	}
 
@@ -71,8 +139,16 @@ func (ae *AssertionExecutor) Execute(assertion Assertion) AssertionResult {
 
 // getValue 获取值（从上下文或通过路径）
 func (ae *AssertionExecutor) getValue(path string) (interface{}, error) {
+	// 检查 context 是否为 nil
+	if ae.context == nil {
+		return nil, fmt.Errorf("context is nil for path: %s", path)
+	}
+	
 	// 首先尝试从简单上下文获取
 	if value, exists := ae.context[path]; exists {
+		if value == nil {
+			return nil, fmt.Errorf("value is nil for path: %s (key exists but value is nil)", path)
+		}
 		return value, nil
 	}
 
@@ -85,20 +161,55 @@ func (ae *AssertionExecutor) getValue(path string) (interface{}, error) {
 	if ae.testContext != nil {
 		value, err := ae.resolvePath(path)
 		if err == nil {
+			// 如果解析成功但值为nil，返回错误
+			if value == nil {
+				return nil, fmt.Errorf("resolvePath returned nil for path: %s", path)
+			}
+			// 将计算得到的值存储到上下文中，以便后续使用
+			if !strings.Contains(path, ".") {
+				ae.context[path] = value
+			}
 			return value, nil
 		}
 		// 如果路径解析失败，尝试作为简单键再次查找
 		if val, exists := ae.context[path]; exists {
+			if val == nil {
+				return nil, fmt.Errorf("value is nil for path: %s (key exists but value is nil)", path)
+			}
 			return val, nil
 		}
-		return nil, fmt.Errorf("value not found: %s", path)
+		// 确保总是返回错误，而不是(nil, nil)
+		if err == nil {
+			return nil, fmt.Errorf("resolvePath returned (nil, nil) for path: %s (context keys: %v)", path, getMapKeys(ae.context))
+		}
+		return nil, fmt.Errorf("value not found: %s (context keys: %v, resolvePath error: %v)", path, getMapKeys(ae.context), err)
 	}
 
-	return nil, fmt.Errorf("value not found: %s", path)
+	// 最终检查：如果到达这里，说明没有找到值
+	// 确保总是返回错误，而不是(nil, nil)
+	err := fmt.Errorf("value not found: %s (no test context, context keys: %v)", path, getMapKeys(ae.context))
+	return nil, err
+}
+
+// getMapKeys 获取 map 的所有键（用于调试）
+func getMapKeys(m map[string]interface{}) []string {
+	if m == nil {
+		return []string{"<nil>"}
+	}
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
 }
 
 // resolvePath 解析路径，支持点号分隔和数组索引
 func (ae *AssertionExecutor) resolvePath(path string) (interface{}, error) {
+	// 如果没有测试上下文，无法解析路径
+	if ae.testContext == nil {
+		return nil, fmt.Errorf("test context not set")
+	}
+	
 	parts := strings.Split(path, ".")
 	if len(parts) == 0 {
 		return nil, fmt.Errorf("invalid path: %s", path)
@@ -139,6 +250,61 @@ func (ae *AssertionExecutor) resolvePath(path string) (interface{}, error) {
 		return ae.getBattleState(), nil
 	case "battle_result":
 		return ae.getBattleResult(), nil
+	// 计算属性（从上下文获取，如果上下文中没有则尝试计算）
+	case "physical_attack", "magic_attack", "max_hp", "phys_crit_rate", "dodge_rate", "speed",
+		"mana_regen", "rage_gain", "energy_regen", "base_damage", "damage_after_defense", "final_damage",
+		"overhealing", "skill_damage_dealt", "skill_used", "equip_success", "error_message":
+		// 首先尝试从上下文获取
+		if val, exists := ae.context[root]; exists {
+			if val == nil {
+				return nil, fmt.Errorf("value is nil for path: %s (key exists but value is nil)", root)
+			}
+			return val, nil
+		}
+		// 如果上下文中没有，尝试从角色计算
+		if ae.testContext != nil && len(ae.testContext.Team) > 0 && ae.testContext.Calculator != nil {
+			char := ae.testContext.Team[0]
+			var calculatedValue interface{}
+			switch root {
+			case "physical_attack":
+				calculatedValue = ae.testContext.Calculator.CalculatePhysicalAttack(char)
+			case "magic_attack":
+				calculatedValue = ae.testContext.Calculator.CalculateMagicAttack(char)
+			case "max_hp":
+				baseHP := 35
+				if char.ClassID == "mage" || char.ClassID == "warlock" {
+					baseHP = 20
+				} else if char.ClassID == "priest" || char.ClassID == "druid" || char.ClassID == "shaman" {
+					baseHP = 22
+				} else if char.ClassID == "rogue" || char.ClassID == "hunter" {
+					baseHP = 25
+				} else if char.ClassID == "paladin" {
+					baseHP = 30
+				}
+				calculatedValue = ae.testContext.Calculator.CalculateHP(char, baseHP)
+			case "phys_crit_rate":
+				calculatedValue = ae.testContext.Calculator.CalculatePhysCritRate(char)
+			case "dodge_rate":
+				calculatedValue = ae.testContext.Calculator.CalculateDodgeRate(char)
+			case "speed":
+				calculatedValue = ae.testContext.Calculator.CalculateSpeed(char)
+			case "mana_regen":
+				calculatedValue = ae.testContext.Calculator.CalculateManaRegen(char)
+			case "rage_gain":
+				calculatedValue = ae.testContext.Calculator.CalculateRageGain(char)
+			case "energy_regen":
+				calculatedValue = ae.testContext.Calculator.CalculateEnergyRegen(char)
+			default:
+				return nil, fmt.Errorf("calculated attribute not handled: %s", root)
+			}
+			// 将计算得到的值存储到上下文中
+			if calculatedValue != nil {
+				ae.context[root] = calculatedValue
+				return calculatedValue, nil
+			}
+			return nil, fmt.Errorf("calculated value is nil for path: %s", root)
+		}
+		return nil, fmt.Errorf("value not found: %s (testContext: %v, team: %d, calculator: %v)", root, ae.testContext != nil, len(ae.testContext.Team), ae.testContext != nil && ae.testContext.Calculator != nil)
 	case "warrior", "priest", "mage", "rogue":
 		// 通过职业名称查找角色
 		current = ae.findCharacterByClass(root)
@@ -248,6 +414,11 @@ func (ae *AssertionExecutor) resolvePath(path string) (interface{}, error) {
 		}
 	}
 
+	// 确保不会返回 (nil, nil)
+	if current == nil {
+		return nil, fmt.Errorf("object is nil at end of resolvePath for path: %s", path)
+	}
+
 	return current, nil
 }
 
@@ -330,7 +501,19 @@ func (ae *AssertionExecutor) getCharacterField(char *models.Character, fieldName
 			}
 		}
 		return 0
+	case "speed", "Speed":
+		// 从Calculator计算速度
+		if ae.testContext != nil && ae.testContext.Calculator != nil {
+			return ae.testContext.Calculator.CalculateSpeed(char)
+		}
+		return char.Agility // 默认返回敏捷值
 	default:
+		// 尝试从上下文获取计算值
+		if ae.context != nil {
+			if val, exists := ae.context[fieldName]; exists {
+				return val
+			}
+		}
 		return nil
 	}
 }
@@ -624,6 +807,9 @@ func (ae *AssertionExecutor) toNumber(value interface{}) (float64, error) {
 
 // SetContext 设置测试上下文
 func (ae *AssertionExecutor) SetContext(key string, value interface{}) {
+	if ae.context == nil {
+		ae.context = make(map[string]interface{})
+	}
 	ae.context[key] = value
 }
 

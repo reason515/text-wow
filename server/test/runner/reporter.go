@@ -43,6 +43,9 @@ func (r *Reporter) GenerateReport(result *TestSuiteResult) string {
 				if assertion.Status == "failed" {
 					report += fmt.Sprintf("  断言失败: %s %s %s (实际: %v)\n",
 						assertion.Target, assertion.Type, assertion.Expected, assertion.Actual)
+					if assertion.Error != "" {
+						report += fmt.Sprintf("    错误: %s\n", assertion.Error)
+					}
 					if assertion.Message != "" {
 						report += fmt.Sprintf("    %s\n", assertion.Message)
 					}

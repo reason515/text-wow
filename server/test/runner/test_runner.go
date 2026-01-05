@@ -74,6 +74,10 @@ func (tr *TestRunner) ResetContext() {
 	tr.context.Calculator = game.NewCalculator()
 	tr.assertion.ClearContext()
 	tr.assertion.SetTestContext(tr.context)
+	// 确保断言执行器可以访问Calculator
+	if tr.assertion != nil && tr.context != nil {
+		tr.assertion.SetTestContext(tr.context)
+	}
 }
 
 // TestSuite 测试套件
@@ -327,6 +331,53 @@ func (tr *TestRunner) createCharacterFromInstruction(instruction string) error {
 		classID = "rogue"
 	}
 	
+	// 解析主属性（力量、敏捷、智力、耐力、精神）
+	strength := 10
+	agility := 10
+	intellect := 10
+	stamina := 10
+	spirit := 10
+	
+	// 解析力量=xxx
+	if strings.Contains(instruction, "力量=") {
+		strengthStr := extractValueAfter(instruction, "力量=")
+		if parsedStrength, err := strconv.Atoi(strengthStr); err == nil {
+			strength = parsedStrength
+		}
+	}
+	
+	// 解析敏捷=xxx
+	if strings.Contains(instruction, "敏捷=") {
+		agilityStr := extractValueAfter(instruction, "敏捷=")
+		if parsedAgility, err := strconv.Atoi(agilityStr); err == nil {
+			agility = parsedAgility
+		}
+	}
+	
+	// 解析智力=xxx
+	if strings.Contains(instruction, "智力=") {
+		intellectStr := extractValueAfter(instruction, "智力=")
+		if parsedIntellect, err := strconv.Atoi(intellectStr); err == nil {
+			intellect = parsedIntellect
+		}
+	}
+	
+	// 解析耐力=xxx
+	if strings.Contains(instruction, "耐力=") {
+		staminaStr := extractValueAfter(instruction, "耐力=")
+		if parsedStamina, err := strconv.Atoi(staminaStr); err == nil {
+			stamina = parsedStamina
+		}
+	}
+	
+	// 解析精神=xxx
+	if strings.Contains(instruction, "精神=") {
+		spiritStr := extractValueAfter(instruction, "精神=")
+		if parsedSpirit, err := strconv.Atoi(spiritStr); err == nil {
+			spirit = parsedSpirit
+		}
+	}
+	
 	// 解析属性
 	hp := 100
 	physicalAttack := 10
@@ -334,20 +385,38 @@ func (tr *TestRunner) createCharacterFromInstruction(instruction string) error {
 	magicAttack := 5
 	magicDefense := 3
 	
-	// 解析 HP=xxx
+	// 解析基础HP（用于计算最大HP）
+	baseHP := 35 // 默认战士基础HP
+	if strings.Contains(instruction, "基础HP=") {
+		baseHPStr := extractValueAfter(instruction, "基础HP=")
+		if parsedBaseHP, err := strconv.Atoi(baseHPStr); err == nil {
+			baseHP = parsedBaseHP
+		}
+	}
+	
+	// 解析 HP=xxx（直接设置HP，不计算）
 	if strings.Contains(instruction, "HP=") {
 		hpStr := extractValueAfter(instruction, "HP=")
 		if parsedHP, err := strconv.Atoi(hpStr); err == nil {
 			hp = parsedHP
 		}
+	} else {
+		// 如果没有直接设置HP，根据耐力和基础HP计算
+		hp = tr.context.Calculator.CalculateHP(&models.Character{Stamina: stamina}, baseHP)
 	}
 	
-	// 解析攻击力=xxx
+	// 解析攻击力=xxx（直接设置，不计算）
 	if strings.Contains(instruction, "攻击力=") {
 		attackStr := extractValueAfter(instruction, "攻击力=")
 		if parsedAttack, err := strconv.Atoi(attackStr); err == nil {
 			physicalAttack = parsedAttack
 		}
+	} else {
+		// 如果没有直接设置攻击力，根据属性计算
+		physicalAttack = tr.context.Calculator.CalculatePhysicalAttack(&models.Character{
+			Strength: strength,
+			Agility:  agility,
+		})
 	}
 	
 	// 解析防御力=xxx
@@ -386,16 +455,34 @@ func (tr *TestRunner) createCharacterFromInstruction(instruction string) error {
 		MagicAttack:     magicAttack,
 		PhysicalDefense: physicalDefense,
 		MagicDefense:    magicDefense,
-		PhysCritRate:    0.05,
-		PhysCritDamage:  1.5,
-		SpellCritRate:   0.05,
-		SpellCritDamage: 1.5,
-		DodgeRate:       0.05,
-		Strength:        10,
-		Agility:         10,
-		Intellect:       10,
-		Stamina:         10,
-		Spirit:          10,
+		Strength:        strength,
+		Agility:         agility,
+		Intellect:       intellect,
+		Stamina:         stamina,
+		Spirit:          spirit,
+	}
+	
+	// 使用Calculator计算派生属性
+	char.PhysicalAttack = tr.context.Calculator.CalculatePhysicalAttack(char)
+	char.MagicAttack = tr.context.Calculator.CalculateMagicAttack(char)
+	char.PhysCritRate = tr.context.Calculator.CalculatePhysCritRate(char)
+	char.PhysCritDamage = tr.context.Calculator.CalculatePhysCritDamage(char)
+	char.SpellCritRate = tr.context.Calculator.CalculateSpellCritRate(char)
+	char.SpellCritDamage = tr.context.Calculator.CalculateSpellCritDamage(char)
+	char.DodgeRate = tr.context.Calculator.CalculateDodgeRate(char)
+	
+	// 如果直接设置了攻击力，覆盖计算值
+	if strings.Contains(instruction, "攻击力=") {
+		attackStr := extractValueAfter(instruction, "攻击力=")
+		if parsedAttack, err := strconv.Atoi(attackStr); err == nil {
+			char.PhysicalAttack = parsedAttack
+		}
+	}
+	
+	// 确保MaxHP正确设置
+	if char.MaxHP < char.HP {
+		char.MaxHP = char.HP
+	}
 	}
 	
 	// 根据职业设置资源类型
@@ -586,7 +673,7 @@ func (tr *TestRunner) createTeamFromInstruction(instruction string) error {
 	return nil
 }
 
-// extractValueAfter 从字符串中提取指定关键字后的值
+// extractValueAfter 从字符串中提取指定关键字后的值（支持负数）
 func extractValueAfter(s, keyword string) string {
 	idx := strings.Index(s, keyword)
 	if idx == -1 {
@@ -595,10 +682,15 @@ func extractValueAfter(s, keyword string) string {
 	
 	start := idx + len(keyword)
 	value := ""
+	// 检查是否有负号
+	if start < len(s) && s[start] == '-' {
+		value += "-"
+		start++
+	}
 	for i := start; i < len(s); i++ {
 		if s[i] >= '0' && s[i] <= '9' {
 			value += string(s[i])
-		} else if value != "" {
+		} else if value != "" && value != "-" {
 			break
 		}
 	}
@@ -694,6 +786,56 @@ func (tr *TestRunner) executeStep(step TestStep) error {
 	// 如果暴击，应用暴击倍率
 	if strings.Contains(action, "暴击") && strings.Contains(action, "暴击倍率") {
 		return tr.executeApplyCrit()
+	}
+	
+	// 计算物理攻击力
+	if action == "计算物理攻击力" || strings.Contains(action, "计算物理攻击力") {
+		return tr.executeCalculatePhysicalAttack()
+	}
+	
+	// 计算法术攻击力
+	if action == "计算法术攻击力" || strings.Contains(action, "计算法术攻击力") {
+		return tr.executeCalculateMagicAttack()
+	}
+	
+	// 计算最大生命值
+	if action == "计算最大生命值" || strings.Contains(action, "计算最大生命值") {
+		return tr.executeCalculateMaxHP()
+	}
+	
+	// 计算物理暴击率
+	if action == "计算物理暴击率" || strings.Contains(action, "计算物理暴击率") {
+		return tr.executeCalculatePhysCritRate()
+	}
+	
+	// 计算闪避率
+	if action == "计算闪避率" || strings.Contains(action, "计算闪避率") {
+		return tr.executeCalculateDodgeRate()
+	}
+	
+	// 计算速度
+	if action == "计算速度" || strings.Contains(action, "计算速度") {
+		return tr.executeCalculateSpeed()
+	}
+	
+	// 计算速度
+	if action == "计算速度" || strings.Contains(action, "计算速度") {
+		return tr.executeCalculateSpeed()
+	}
+	
+	// 计算法力恢复
+	if strings.Contains(action, "计算法力恢复") {
+		return tr.executeCalculateManaRegen(action)
+	}
+	
+	// 计算怒气获得
+	if strings.Contains(action, "计算怒气获得") {
+		return tr.executeCalculateRageGain(action)
+	}
+	
+	// 计算能量恢复
+	if strings.Contains(action, "计算能量恢复") {
+		return tr.executeCalculateEnergyRegen(action)
 	}
 	
 	return fmt.Errorf("unknown action: %s", action)
@@ -1034,6 +1176,183 @@ func extractSkillName(action string) string {
 		}
 	}
 	return ""
+}
+
+// executeCalculatePhysicalAttack 计算物理攻击力
+func (tr *TestRunner) executeCalculatePhysicalAttack() error {
+	if len(tr.context.Team) == 0 {
+		return fmt.Errorf("character not found")
+	}
+	if tr.assertion == nil {
+		return fmt.Errorf("assertion executor is nil")
+	}
+	char := tr.context.Team[0]
+	physicalAttack := tr.context.Calculator.CalculatePhysicalAttack(char)
+	// 存储到断言上下文
+	tr.assertion.SetContext("physical_attack", physicalAttack)
+	// 同时更新角色的物理攻击力（用于后续断言）
+	char.PhysicalAttack = physicalAttack
+	return nil
+}
+
+// executeCalculateMagicAttack 计算法术攻击力
+func (tr *TestRunner) executeCalculateMagicAttack() error {
+	if len(tr.context.Team) == 0 {
+		return fmt.Errorf("character not found")
+	}
+	char := tr.context.Team[0]
+	magicAttack := tr.context.Calculator.CalculateMagicAttack(char)
+	// 存储到断言上下文
+	tr.assertion.SetContext("magic_attack", magicAttack)
+	// 同时更新角色的法术攻击力（用于后续断言）
+	char.MagicAttack = magicAttack
+	return nil
+}
+
+// executeCalculateMaxHP 计算最大生命值
+func (tr *TestRunner) executeCalculateMaxHP() error {
+	if len(tr.context.Team) == 0 {
+		return fmt.Errorf("character not found")
+	}
+	char := tr.context.Team[0]
+	// 获取职业基础HP
+	baseHP := 35 // 默认战士基础HP
+	if char.ClassID == "mage" || char.ClassID == "warlock" {
+		baseHP = 20
+	} else if char.ClassID == "priest" || char.ClassID == "druid" || char.ClassID == "shaman" {
+		baseHP = 22
+	} else if char.ClassID == "rogue" || char.ClassID == "hunter" {
+		baseHP = 25
+	} else if char.ClassID == "paladin" {
+		baseHP = 30
+	}
+	maxHP := tr.context.Calculator.CalculateHP(char, baseHP)
+	// 存储到断言上下文
+	tr.assertion.SetContext("max_hp", maxHP)
+	// 同时更新角色的最大生命值（用于后续断言）
+	char.MaxHP = maxHP
+	return nil
+}
+
+// executeCalculatePhysCritRate 计算物理暴击率
+func (tr *TestRunner) executeCalculatePhysCritRate() error {
+	if len(tr.context.Team) == 0 {
+		return fmt.Errorf("character not found")
+	}
+	char := tr.context.Team[0]
+	critRate := tr.context.Calculator.CalculatePhysCritRate(char)
+	// 存储到断言上下文
+	tr.assertion.SetContext("phys_crit_rate", critRate)
+	// 同时更新角色的物理暴击率（用于后续断言）
+	char.PhysCritRate = critRate
+	return nil
+}
+
+// executeCalculateDodgeRate 计算闪避率
+func (tr *TestRunner) executeCalculateDodgeRate() error {
+	if len(tr.context.Team) == 0 {
+		return fmt.Errorf("character not found")
+	}
+	char := tr.context.Team[0]
+	dodgeRate := tr.context.Calculator.CalculateDodgeRate(char)
+	// 存储到断言上下文
+	tr.assertion.SetContext("dodge_rate", dodgeRate)
+	// 同时更新角色的闪避率（用于后续断言）
+	char.DodgeRate = dodgeRate
+	return nil
+}
+
+// executeCalculateSpeed 计算速度
+func (tr *TestRunner) executeCalculateSpeed() error {
+	if len(tr.context.Team) == 0 {
+		return fmt.Errorf("character not found")
+	}
+	char := tr.context.Team[0]
+	speed := tr.context.Calculator.CalculateSpeed(char)
+	// 存储到断言上下文
+	tr.assertion.SetContext("speed", speed)
+	return nil
+}
+
+// executeCalculateManaRegen 计算法力恢复
+func (tr *TestRunner) executeCalculateManaRegen(action string) error {
+	if len(tr.context.Team) == 0 {
+		return fmt.Errorf("character not found")
+	}
+	char := tr.context.Team[0]
+	
+	// 从action中提取基础恢复值，默认10
+	baseRegen := 10
+	if strings.Contains(action, "基础恢复=") {
+		baseRegenStr := extractValueAfter(action, "基础恢复=")
+		if parsedBaseRegen, err := strconv.Atoi(baseRegenStr); err == nil {
+			baseRegen = parsedBaseRegen
+		}
+	}
+	
+	manaRegen := tr.context.Calculator.CalculateManaRegen(char, baseRegen)
+	tr.assertion.SetContext("mana_regen", manaRegen)
+	return nil
+}
+
+// executeCalculateRageGain 计算怒气获得
+func (tr *TestRunner) executeCalculateRageGain(action string) error {
+	// 从action中提取基础获得和加成百分比
+	baseGain := 10
+	bonusPercent := 0.0
+	
+	// 解析基础获得
+	if strings.Contains(action, "基础获得=") || strings.Contains(action, "基础怒气获得=") {
+		var baseGainStr string
+		if strings.Contains(action, "基础获得=") {
+			baseGainStr = extractValueAfter(action, "基础获得=")
+		} else {
+			baseGainStr = extractValueAfter(action, "基础怒气获得=")
+		}
+		if parsedBaseGain, err := strconv.Atoi(baseGainStr); err == nil {
+			baseGain = parsedBaseGain
+		}
+	}
+	
+	// 解析加成百分比
+	if strings.Contains(action, "加成百分比=") || strings.Contains(action, "加成=") {
+		var bonusStr string
+		if strings.Contains(action, "加成百分比=") {
+			bonusStr = extractValueAfter(action, "加成百分比=")
+		} else {
+			bonusStr = extractValueAfter(action, "加成=")
+		}
+		// 移除%符号
+		bonusStr = strings.TrimSuffix(bonusStr, "%")
+		if parsedBonus, err := strconv.ParseFloat(bonusStr, 64); err == nil {
+			bonusPercent = parsedBonus
+		}
+	}
+	
+	rageGain := tr.context.Calculator.CalculateRageGain(baseGain, bonusPercent)
+	tr.assertion.SetContext("rage_gain", rageGain)
+	return nil
+}
+
+// executeCalculateEnergyRegen 计算能量恢复
+func (tr *TestRunner) executeCalculateEnergyRegen(action string) error {
+	if len(tr.context.Team) == 0 {
+		return fmt.Errorf("character not found")
+	}
+	char := tr.context.Team[0]
+	
+	// 从action中提取基础恢复值，默认10
+	baseRegen := 10
+	if strings.Contains(action, "基础恢复=") {
+		baseRegenStr := extractValueAfter(action, "基础恢复=")
+		if parsedBaseRegen, err := strconv.Atoi(baseRegenStr); err == nil {
+			baseRegen = parsedBaseRegen
+		}
+	}
+	
+	energyRegen := tr.context.Calculator.CalculateEnergyRegen(char, baseRegen)
+	tr.assertion.SetContext("energy_regen", energyRegen)
+	return nil
 }
 
 // updateContextFromBattle 从战斗会话更新上下文数据

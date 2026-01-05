@@ -89,7 +89,7 @@ func (c *Calculator) CalculateMP(char *models.Character, baseMP int) int {
 }
 
 // CalculatePhysCritRate 计算物理暴击率
-// 公式: 5% (基础) + (敏捷 / 20) + 装备加成
+// 公式: 5% (基础) + (敏捷 / 20)% + 装备加成
 // 上限: 50%
 // 边界处理: 确保返回值在0-0.5之间
 func (c *Calculator) CalculatePhysCritRate(char *models.Character) float64 {
@@ -97,7 +97,9 @@ func (c *Calculator) CalculatePhysCritRate(char *models.Character) float64 {
 		return 0.05
 	}
 	baseRate := 0.05
-	agilityBonus := float64(char.Agility) / 20.0 / 100.0 // 转换为小数
+	// 敏捷/20 得到百分比，然后除以100转换为小数
+	// 例如：敏捷20 -> 20/20 = 1% -> 0.01
+	agilityBonus := float64(char.Agility) / 20.0 / 100.0
 	rate := baseRate + agilityBonus
 	// 限制范围在0-50%之间
 	if rate < 0 {
@@ -126,11 +128,25 @@ func (c *Calculator) CalculatePhysCritDamage(char *models.Character) float64 {
 }
 
 // CalculateSpellCritRate 计算法术暴击率
-// 公式: 5% (基础) + (精神 / 20) + 装备加成
+// 公式: 5% (基础) + (精神 / 20)% + 装备加成
+// 上限: 50%
+// 边界处理: 确保返回值在0-0.5之间
 func (c *Calculator) CalculateSpellCritRate(char *models.Character) float64 {
+	if char == nil {
+		return 0.05
+	}
 	baseRate := 0.05
-	spiritBonus := float64(char.Spirit) / 20.0 / 100.0 // 转换为小数
-	return baseRate + spiritBonus
+	// 精神/20 得到百分比，然后除以100转换为小数
+	spiritBonus := float64(char.Spirit) / 20.0 / 100.0
+	rate := baseRate + spiritBonus
+	// 限制范围在0-50%之间
+	if rate < 0 {
+		rate = 0
+	}
+	if rate > 0.5 {
+		rate = 0.5
+	}
+	return rate
 }
 
 // CalculateSpellCritDamage 计算法术暴击伤害倍率
