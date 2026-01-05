@@ -419,6 +419,7 @@ func (tr *TestRunner) updateAssertionContext() {
 		tr.assertion.SetContext("character.spell_crit_rate", char.SpellCritRate)
 		tr.assertion.SetContext("character.spell_crit_damage", char.SpellCritDamage)
 		tr.assertion.SetContext("character.dodge_rate", char.DodgeRate)
+		tr.assertion.SetContext("character.id", char.ID)
 		
 		// 同步Buff信息（从上下文获取）
 		if buffModifier, exists := tr.context.Variables["character_buff_attack_modifier"]; exists {
@@ -792,10 +793,21 @@ func (tr *TestRunner) generateEquipmentFromMonster(action string) error {
 
 // createCharacter 创建角色
 func (tr *TestRunner) createCharacter(instruction string) error {
+	classID := "warrior" // 默认职业
+	if strings.Contains(instruction, "法师") {
+		classID = "mage"
+	} else if strings.Contains(instruction, "战士") {
+		classID = "warrior"
+	} else if strings.Contains(instruction, "盗贼") {
+		classID = "rogue"
+	} else if strings.Contains(instruction, "牧师") {
+		classID = "priest"
+	}
+	
 	char := &models.Character{
 		ID:       1,
 		Name:     "测试角色",
-		ClassID:  "warrior",
+		ClassID:  classID,
 		Level:    1,
 		Strength: 10,
 		Agility:  10,

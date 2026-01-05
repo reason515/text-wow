@@ -48,8 +48,9 @@ func (ae *AssertionExecutor) Execute(assertion Assertion) AssertionResult {
 		return result
 	}
 
-	// 检查 actual 是否为 nil
-	if actual == nil {
+	// 检查 actual 是否为 nil（对于 "null" 或 "nil" 的断言，nil 是有效的）
+	// 只有在 expected 不是 "null" 或 "nil" 时才检查 nil
+	if actual == nil && assertion.Expected != "null" && assertion.Expected != "nil" {
 		result.Status = "failed"
 		result.Error = fmt.Sprintf("value is nil for path: %s (context keys: %v)", 
 			assertion.Target, getMapKeys(ae.context))
@@ -211,10 +212,19 @@ func (ae *AssertionExecutor) assertEquals(actual interface{}, expected string) s
 		}
 		// 检查是否是空字符串或零值
 		actualStr := fmt.Sprintf("%v", actual)
-		if actualStr == "" || actualStr == "<nil>" || actualStr == "0" {
+		// 接受 nil、<nil>、空字符串、0 等表示空值的字符串
+		if actualStr == "" || actualStr == "<nil>" || actualStr == "0" || actualStr == "nil" || actualStr == "null" {
 			return "passed"
 		}
 		return "failed"
+	}
+	
+	// 如果 expected 是一个路径（如 "character.id"），尝试从上下文获取值
+	if strings.Contains(expected, ".") {
+		expectedValue, err := ae.getValue(expected)
+		if err == nil && expectedValue != nil {
+			expected = fmt.Sprintf("%v", expectedValue)
+		}
 	}
 	
 	actualStr := fmt.Sprintf("%v", actual)

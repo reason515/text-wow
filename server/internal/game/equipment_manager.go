@@ -552,8 +552,8 @@ func (em *EquipmentManager) validateEquipmentRequirements(char *models.Character
 	}
 
 	// 调试：打印item配置
-	fmt.Printf("[DEBUG] validateEquipmentRequirements: itemID=%s, charLevel=%d, item level_required=%v\n", 
-		equipment.ItemID, char.Level, item["level_required"])
+	fmt.Printf("[DEBUG] validateEquipmentRequirements: itemID=%s, charLevel=%d, charClass=%s, item level_required=%v, item class_required=%v\n", 
+		equipment.ItemID, char.Level, char.ClassID, item["level_required"], item["class_required"])
 
 	// 检查等级要求
 	levelRequired, ok := item["level_required"].(int)
