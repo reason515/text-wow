@@ -551,6 +551,10 @@ func (em *EquipmentManager) validateEquipmentRequirements(char *models.Character
 		return fmt.Errorf("failed to get item: %w", err)
 	}
 
+	// 调试：打印item配置
+	fmt.Printf("[DEBUG] validateEquipmentRequirements: itemID=%s, charLevel=%d, item level_required=%v\n", 
+		equipment.ItemID, char.Level, item["level_required"])
+
 	// 检查等级要求
 	levelRequired, ok := item["level_required"].(int)
 	if !ok {
@@ -562,19 +566,19 @@ func (em *EquipmentManager) validateEquipmentRequirements(char *models.Character
 		}
 	}
 	if levelRequired > 0 && char.Level < levelRequired {
-		return fmt.Errorf("character level %d is below required level %d", char.Level, levelRequired)
+		return fmt.Errorf("等级不足：角色等级 %d 低于需求等级 %d", char.Level, levelRequired)
 	}
 
 	// 检查职业要求
 	classRequired, _ := item["class_required"].(string)
 	if classRequired != "" && char.ClassID != classRequired {
-		return fmt.Errorf("character class %s does not match required class %s", char.ClassID, classRequired)
+		return fmt.Errorf("职业不匹配：角色职业 %s 不符合需求职业 %s", char.ClassID, classRequired)
 	}
 
 	// 检查属性要求
 	strengthRequired := getIntFromMap(item, "strength_required")
 	if strengthRequired > 0 && char.Strength < strengthRequired {
-		return fmt.Errorf("character strength %d is below required %d", char.Strength, strengthRequired)
+		return fmt.Errorf("属性不足：角色力量 %d 低于需求 %d", char.Strength, strengthRequired)
 	}
 	agilityRequired := getIntFromMap(item, "agility_required")
 	if agilityRequired > 0 && char.Agility < agilityRequired {

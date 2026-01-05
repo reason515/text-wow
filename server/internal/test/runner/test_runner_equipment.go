@@ -2,6 +2,7 @@ package runner
 
 import (
 	"fmt"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -30,14 +31,19 @@ func (tr *TestRunner) generateEquipmentWithAttributes(instruction string) error 
 	
 	// 解析装备类型和槽位
 	itemID := "worn_sword"
+	slot := "main_hand"
 	if strings.Contains(instruction, "武器") {
 		itemID = "worn_sword"
+		slot = "main_hand"
 	} else if strings.Contains(instruction, "护甲") || strings.Contains(instruction, "盔甲") {
 		itemID = "cloth_robe"
+		slot = "armor"
 	} else if strings.Contains(instruction, "饰品") {
 		itemID = "ring"
+		slot = "accessory"
 	} else if strings.Contains(instruction, "盾牌") {
 		itemID = "wooden_shield"
+		slot = "off_hand"
 	}
 	
 	// 解析品质（默认蓝色）
@@ -53,6 +59,132 @@ func (tr *TestRunner) generateEquipmentWithAttributes(instruction string) error 
 	} else if strings.Contains(instruction, "橙色") || strings.Contains(instruction, "legendary") {
 		quality = "legendary"
 	}
+	
+	// 解析装备要求（等级、职业、属性）
+	levelRequired := 0
+	classRequired := ""
+	strengthRequired := 0
+	agilityRequired := 0
+	intellectRequired := 0
+	
+	// 解析等级要求：如"需要10级才能装备"或"需要10级才能装备的武器"
+	if strings.Contains(instruction, "需要") && strings.Contains(instruction, "级才能装备") {
+		re := regexp.MustCompile(`需要(\d+)级才能装备`)
+		matches := re.FindStringSubmatch(instruction)
+		if len(matches) > 1 {
+			if l, err := strconv.Atoi(matches[1]); err == nil {
+				levelRequired = l
+				fmt.Fprintf(os.Stderr, "[DEBUG] generateEquipmentWithAttributes: parsed level_required=%d\n", levelRequired)
+			}
+		}
+	}
+	
+	// 解析职业要求：如"只有战士才能装备"
+	if strings.Contains(instruction, "只有") && strings.Contains(instruction, "才能装备") {
+		// 使用更宽泛的正则表达式匹配中文职业名称
+		re := regexp.MustCompile(`只有([^才]+)才能装备`)
+		matches := re.FindStringSubmatch(instruction)
+		if len(matches) > 1 {
+			classRequired = strings.TrimSpace(matches[1])
+			// 转换中文职业名称为ID
+			if classRequired == "战士" {
+				classRequired = "warrior"
+			} else if classRequired == "法师" {
+				classRequired = "mage"
+			} else if classRequired == "盗贼" {
+				classRequired = "rogue"
+			} else if classRequired == "牧师" {
+				classRequired = "priest"
+			}
+		}
+	}
+	
+	// 解析属性要求：如"需要力量15才能装备"
+	if strings.Contains(instruction, "需要") && (strings.Contains(instruction, "力量") || strings.Contains(instruction, "敏捷") || strings.Contains(instruction, "智力")) && strings.Contains(instruction, "才能装备") {
+		// 力量要求
+		if strings.Contains(instruction, "力量") {
+			re := regexp.MustCompile(`需要力量(\d+)才能装备`)
+			matches := re.FindStringSubmatch(instruction)
+			if len(matches) > 1 {
+				if s, err := strconv.Atoi(matches[1]); err == nil {
+					strengthRequired = s
+				}
+			}
+		}
+		// 敏捷要求
+		if strings.Contains(instruction, "敏捷") {
+			re := regexp.MustCompile(`需要敏捷(\d+)才能装备`)
+			matches := re.FindStringSubmatch(instruction)
+			if len(matches) > 1 {
+				if a, err := strconv.Atoi(matches[1]); err == nil {
+					agilityRequired = a
+				}
+			}
+		}
+		// 智力要求
+		if strings.Contains(instruction, "智力") {
+			re := regexp.MustCompile(`需要智力(\d+)才能装备`)
+			matches := re.FindStringSubmatch(instruction)
+			if len(matches) > 1 {
+				if i, err := strconv.Atoi(matches[1]); err == nil {
+					intellectRequired = i
+				}
+			}
+		}
+	}
+	
+	// 如果有特殊要求，创建或更新item配置
+	fmt.Fprintf(os.Stderr, "[DEBUG] generateEquipmentWithAttributes: checking requirements - levelRequired=%d, classRequired=%s, strengthRequired=%d, agilityRequired=%d, intellectRequired=%d\n", 
+		levelRequired, classRequired, strengthRequired, agilityRequired, intellectRequired)
+	if levelRequired > 0 || classRequired != "" || strengthRequired > 0 || agilityRequired > 0 || intellectRequired > 0 {
+		// 生成唯一的item ID（基于要求）
+		testItemID := fmt.Sprintf("test_item_%s_%d_%s_%d_%d_%d", slot, levelRequired, classRequired, strengthRequired, agilityRequired, intellectRequired)
+		fmt.Fprintf(os.Stderr, "[DEBUG] generateEquipmentWithAttributes: will create test item with ID=%s\n", testItemID)
+		
+		// 获取基础item配置
+		gameRepo := repository.NewGameRepository()
+		baseItem, err := gameRepo.GetItemByID(itemID)
+		if err != nil {
+			// 如果基础item不存在，创建一个默认配置
+			baseItem = map[string]interface{}{
+				"id":            testItemID,
+				"name":          "测试装备",
+				"type":          "equipment",
+				"slot":          slot,
+				"quality":       quality,
+				"level_required": levelRequired,
+				"class_required": classRequired,
+				"strength_required": strengthRequired,
+				"agility_required": agilityRequired,
+				"intellect_required": intellectRequired,
+			}
+		} else {
+			// 复制基础配置并更新要求
+			baseItem["id"] = testItemID
+			baseItem["level_required"] = levelRequired
+			if classRequired != "" {
+				baseItem["class_required"] = classRequired
+			}
+			baseItem["strength_required"] = strengthRequired
+			baseItem["agility_required"] = agilityRequired
+			baseItem["intellect_required"] = intellectRequired
+		}
+		
+		// 在数据库中插入或更新item配置
+		fmt.Fprintf(os.Stderr, "[DEBUG] generateEquipmentWithAttributes: calling createOrUpdateTestItem for itemID=%s\n", testItemID)
+		err = tr.createOrUpdateTestItem(baseItem)
+		if err != nil {
+			return fmt.Errorf("failed to create test item: %w", err)
+		}
+		fmt.Fprintf(os.Stderr, "[DEBUG] generateEquipmentWithAttributes: createOrUpdateTestItem succeeded for itemID=%s\n", testItemID)
+		
+		// 使用测试item ID
+		itemID = testItemID
+		fmt.Fprintf(os.Stderr, "[DEBUG] generateEquipmentWithAttributes: updated itemID to %s with requirements (level=%d, class=%s, str=%d, agi=%d, int=%d)\n", 
+			itemID, levelRequired, classRequired, strengthRequired, agilityRequired, intellectRequired)
+	}
+	
+	fmt.Fprintf(os.Stderr, "[DEBUG] generateEquipmentWithAttributes: using itemID=%s to generate equipment\n", itemID)
 	
 	// 确保用户和角色存在
 	ownerID := 1
@@ -286,6 +418,8 @@ func (tr *TestRunner) executeUnequipItem(instruction string) error {
 
 // executeTryEquipItem 尝试穿戴装备（用于测试失败情况）
 func (tr *TestRunner) executeTryEquipItem(instruction string) error {
+	fmt.Fprintf(os.Stderr, "[DEBUG] executeTryEquipItem: called with instruction=%s\n", instruction)
+	
 	char, ok := tr.context.Characters["character"]
 	if !ok || char == nil {
 		return fmt.Errorf("character not found")
@@ -295,6 +429,7 @@ func (tr *TestRunner) executeTryEquipItem(instruction string) error {
 	var equipment *models.EquipmentInstance
 	if eq, ok := tr.context.Variables["equipment"].(*models.EquipmentInstance); ok {
 		equipment = eq
+		fmt.Fprintf(os.Stderr, "[DEBUG] executeTryEquipItem: found equipment from Variables, ID=%d\n", equipment.ID)
 	} else if eqID, ok := tr.context.Variables["equipment_id"].(int); ok {
 		equipmentRepo := repository.NewEquipmentRepository()
 		eq, err := equipmentRepo.GetByID(eqID)
@@ -302,6 +437,14 @@ func (tr *TestRunner) executeTryEquipItem(instruction string) error {
 			return fmt.Errorf("failed to get equipment: %w", err)
 		}
 		equipment = eq
+		fmt.Fprintf(os.Stderr, "[DEBUG] executeTryEquipItem: found equipment from equipment_id, ID=%d\n", equipment.ID)
+	} else {
+		// 尝试从Equipments map中获取
+		for _, eq := range tr.context.Equipments {
+			equipment = eq
+			fmt.Fprintf(os.Stderr, "[DEBUG] executeTryEquipItem: found equipment from Equipments map, ID=%d\n", equipment.ID)
+			break
+		}
 	}
 	
 	if equipment == nil {
@@ -309,16 +452,21 @@ func (tr *TestRunner) executeTryEquipItem(instruction string) error {
 	}
 	
 	// 尝试穿戴装备
+	fmt.Fprintf(os.Stderr, "[DEBUG] executeTryEquipItem: attempting to equip equipment ID=%d for character ID=%d\n", equipment.ID, char.ID)
 	err := tr.equipmentManager.EquipItem(char.ID, equipment.ID)
 	if err != nil {
 		// 装备失败，记录错误信息
 		tr.context.Variables["equip_success"] = false
-		tr.context.Variables["error_message"] = err.Error()
+		errorMsg := err.Error()
+		// 确保错误消息包含中文关键词（用于contains断言）
+		tr.context.Variables["error_message"] = errorMsg
+		fmt.Fprintf(os.Stderr, "[DEBUG] executeTryEquipItem: equip failed, error=%s, set equip_success=false, error_message=%s\n", errorMsg, errorMsg)
 		return nil // 不返回错误，因为这是预期的失败
 	}
 	
 	// 装备成功
 	tr.context.Variables["equip_success"] = true
+	fmt.Fprintf(os.Stderr, "[DEBUG] executeTryEquipItem: equip succeeded, set equip_success=true\n")
 	
 	// 重新加载角色
 	charRepo := repository.NewCharacterRepository()

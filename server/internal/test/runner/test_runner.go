@@ -276,15 +276,16 @@ func (tr *TestRunner) executeInstruction(instruction string) error {
 	} else if strings.Contains(instruction, "获得") && (strings.Contains(instruction, "装备") || strings.Contains(instruction, "武器") || strings.Contains(instruction, "护甲") || strings.Contains(instruction, "饰品")) {
 		// 处理"获得一件X级武器，攻击力+X"这样的setup指令
 		return tr.generateEquipmentWithAttributes(instruction)
+	} else if strings.Contains(instruction, "尝试穿戴") || strings.Contains(instruction, "尝试装备") {
+		// 处理"角色尝试穿戴武器"等action（用于测试失败情况）
+		// 必须在"穿戴"之前检查，因为"尝试穿戴"包含"穿戴"
+		return tr.executeTryEquipItem(instruction)
 	} else if strings.Contains(instruction, "穿戴") && (strings.Contains(instruction, "装备") || strings.Contains(instruction, "武器") || strings.Contains(instruction, "护甲") || strings.Contains(instruction, "饰品")) {
 		// 处理"角色穿戴武器"、"角色穿戴装备"等action
 		return tr.executeEquipItem(instruction)
 	} else if strings.Contains(instruction, "卸下") && (strings.Contains(instruction, "装备") || strings.Contains(instruction, "武器") || strings.Contains(instruction, "护甲") || strings.Contains(instruction, "饰品")) {
 		// 处理"角色卸下武器"、"角色卸下装备"等action
 		return tr.executeUnequipItem(instruction)
-	} else if strings.Contains(instruction, "尝试穿戴") || strings.Contains(instruction, "尝试装备") {
-		// 处理"角色尝试穿戴武器"等action（用于测试失败情况）
-		return tr.executeTryEquipItem(instruction)
 	} else if strings.Contains(instruction, "依次穿戴") && strings.Contains(instruction, "装备") {
 		// 处理"角色依次穿戴所有装备"
 		return tr.executeEquipAllItems(instruction)
