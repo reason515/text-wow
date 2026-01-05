@@ -39,6 +39,21 @@ func (ae *AssertionExecutor) Execute(assertion Assertion) AssertionResult {
 	// 获取实际值
 	actual, err := ae.getValue(assertion.Target)
 	
+	// 强制检查：如果err为nil但actual也为nil，这是不应该发生的
+	if err == nil && actual == nil {
+		result.Status = "failed"
+		teamLen := 0
+		hasCalculator := false
+		if ae.testContext != nil {
+			teamLen = len(ae.testContext.Team)
+			hasCalculator = ae.testContext.Calculator != nil
+		}
+		result.Error = fmt.Sprintf("getValue returned (nil, nil) for path: %s (context keys: %v, testContext: %v, team: %d, calculator: %v)", 
+			assertion.Target, getMapKeys(ae.context), ae.testContext != nil, teamLen, hasCalculator)
+		result.Actual = nil
+		return result
+	}
+	
 	if err != nil {
 		result.Status = "failed"
 		result.Error = fmt.Sprintf("failed to get value: %v", err)
