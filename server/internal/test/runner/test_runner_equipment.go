@@ -212,6 +212,15 @@ func (tr *TestRunner) executeEquipItem(instruction string) error {
 		tr.context.Equipments[fmt.Sprintf("%d", updatedEquipment.ID)] = updatedEquipment
 	}
 	
+	// 如果有旧装备，重新加载以获取更新后的character_id（应该是nil）
+	if oldEquipment != nil {
+		updatedOldEquipment, err := equipmentRepo.GetByID(oldEquipment.ID)
+		if err == nil {
+			tr.context.Variables["old_weapon"] = updatedOldEquipment
+			tr.context.Variables["old_equipment"] = updatedOldEquipment
+		}
+	}
+	
 	return nil
 }
 
