@@ -268,7 +268,9 @@ func (ae *AssertionExecutor) resolvePath(path string) (interface{}, error) {
 	// 计算属性（从上下文获取，如果上下文中没有则尝试计算）
 	case "physical_attack", "magic_attack", "max_hp", "phys_crit_rate", "dodge_rate", "speed",
 		"mana_regen", "rage_gain", "energy_regen", "base_damage", "damage_after_defense", "final_damage",
-		"overhealing", "skill_damage_dealt", "skill_used", "equip_success", "error_message":
+		"overhealing", "skill_damage_dealt", "skill_used", "skill_learned", "skill_healing_done",
+		"skill_cooldown_round_1", "skill_usable_round_2", "skill_usable_round_4",
+		"equip_success", "error_message":
 		// 首先尝试从上下文获取
 		if val, exists := ae.context[root]; exists {
 			if val == nil {
@@ -516,6 +518,8 @@ func (ae *AssertionExecutor) getCharacterField(char *models.Character, fieldName
 		return char.Stamina
 	case "spirit", "Spirit":
 		return char.Spirit
+	case "skill_points", "skillPoints", "SkillPoints", "unspent_points", "unspentPoints", "UnspentPoints":
+		return char.UnspentPoints
 	case "phys_crit_rate", "physCritRate":
 		return char.PhysCritRate
 	case "phys_crit_damage", "physCritDamage":
@@ -564,6 +568,50 @@ func (ae *AssertionExecutor) getCharacterField(char *models.Character, fieldName
 			return skillIDs
 		}
 		return []string{}
+	case "initial_skills_count", "initialSkillsCount":
+		// 返回初始技能数量（创建时获得的技能数量）
+		if char.Skills != nil {
+			return len(char.Skills)
+		}
+		return 0
+	case "buff_attack_modifier", "buffAttackModifier":
+		// 从Buffs中获取攻击力加成
+		if char.Buffs != nil {
+			for _, buff := range char.Buffs {
+				if buff.StatAffected == "physical_attack" || buff.StatAffected == "attack" {
+					return buff.Value
+				}
+			}
+		}
+		// 如果没有Buff，尝试从战斗会话获取
+		if ae.testContext != nil && ae.testContext.UserID > 0 {
+			session := ae.testContext.BattleManager.GetSession(ae.testContext.UserID)
+			if session != nil && session.BuffManager != nil {
+				buffs := session.BuffManager.GetCharacterBuffs(char.ID)
+				for _, buff := range buffs {
+					if buff.StatAffected == "physical_attack" || buff.StatAffected == "attack" {
+						return buff.Value
+					}
+				}
+			}
+		}
+		return 0.0
+	case "buff_duration", "buffDuration":
+		// 从Buffs中获取持续时间
+		if char.Buffs != nil && len(char.Buffs) > 0 {
+			return char.Buffs[0].Duration
+		}
+		// 如果没有Buff，尝试从战斗会话获取
+		if ae.testContext != nil && ae.testContext.UserID > 0 {
+			session := ae.testContext.BattleManager.GetSession(ae.testContext.UserID)
+			if session != nil && session.BuffManager != nil {
+				buffs := session.BuffManager.GetCharacterBuffs(char.ID)
+				if len(buffs) > 0 {
+					return buffs[0].Duration
+				}
+			}
+		}
+		return 0
 	default:
 		// 处理skill_xxx格式的字段（如skill_charge）
 		if strings.HasPrefix(fieldName, "skill_") {
