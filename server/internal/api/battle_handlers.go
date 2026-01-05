@@ -197,9 +197,8 @@ func (h *BattleHandler) GetBattleStatus(c *gin.Context) {
 	
 	status := h.battleMgr.GetBattleStatus(userID)
 	
-	// 获取计算器和职业信息
+	// 获取计算器
 	calculator := game.NewCalculator()
-	gameRepo := repository.NewGameRepository()
 	
 	// 为每个角色添加buff信息，并确保战士的怒气正确，同时重新计算属性
 	for _, char := range characters {
