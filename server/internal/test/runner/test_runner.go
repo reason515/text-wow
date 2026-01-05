@@ -301,6 +301,12 @@ func (tr *TestRunner) updateAssertionContext() {
 		tr.assertion.SetContext("character.hp", char.HP)
 		tr.assertion.SetContext("character.max_hp", char.MaxHP)
 		tr.assertion.SetContext("character.level", char.Level)
+		tr.assertion.SetContext("character.resource", char.Resource)
+		tr.assertion.SetContext("character.max_resource", char.MaxResource)
+		tr.assertion.SetContext("character.physical_attack", char.PhysicalAttack)
+		tr.assertion.SetContext("character.magic_attack", char.MagicAttack)
+		tr.assertion.SetContext("character.physical_defense", char.PhysicalDefense)
+		tr.assertion.SetContext("character.magic_defense", char.MagicDefense)
 	}
 	
 	// 同步装备信息

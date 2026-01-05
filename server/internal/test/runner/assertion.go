@@ -31,9 +31,29 @@ func (ae *AssertionExecutor) Execute(assertion Assertion) AssertionResult {
 
 	// 获取实际值
 	actual, err := ae.getValue(assertion.Target)
+	
+	// 检查 (nil, nil) 的情况
+	if err == nil && actual == nil {
+		result.Status = "failed"
+		result.Error = fmt.Sprintf("getValue returned (nil, nil) for path: %s (context keys: %v)", 
+			assertion.Target, getMapKeys(ae.context))
+		result.Actual = nil
+		return result
+	}
+	
 	if err != nil {
 		result.Status = "failed"
 		result.Error = fmt.Sprintf("failed to get value: %v", err)
+		result.Actual = nil
+		return result
+	}
+
+	// 检查 actual 是否为 nil
+	if actual == nil {
+		result.Status = "failed"
+		result.Error = fmt.Sprintf("value is nil for path: %s (context keys: %v)", 
+			assertion.Target, getMapKeys(ae.context))
+		result.Actual = nil
 		return result
 	}
 
@@ -380,6 +400,18 @@ func (ae *AssertionExecutor) SetContext(key string, value interface{}) {
 // ClearContext 清空测试上下文
 func (ae *AssertionExecutor) ClearContext() {
 	ae.context = make(map[string]interface{})
+}
+
+// getMapKeys 获取 map 的所有键（用于调试）
+func getMapKeys(m map[string]interface{}) []string {
+	if m == nil {
+		return []string{"<nil>"}
+	}
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
 }
 
 // assertNotContains 断言不包含

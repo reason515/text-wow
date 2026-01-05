@@ -229,9 +229,17 @@ func (tr *TestRunner) RunTestCase(testCase TestCase) TestResult {
 	// 执行断言
 	for _, assertion := range testCase.Assertions {
 		assertionResult := tr.assertion.Execute(assertion)
+		// 直接打印 Error 字段的值用于调试（使用 stderr 确保输出）
+		fmt.Fprintf(os.Stderr, "[DEBUG RunTestCase] 断言结果: Target=%s, Status=%s, Error='%s' (长度=%d), Actual=%v\n", 
+			assertionResult.Target, assertionResult.Status, assertionResult.Error, len(assertionResult.Error), assertionResult.Actual)
 		result.Assertions = append(result.Assertions, assertionResult)
 		if assertionResult.Status == "failed" {
 			result.Status = "failed"
+			// 如果断言失败但 Error 为空，打印警告
+			if assertionResult.Error == "" {
+				fmt.Fprintf(os.Stderr, "[WARNING RunTestCase] 断言失败但Error为空! Target=%s, Actual=%v\n", 
+					assertionResult.Target, assertionResult.Actual)
+			}
 		}
 	}
 

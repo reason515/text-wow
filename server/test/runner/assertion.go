@@ -30,12 +30,17 @@ func (ae *AssertionExecutor) SetTestContext(ctx *TestContext) {
 
 // Execute 执行断言
 func (ae *AssertionExecutor) Execute(assertion Assertion) AssertionResult {
+	// 在函数开头打印，确认函数被调用
+	fmt.Fprintf(os.Stderr, "[DEBUG Execute] 开始执行断言: Target=%s, Type=%s, Expected=%s\n", 
+		assertion.Target, assertion.Type, assertion.Expected)
+	
 	result := AssertionResult{
 		Type:     assertion.Type,
 		Target:   assertion.Target,
 		Expected: assertion.Expected,
 		Status:   "pending",
 		Message:  assertion.Message,
+		Error:    "", // 显式初始化为空字符串
 	}
 
 	// 获取实际值
