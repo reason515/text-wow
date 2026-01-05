@@ -1109,9 +1109,13 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 		}
 		if existingChar != nil {
 			char.ID = existingChar.ID
-			// 更新已存在角色的ClassID（如果指令中指定了）
+			// 更新已存在角色的ClassID（如果指令中指定了不同的职业）
 			if char.ClassID != existingChar.ClassID {
 				existingChar.ClassID = char.ClassID
+				// 更新数据库中的ClassID
+				if err := charRepo.Update(existingChar); err != nil {
+					return fmt.Errorf("failed to update character class: %w", err)
+				}
 			}
 			char = existingChar // 使用数据库中的角色，但更新ClassID
 			// 在设置ID之后，如果MaxHP为0或小于计算值，重新计算MaxHP（从数据库读取后可能被重置）
