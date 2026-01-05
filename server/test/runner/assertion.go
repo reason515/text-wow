@@ -213,10 +213,19 @@ func (ae *AssertionExecutor) Execute(assertion Assertion) AssertionResult {
 					assertion.Target, assertion.Type, assertion.Expected, actual, actual)
 			}
 		}
-		fmt.Fprintf(os.Stderr, "[DEBUG Execute] 设置默认错误信息: Error=%s\n", result.Error)
+		fmt.Fprintf(os.Stderr, "[DEBUG Execute] 设置默认错误信息: Error='%s' (长度=%d)\n", result.Error, len(result.Error))
 	}
 
-	fmt.Fprintf(os.Stderr, "[DEBUG Execute] 返回结果: Status=%s, Error=%s, Actual=%v\n", result.Status, result.Error, result.Actual)
+	// 强制检查：如果Status是failed但Error为空，这不应该发生
+	// 但先不panic，而是设置一个默认错误信息
+	if result.Status == "failed" && result.Error == "" {
+		result.Error = fmt.Sprintf("CRITICAL: Assertion failed but Error was empty! Target=%s, Actual=%v, Type=%T, Expected=%s", 
+			assertion.Target, actual, actual, assertion.Expected)
+		fmt.Fprintf(os.Stderr, "[DEBUG Execute] CRITICAL: 发现Status=failed但Error为空，已设置默认错误信息\n")
+	}
+
+	fmt.Fprintf(os.Stderr, "[DEBUG Execute] 返回结果: Status=%s, Error='%s' (长度=%d), Actual=%v\n", 
+		result.Status, result.Error, len(result.Error), result.Actual)
 	return result
 }
 

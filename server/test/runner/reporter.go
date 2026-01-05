@@ -43,6 +43,9 @@ func (r *Reporter) GenerateReport(result *TestSuiteResult) string {
 				if assertion.Status == "failed" {
 					report += fmt.Sprintf("  断言失败: %s %s %s (实际: %v)\n",
 						assertion.Target, assertion.Type, assertion.Expected, assertion.Actual)
+					// 调试信息：总是显示 Error 字段的值
+					report += fmt.Sprintf("    [DEBUG] Error字段值: '%s' (长度=%d, 是否为空=%v)\n", 
+						assertion.Error, len(assertion.Error), assertion.Error == "")
 					if assertion.Error != "" {
 						report += fmt.Sprintf("    错误: %s\n", assertion.Error)
 					}
