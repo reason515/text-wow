@@ -421,6 +421,11 @@ func (tr *TestRunner) updateAssertionContext() {
 		tr.assertion.SetContext("character.dodge_rate", char.DodgeRate)
 		tr.assertion.SetContext("character.id", char.ID)
 		
+		// 计算并同步速度（speed = agility）
+		speed := tr.calculator.CalculateSpeed(char)
+		tr.assertion.SetContext("character.speed", speed)
+		tr.assertion.SetContext("speed", speed)
+		
 		// 同步Buff信息（从上下文获取）
 		if buffModifier, exists := tr.context.Variables["character_buff_attack_modifier"]; exists {
 			tr.assertion.SetContext("character.buff_attack_modifier", buffModifier)
@@ -460,7 +465,7 @@ func (tr *TestRunner) updateAssertionContext() {
 	tr.syncEquipmentToContext("new_equipment", tr.context.Variables["new_equipment"])
 	
 	// 同步装备槽位计数（用于测试槽位冲突）
-	if char, ok := tr.context.Characters["character"]; ok {
+	if char, ok := tr.context.Characters["character"]; ok && char != nil {
 		equipmentRepo := repository.NewEquipmentRepository()
 		mainHandCount := 0
 		equippedEquipments, _ := equipmentRepo.GetByCharacterID(char.ID)
@@ -803,6 +808,8 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 	} else if strings.Contains(instruction, "牧师") {
 		classID = "priest"
 	}
+	// 保存ClassID到Variables
+	tr.context.Variables["character_class_id"] = classID
 	
 	char := &models.Character{
 		ID:       1,
@@ -848,7 +855,8 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 			agiStr := parseAttribute(parts[1])
 			if agi, err := strconv.Atoi(agiStr); err == nil {
 				char.Agility = agi
-				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: set Agility=%d\n", agi)
+				tr.context.Variables["character_agility"] = agi
+				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: set Agility=%d and saved to Variables\n", agi)
 			}
 		}
 	}
@@ -1002,6 +1010,9 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 				if len(hpParts) >= 2 {
 					if maxHP, err := strconv.Atoi(strings.TrimSpace(hpParts[1])); err == nil {
 						char.MaxHP = maxHP
+						// 保存MaxHP到Variables，以便后续恢复
+						tr.context.Variables["character_explicit_max_hp"] = maxHP
+						fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: set explicitMaxHP=%d\n", maxHP)
 					}
 				}
 			} else {
@@ -1098,6 +1109,33 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 			return fmt.Errorf("failed to create character in DB: %w", err)
 		}
 		char = createdChar
+		
+		// 从Variables恢复我们在指令中设置的属性值（Create可能覆盖了它们）
+		if strengthVal, exists := tr.context.Variables["character_strength"]; exists {
+			if strength, ok := strengthVal.(int); ok {
+				char.Strength = strength
+			}
+		}
+		if agilityVal, exists := tr.context.Variables["character_agility"]; exists {
+			if agility, ok := agilityVal.(int); ok {
+				char.Agility = agility
+			}
+		}
+		if intellectVal, exists := tr.context.Variables["character_intellect"]; exists {
+			if intellect, ok := intellectVal.(int); ok {
+				char.Intellect = intellect
+			}
+		}
+		if staminaVal, exists := tr.context.Variables["character_stamina"]; exists {
+			if stamina, ok := staminaVal.(int); ok {
+				char.Stamina = stamina
+			}
+		}
+		if spiritVal, exists := tr.context.Variables["character_spirit"]; exists {
+			if spirit, ok := spiritVal.(int); ok {
+				char.Spirit = spirit
+			}
+		}
 	} else {
 		// 查找匹配slot的角色
 		var existingChar *models.Character
@@ -1109,23 +1147,41 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 		}
 		if existingChar != nil {
 			char.ID = existingChar.ID
+			// 使用数据库中的角色
+			char = existingChar
+			
+			// 从Variables恢复我们在指令中设置的属性值
+			if strengthVal, exists := tr.context.Variables["character_strength"]; exists {
+				if strength, ok := strengthVal.(int); ok {
+					char.Strength = strength
+				}
+			}
+			if agilityVal, exists := tr.context.Variables["character_agility"]; exists {
+				if agility, ok := agilityVal.(int); ok {
+					char.Agility = agility
+				}
+			}
+			if intellectVal, exists := tr.context.Variables["character_intellect"]; exists {
+				if intellect, ok := intellectVal.(int); ok {
+					char.Intellect = intellect
+				}
+			}
+			if staminaVal, exists := tr.context.Variables["character_stamina"]; exists {
+				if stamina, ok := staminaVal.(int); ok {
+					char.Stamina = stamina
+				}
+			}
+			if spiritVal, exists := tr.context.Variables["character_spirit"]; exists {
+				if spirit, ok := spiritVal.(int); ok {
+					char.Spirit = spirit
+				}
+			}
 			// 更新已存在角色的ClassID（如果指令中指定了不同的职业）
-			if char.ClassID != existingChar.ClassID {
-				existingChar.ClassID = char.ClassID
-				// 更新数据库中的ClassID
-				if err := charRepo.Update(existingChar); err != nil {
-					return fmt.Errorf("failed to update character class: %w", err)
+			if classIDVal, exists := tr.context.Variables["character_class_id"]; exists {
+				if classID, ok := classIDVal.(string); ok && classID != "" {
+					char.ClassID = classID
 				}
 			}
-			// 如果指令中指定了不同的职业，更新数据库中的ClassID
-			if char.ClassID != existingChar.ClassID {
-				existingChar.ClassID = char.ClassID
-				// 更新数据库中的ClassID
-				if err := charRepo.Update(existingChar); err != nil {
-					return fmt.Errorf("failed to update character class: %w", err)
-				}
-			}
-			char = existingChar // 使用数据库中的角色，但更新ClassID
 			// 在设置ID之后，如果MaxHP为0或小于计算值，重新计算MaxHP（从数据库读取后可能被重置）
 			// 但是，如果HP已经被明确设置（通过"HP="指令），不要覆盖它
 			explicitHP := 0
@@ -1140,8 +1196,26 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 					baseHP = hp
 				}
 			}
+			// 检查MaxHP是否已经被明确设置（通过"HP=95/100"）
+			explicitMaxHP := 0
+			if maxHPVal, exists := tr.context.Variables["character_explicit_max_hp"]; exists {
+				if maxHP, ok := maxHPVal.(int); ok && maxHP > 0 {
+					explicitMaxHP = maxHP
+				}
+			}
+			
 			calculatedMaxHP := tr.calculator.CalculateHP(char, baseHP)
-			if char.MaxHP == 0 || char.MaxHP < calculatedMaxHP {
+			// 如果MaxHP已经被明确设置，使用明确设置的值
+			if explicitMaxHP > 0 {
+				char.MaxHP = explicitMaxHP
+				// 如果HP已经被明确设置，保持HP不变
+				if explicitHP > 0 {
+					char.HP = explicitHP
+				} else if char.HP == 0 || char.HP < char.MaxHP {
+					char.HP = char.MaxHP
+				}
+				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after setting ID, using explicitMaxHP=%d, HP=%d (explicitHP=%d)\n", char.MaxHP, char.HP, explicitHP)
+			} else if char.MaxHP == 0 || char.MaxHP < calculatedMaxHP {
 				char.MaxHP = calculatedMaxHP
 				// 如果HP已经被明确设置，保持HP不变
 				if explicitHP > 0 {
@@ -1201,10 +1275,38 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after Update, char.PhysicalAttack=%d (not restored)\n", char.PhysicalAttack)
 			}
 			// 恢复Resource值（如果它被数据库更新覆盖了）
-			if savedResource > 0 {
-				char.Resource = savedResource
+			// 优先使用savedResource和savedMaxResource（如果它们都不为0）
+			// 如果MaxResource是100（默认值），Resource也应该恢复为100（除非被明确设置为其他值）
+			if savedResource > 0 && savedMaxResource > 0 {
+				// 如果savedMaxResource是100（默认值），且savedResource小于100，说明Resource可能被错误重置了
+				// 在这种情况下，恢复Resource为MaxResource
+				if savedMaxResource == 100 && savedResource < 100 {
+					char.Resource = savedMaxResource
+					char.MaxResource = savedMaxResource
+					fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after Update, restored Resource=%d/%d (from MaxResource, Resource was %d)\n", char.Resource, char.MaxResource, savedResource)
+				} else {
+					char.Resource = savedResource
+					char.MaxResource = savedMaxResource
+					fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after Update, restored Resource=%d/%d\n", char.Resource, char.MaxResource)
+				}
+			} else if savedMaxResource > 0 {
+				// 如果MaxResource不为0但Resource为0，恢复Resource为MaxResource
+				char.Resource = savedMaxResource
 				char.MaxResource = savedMaxResource
-				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after Update, restored Resource=%d/%d\n", char.Resource, char.MaxResource)
+				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after Update, restored Resource=%d/%d (from MaxResource)\n", char.Resource, char.MaxResource)
+			} else if char.Resource == 0 && char.MaxResource == 0 {
+				// 如果资源被重置为0，恢复默认值
+				char.Resource = 100
+				char.MaxResource = 100
+				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after Update, restored default Resource=100/100\n")
+			} else if char.MaxResource > 0 && char.Resource == 0 {
+				// 如果MaxResource不为0但Resource为0，恢复Resource为MaxResource
+				char.Resource = char.MaxResource
+				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after Update, restored Resource=%d (from MaxResource)\n", char.Resource)
+			} else if char.MaxResource == 100 && char.Resource < 100 {
+				// 如果MaxResource是100但Resource小于100，恢复Resource为100
+				char.Resource = char.MaxResource
+				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after Update, restored Resource=%d (MaxResource is 100)\n", char.Resource)
 			}
 			// 恢复MaxHP和HP值（如果它们被数据库更新覆盖了）
 			if savedMaxHP > 0 {
@@ -1236,10 +1338,38 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after Create, char.PhysicalAttack=%d (not restored)\n", char.PhysicalAttack)
 			}
 			// 恢复Resource值（如果它被Create覆盖了）
-			if savedResource > 0 {
-				char.Resource = savedResource
+			// 优先使用savedResource和savedMaxResource（如果它们都不为0）
+			// 如果MaxResource是100（默认值），Resource也应该恢复为100（除非被明确设置为其他值）
+			if savedResource > 0 && savedMaxResource > 0 {
+				// 如果savedMaxResource是100（默认值），且savedResource小于100，说明Resource可能被错误重置了
+				// 在这种情况下，恢复Resource为MaxResource
+				if savedMaxResource == 100 && savedResource < 100 {
+					char.Resource = savedMaxResource
+					char.MaxResource = savedMaxResource
+					fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after Create, restored Resource=%d/%d (from MaxResource, Resource was %d)\n", char.Resource, char.MaxResource, savedResource)
+				} else {
+					char.Resource = savedResource
+					char.MaxResource = savedMaxResource
+					fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after Create, restored Resource=%d/%d\n", char.Resource, char.MaxResource)
+				}
+			} else if savedMaxResource > 0 {
+				// 如果MaxResource不为0但Resource为0，恢复Resource为MaxResource
+				char.Resource = savedMaxResource
 				char.MaxResource = savedMaxResource
-				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after Create, restored Resource=%d/%d\n", char.Resource, char.MaxResource)
+				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after Create, restored Resource=%d/%d (from MaxResource)\n", char.Resource, char.MaxResource)
+			} else if char.Resource == 0 && char.MaxResource == 0 {
+				// 如果资源被重置为0，恢复默认值
+				char.Resource = 100
+				char.MaxResource = 100
+				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after Create, restored default Resource=100/100\n")
+			} else if char.MaxResource > 0 && char.Resource == 0 {
+				// 如果MaxResource不为0但Resource为0，恢复Resource为MaxResource
+				char.Resource = char.MaxResource
+				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after Create, restored Resource=%d (from MaxResource)\n", char.Resource)
+			} else if char.MaxResource == 100 && char.Resource < 100 {
+				// 如果MaxResource是100但Resource小于100，恢复Resource为100
+				char.Resource = char.MaxResource
+				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after Create, restored Resource=%d (MaxResource is 100)\n", char.Resource)
 			}
 			// 恢复MaxHP和HP值（如果它们被Create覆盖了）
 			if savedMaxHP > 0 {
@@ -1254,9 +1384,99 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 		}
 	}
 	
-	// 存储到上下文（确保PhysicalAttack正确）
+	// 在计算属性前，确保基础属性值正确（从Variables恢复）
+	if strengthVal, exists := tr.context.Variables["character_strength"]; exists {
+		if strength, ok := strengthVal.(int); ok {
+			char.Strength = strength
+			fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: restored Strength=%d from Variables before calculation\n", strength)
+		}
+	}
+	if agilityVal, exists := tr.context.Variables["character_agility"]; exists {
+		if agility, ok := agilityVal.(int); ok {
+			char.Agility = agility
+			fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: restored Agility=%d from Variables before calculation\n", agility)
+		}
+	} else {
+		fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: character_agility NOT found in Variables (keys: %v)\n", getMapKeys(tr.context.Variables))
+	}
+	if intellectVal, exists := tr.context.Variables["character_intellect"]; exists {
+		if intellect, ok := intellectVal.(int); ok {
+			char.Intellect = intellect
+		}
+	}
+	if staminaVal, exists := tr.context.Variables["character_stamina"]; exists {
+		if stamina, ok := staminaVal.(int); ok {
+			char.Stamina = stamina
+		}
+	}
+	if spiritVal, exists := tr.context.Variables["character_spirit"]; exists {
+		if spirit, ok := spiritVal.(int); ok {
+			char.Spirit = spirit
+		}
+	}
+	
+	// 计算并更新所有属性（如果它们为0或未设置）
+	// 获取基础HP（从Variables或使用默认值）
+	baseHP := 35 // 默认战士基础HP
+	if baseHPVal, exists := tr.context.Variables["character_base_hp"]; exists {
+		if hp, ok := baseHPVal.(int); ok {
+			baseHP = hp
+		}
+	}
+	
+	// 计算所有属性（如果为0，则重新计算）
+	// 注意：如果属性已经在指令中明确设置（如"物理暴击率=20%"），则不会覆盖
+	// 只有在属性为0时才计算
+	if char.PhysicalAttack == 0 {
+		char.PhysicalAttack = tr.calculator.CalculatePhysicalAttack(char)
+	}
+	if char.MagicAttack == 0 {
+		char.MagicAttack = tr.calculator.CalculateMagicAttack(char)
+	}
+	if char.PhysicalDefense == 0 {
+		char.PhysicalDefense = tr.calculator.CalculatePhysicalDefense(char)
+	}
+	if char.MagicDefense == 0 {
+		char.MagicDefense = tr.calculator.CalculateMagicDefense(char)
+	}
+	// 暴击率和闪避率：如果为0，则计算；如果已设置，保持原值
+	if char.PhysCritRate == 0 {
+		char.PhysCritRate = tr.calculator.CalculatePhysCritRate(char)
+	}
+	if char.PhysCritDamage == 0 {
+		char.PhysCritDamage = tr.calculator.CalculatePhysCritDamage(char)
+	}
+	if char.SpellCritRate == 0 {
+		char.SpellCritRate = tr.calculator.CalculateSpellCritRate(char)
+	}
+	if char.SpellCritDamage == 0 {
+		char.SpellCritDamage = tr.calculator.CalculateSpellCritDamage(char)
+	}
+	if char.DodgeRate == 0 {
+		char.DodgeRate = tr.calculator.CalculateDodgeRate(char)
+	}
+	
+	// 计算MaxHP（如果为0，或者如果MaxHP小于明确设置的HP值）
+	// 但是，如果MaxHP已经被明确设置（通过"HP=95/100"），不要覆盖它
+	if char.MaxHP == 0 {
+		char.MaxHP = tr.calculator.CalculateHP(char, baseHP)
+		if char.HP == 0 {
+			char.HP = char.MaxHP
+		}
+	} else {
+		// 如果MaxHP已经被设置，确保HP不超过MaxHP
+		if char.HP > char.MaxHP {
+			char.HP = char.MaxHP
+		}
+		// 如果HP为0但MaxHP不为0，设置HP为MaxHP
+		if char.HP == 0 && char.MaxHP > 0 {
+			char.HP = char.MaxHP
+		}
+	}
+	
+	// 存储到上下文（确保所有属性正确）
 	tr.context.Characters["character"] = char
-	fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: stored character to context, PhysicalAttack=%d\n", char.PhysicalAttack)
+	fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: stored character to context, PhysicalAttack=%d, MagicAttack=%d\n", char.PhysicalAttack, char.MagicAttack)
 	// 也存储到Variables，以防角色对象被修改
 	if char.PhysicalAttack > 0 {
 		tr.context.Variables["character_physical_attack"] = char.PhysicalAttack
@@ -1665,7 +1885,17 @@ func (tr *TestRunner) executeCalculateSpeed() error {
 		return fmt.Errorf("character not found")
 	}
 	
+	// 确保敏捷值正确（从Variables恢复，如果存在）
+	if agilityVal, exists := tr.context.Variables["character_agility"]; exists {
+		if agility, ok := agilityVal.(int); ok {
+			char.Agility = agility
+			fmt.Fprintf(os.Stderr, "[DEBUG] executeCalculateSpeed: restored Agility=%d from Variables\n", agility)
+		}
+	}
+	
+	fmt.Fprintf(os.Stderr, "[DEBUG] executeCalculateSpeed: char.Agility=%d\n", char.Agility)
 	speed := tr.calculator.CalculateSpeed(char)
+	fmt.Fprintf(os.Stderr, "[DEBUG] executeCalculateSpeed: calculated speed=%d\n", speed)
 	tr.assertion.SetContext("speed", speed)
 	tr.context.Variables["speed"] = speed
 	return nil
@@ -2078,12 +2308,13 @@ func (tr *TestRunner) createSkill(instruction string) error {
 		}
 	}
 	
-	// 解析治疗量（如"治疗量=30"）
+	// 解析治疗量（如"治疗量=30"或"治疗量=20"）
 	if strings.Contains(instruction, "治疗量") {
 		parts := strings.Split(instruction, "治疗量")
 		if len(parts) > 1 {
 			healStr := strings.TrimSpace(strings.Split(parts[1], "，")[0])
-			healStr = strings.TrimSpace(strings.Split(healStr, "=")[0])
+			healStr = strings.TrimSpace(strings.Split(healStr, ",")[0])
+			// 解析"=20"格式
 			if strings.Contains(healStr, "=") {
 				healParts := strings.Split(healStr, "=")
 				if len(healParts) > 1 {
@@ -2094,6 +2325,7 @@ func (tr *TestRunner) createSkill(instruction string) error {
 				skill.Type = "heal"
 				// 将治疗量存储到上下文中
 				tr.context.Variables["skill_heal_amount"] = heal
+				fmt.Fprintf(os.Stderr, "[DEBUG] createSkill: parsed heal amount=%d\n", heal)
 			}
 		}
 	}
