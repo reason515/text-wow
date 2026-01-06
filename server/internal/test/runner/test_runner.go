@@ -340,6 +340,8 @@ func (tr *TestRunner) executeInstruction(instruction string) error {
 		return tr.executeApplyCrit()
 	} else if strings.Contains(instruction, "计算伤害") {
 		return tr.executeCalculateDamage(instruction)
+	} else if strings.Contains(instruction, "学习技能") || strings.Contains(instruction, "角色学习技能") {
+		return tr.executeLearnSkill(instruction)
 	} else if strings.Contains(instruction, "使用技能") || strings.Contains(instruction, "角色使用技能") || (strings.Contains(instruction, "使用") && strings.Contains(instruction, "技能")) {
 		return tr.executeUseSkill(instruction)
 	} else if strings.Contains(instruction, "创建一个") && strings.Contains(instruction, "技能") {
@@ -420,6 +422,32 @@ func (tr *TestRunner) updateAssertionContext() {
 		tr.assertion.SetContext("character.spell_crit_damage", char.SpellCritDamage)
 		tr.assertion.SetContext("character.dodge_rate", char.DodgeRate)
 		tr.assertion.SetContext("character.id", char.ID)
+		tr.assertion.SetContext("character.strength", char.Strength)
+		tr.assertion.SetContext("character.agility", char.Agility)
+		tr.assertion.SetContext("character.intellect", char.Intellect)
+		tr.assertion.SetContext("character.stamina", char.Stamina)
+		tr.assertion.SetContext("character.spirit", char.Spirit)
+		
+		// 同时设置简化路径（不带character.前缀），以支持测试用例中的直接访问
+		tr.assertion.SetContext("hp", char.HP)
+		tr.assertion.SetContext("max_hp", char.MaxHP)
+		tr.assertion.SetContext("level", char.Level)
+		tr.assertion.SetContext("resource", char.Resource)
+		tr.assertion.SetContext("max_resource", char.MaxResource)
+		tr.assertion.SetContext("physical_attack", char.PhysicalAttack)
+		tr.assertion.SetContext("magic_attack", char.MagicAttack)
+		tr.assertion.SetContext("physical_defense", char.PhysicalDefense)
+		tr.assertion.SetContext("magic_defense", char.MagicDefense)
+		tr.assertion.SetContext("phys_crit_rate", char.PhysCritRate)
+		tr.assertion.SetContext("phys_crit_damage", char.PhysCritDamage)
+		tr.assertion.SetContext("spell_crit_rate", char.SpellCritRate)
+		tr.assertion.SetContext("spell_crit_damage", char.SpellCritDamage)
+		tr.assertion.SetContext("dodge_rate", char.DodgeRate)
+		tr.assertion.SetContext("strength", char.Strength)
+		tr.assertion.SetContext("agility", char.Agility)
+		tr.assertion.SetContext("intellect", char.Intellect)
+		tr.assertion.SetContext("stamina", char.Stamina)
+		tr.assertion.SetContext("spirit", char.Spirit)
 		
 		// 计算并同步速度（speed = agility）
 		speed := tr.calculator.CalculateSpeed(char)
@@ -798,6 +826,9 @@ func (tr *TestRunner) generateEquipmentFromMonster(action string) error {
 
 // createCharacter 创建角色
 func (tr *TestRunner) createCharacter(instruction string) error {
+	// 保存当前指令到上下文，以便后续判断是否明确设置了某些属性
+	tr.context.Variables["last_instruction"] = instruction
+	
 	classID := "warrior" // 默认职业
 	if strings.Contains(instruction, "法师") {
 		classID = "mage"
@@ -845,7 +876,8 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 			strStr := parseAttribute(parts[1])
 			if str, err := strconv.Atoi(strStr); err == nil {
 				char.Strength = str
-				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: set Strength=%d\n", str)
+				tr.context.Variables["character_strength"] = str
+				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: set Strength=%d and saved to Variables\n", str)
 			}
 		}
 	}
@@ -866,7 +898,8 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 			intStr := parseAttribute(parts[1])
 			if intel, err := strconv.Atoi(intStr); err == nil {
 				char.Intellect = intel
-				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: set Intellect=%d\n", intel)
+				tr.context.Variables["character_intellect"] = intel
+				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: set Intellect=%d and saved to Variables\n", intel)
 			}
 		}
 	}
@@ -876,7 +909,8 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 			spiStr := parseAttribute(parts[1])
 			if spi, err := strconv.Atoi(spiStr); err == nil {
 				char.Spirit = spi
-				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: set Spirit=%d\n", spi)
+				tr.context.Variables["character_spirit"] = spi
+				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: set Spirit=%d and saved to Variables\n", spi)
 			}
 		}
 	}
@@ -886,7 +920,8 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 			staStr := parseAttribute(parts[1])
 			if sta, err := strconv.Atoi(staStr); err == nil {
 				char.Stamina = sta
-				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: set Stamina=%d\n", sta)
+				tr.context.Variables["character_stamina"] = sta
+				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: set Stamina=%d and saved to Variables\n", sta)
 			}
 		}
 	}
@@ -971,20 +1006,30 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 				if len(resourceParts) >= 1 {
 					if resource, err := strconv.Atoi(strings.TrimSpace(resourceParts[0])); err == nil {
 						char.Resource = resource
+						// 也存储到Variables，以便后续恢复
+						tr.context.Variables["character_resource"] = resource
+						fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: parsed Resource=%d from instruction\n", resource)
 					}
 				}
 				if len(resourceParts) >= 2 {
 					if maxResource, err := strconv.Atoi(strings.TrimSpace(resourceParts[1])); err == nil {
 						char.MaxResource = maxResource
+						// 也存储到Variables，以便后续恢复
+						tr.context.Variables["character_max_resource"] = maxResource
+						fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: parsed MaxResource=%d from instruction\n", maxResource)
 					}
 				}
 			} else {
 				// 处理 "100" 格式
 				if resource, err := strconv.Atoi(resourceStr); err == nil {
 					char.Resource = resource
+					// 也存储到Variables，以便后续恢复
+					tr.context.Variables["character_resource"] = resource
 					if char.MaxResource == 0 {
 						char.MaxResource = resource
 					}
+					tr.context.Variables["character_max_resource"] = char.MaxResource
+					fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: parsed Resource=%d, MaxResource=%d from instruction\n", resource, char.MaxResource)
 				}
 			}
 		}
@@ -1176,6 +1221,19 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 					char.Spirit = spirit
 				}
 			}
+			// 从Variables恢复Resource（如果指令中指定了）
+			if resourceVal, exists := tr.context.Variables["character_resource"]; exists {
+				if resource, ok := resourceVal.(int); ok && resource > 0 {
+					char.Resource = resource
+					fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: restored Resource=%d from Variables\n", resource)
+				}
+			}
+			if maxResourceVal, exists := tr.context.Variables["character_max_resource"]; exists {
+				if maxResource, ok := maxResourceVal.(int); ok && maxResource > 0 {
+					char.MaxResource = maxResource
+					fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: restored MaxResource=%d from Variables\n", maxResource)
+				}
+			}
 			// 更新已存在角色的ClassID（如果指令中指定了不同的职业）
 			if classIDVal, exists := tr.context.Variables["character_class_id"]; exists {
 				if classID, ok := classIDVal.(string); ok && classID != "" {
@@ -1276,19 +1334,12 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 			}
 			// 恢复Resource值（如果它被数据库更新覆盖了）
 			// 优先使用savedResource和savedMaxResource（如果它们都不为0）
-			// 如果MaxResource是100（默认值），Resource也应该恢复为100（除非被明确设置为其他值）
+			fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after Update, char.Resource=%d/%d (from DB)\n", char.Resource, char.MaxResource)
 			if savedResource > 0 && savedMaxResource > 0 {
-				// 如果savedMaxResource是100（默认值），且savedResource小于100，说明Resource可能被错误重置了
-				// 在这种情况下，恢复Resource为MaxResource
-				if savedMaxResource == 100 && savedResource < 100 {
-					char.Resource = savedMaxResource
-					char.MaxResource = savedMaxResource
-					fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after Update, restored Resource=%d/%d (from MaxResource, Resource was %d)\n", char.Resource, char.MaxResource, savedResource)
-				} else {
-					char.Resource = savedResource
-					char.MaxResource = savedMaxResource
-					fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after Update, restored Resource=%d/%d\n", char.Resource, char.MaxResource)
-				}
+				// 直接恢复保存的值，不做特殊判断
+				char.Resource = savedResource
+				char.MaxResource = savedMaxResource
+				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after Update, restored Resource=%d/%d (from saved values)\n", char.Resource, char.MaxResource)
 			} else if savedMaxResource > 0 {
 				// 如果MaxResource不为0但Resource为0，恢复Resource为MaxResource
 				char.Resource = savedMaxResource
@@ -1339,19 +1390,11 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 			}
 			// 恢复Resource值（如果它被Create覆盖了）
 			// 优先使用savedResource和savedMaxResource（如果它们都不为0）
-			// 如果MaxResource是100（默认值），Resource也应该恢复为100（除非被明确设置为其他值）
 			if savedResource > 0 && savedMaxResource > 0 {
-				// 如果savedMaxResource是100（默认值），且savedResource小于100，说明Resource可能被错误重置了
-				// 在这种情况下，恢复Resource为MaxResource
-				if savedMaxResource == 100 && savedResource < 100 {
-					char.Resource = savedMaxResource
-					char.MaxResource = savedMaxResource
-					fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after Create, restored Resource=%d/%d (from MaxResource, Resource was %d)\n", char.Resource, char.MaxResource, savedResource)
-				} else {
-					char.Resource = savedResource
-					char.MaxResource = savedMaxResource
-					fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after Create, restored Resource=%d/%d\n", char.Resource, char.MaxResource)
-				}
+				// 直接恢复保存的值，不做特殊判断
+				char.Resource = savedResource
+				char.MaxResource = savedMaxResource
+				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after Create, restored Resource=%d/%d\n", char.Resource, char.MaxResource)
 			} else if savedMaxResource > 0 {
 				// 如果MaxResource不为0但Resource为0，恢复Resource为MaxResource
 				char.Resource = savedMaxResource
@@ -1424,11 +1467,30 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 		}
 	}
 	
-	// 计算所有属性（如果为0，则重新计算）
-	// 注意：如果属性已经在指令中明确设置（如"物理暴击率=20%"），则不会覆盖
-	// 只有在属性为0时才计算
-	if char.PhysicalAttack == 0 {
-		char.PhysicalAttack = tr.calculator.CalculatePhysicalAttack(char)
+	// 计算所有属性（如果为0或未明确设置，则重新计算）
+	// 注意：如果属性已经在指令中明确设置（如"攻击力=20"或"物理暴击率=20%"），则不会覆盖
+	// 检查是否明确设置了攻击力（通过"攻击力="指令）
+	explicitPhysicalAttack := false
+	if attackVal, exists := tr.context.Variables["character_physical_attack"]; exists {
+		// 检查是否是通过"攻击力="指令设置的（而不是计算后存储的）
+		if instruction, ok := tr.context.Variables["last_instruction"].(string); ok && strings.Contains(instruction, "攻击力=") {
+			explicitPhysicalAttack = true
+			if attack, ok := attackVal.(int); ok {
+				char.PhysicalAttack = attack
+				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: using explicit PhysicalAttack=%d from instruction\n", attack)
+			}
+		}
+	}
+	
+	// 如果未明确设置，总是基于主属性重新计算（即使当前值不为0）
+	if !explicitPhysicalAttack {
+		oldAttack := char.PhysicalAttack
+		calculatedAttack := tr.calculator.CalculatePhysicalAttack(char)
+		if oldAttack != calculatedAttack {
+			char.PhysicalAttack = calculatedAttack
+			fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: re-calculated PhysicalAttack=%d (from Strength=%d, Agility=%d, was %d)\n", 
+				char.PhysicalAttack, char.Strength, char.Agility, oldAttack)
+		}
 	}
 	if char.MagicAttack == 0 {
 		char.MagicAttack = tr.calculator.CalculateMagicAttack(char)
@@ -2330,10 +2392,11 @@ func (tr *TestRunner) createSkill(instruction string) error {
 		}
 	}
 	
-	// 解析Buff效果（如"攻击力+50%，持续3回合"）
-	if strings.Contains(instruction, "Buff") || strings.Contains(instruction, "效果：") {
+	// 解析Buff效果（如"攻击力+50%，持续3回合"或"效果：攻击力+50%，持续3回合"）
+	if strings.Contains(instruction, "Buff") || strings.Contains(instruction, "效果：") || strings.Contains(instruction, "效果:") {
+		skill.Type = "buff" // 设置为Buff技能类型
 		if strings.Contains(instruction, "攻击力") && strings.Contains(instruction, "%") {
-			// 解析攻击力加成百分比（如"攻击力+50%"）
+			// 解析攻击力加成百分比（如"攻击力+50%"或"效果：攻击力+50%"）
 			parts := strings.Split(instruction, "攻击力")
 			if len(parts) > 1 {
 				modifierPart := parts[1]
@@ -2342,8 +2405,8 @@ func (tr *TestRunner) createSkill(instruction string) error {
 					modifierStr := modifierPart[plusIdx+1:]
 					modifierStr = strings.TrimSpace(strings.Split(modifierStr, "%")[0])
 					if modifier, err := strconv.ParseFloat(modifierStr, 64); err == nil {
-						skill.Type = "buff"
 						tr.context.Variables["skill_buff_attack_modifier"] = modifier / 100.0 // 转换为小数（50% -> 0.5）
+						fmt.Fprintf(os.Stderr, "[DEBUG] createSkill: parsed buff attack modifier=%f (from %s%%)\n", modifier/100.0, modifierStr)
 					}
 				}
 			}
@@ -2355,6 +2418,7 @@ func (tr *TestRunner) createSkill(instruction string) error {
 				durationStr := strings.TrimSpace(strings.Split(parts[1], "回合")[0])
 				if duration, err := strconv.Atoi(durationStr); err == nil {
 					tr.context.Variables["skill_buff_duration"] = duration
+					fmt.Fprintf(os.Stderr, "[DEBUG] createSkill: parsed buff duration=%d\n", duration)
 				}
 			}
 		}
@@ -2380,6 +2444,46 @@ func (tr *TestRunner) createSkill(instruction string) error {
 	tr.context.Variables["skill_type"] = skill.Type
 	tr.context.Variables["skill_scaling_ratio"] = skill.ScalingRatio
 	fmt.Fprintf(os.Stderr, "[DEBUG] createSkill: stored skill, ScalingRatio=%f\n", skill.ScalingRatio)
+	return nil
+}
+
+// executeLearnSkill 执行学习技能
+func (tr *TestRunner) executeLearnSkill(instruction string) error {
+	char, ok := tr.context.Characters["character"]
+	if !ok || char == nil {
+		tr.assertion.SetContext("skill_learned", false)
+		tr.assertion.SetContext("error_message", "角色不存在")
+		return fmt.Errorf("character not found")
+	}
+	
+	// 从上下文获取技能
+	skillVal, exists := tr.context.Variables["skill"]
+	if !exists {
+		tr.assertion.SetContext("skill_learned", false)
+		tr.assertion.SetContext("error_message", "技能不存在，请先创建技能")
+		return fmt.Errorf("skill not found in context, please create a skill first")
+	}
+	
+	skill, ok := skillVal.(*models.Skill)
+	if !ok || skill == nil {
+		tr.assertion.SetContext("skill_learned", false)
+		tr.assertion.SetContext("error_message", "技能对象无效")
+		return fmt.Errorf("skill is not a valid skill object")
+	}
+	
+	// 使用skillRepo让角色学习技能
+	skillRepo := repository.NewSkillRepository()
+	err := skillRepo.AddCharacterSkill(char.ID, skill.ID, 1)
+	if err != nil {
+		tr.assertion.SetContext("skill_learned", false)
+		tr.assertion.SetContext("error_message", err.Error())
+		return fmt.Errorf("failed to learn skill: %w", err)
+	}
+	
+	// 设置学习成功标志
+	tr.assertion.SetContext("skill_learned", true)
+	tr.context.Variables["skill_learned"] = true
+	fmt.Fprintf(os.Stderr, "[DEBUG] executeLearnSkill: character %d learned skill %s\n", char.ID, skill.ID)
 	return nil
 }
 
