@@ -190,6 +190,9 @@ func (tr *TestRunner) RunTestCase(testCase TestCase) TestResult {
 		return result
 	}
 	
+	// 在setup执行后立即更新断言上下文，确保所有计算属性都被正确同步
+	tr.updateAssertionContext()
+	
 	// 调试：检查setup后的上下文状态
 	fmt.Fprintf(os.Stderr, "[DEBUG] RunTestCase: after setup for '%s' - characters=%d, monsters=%d, variables=%d\n", 
 		testCase.Name, len(tr.context.Characters), len(tr.context.Monsters), len(tr.context.Variables))
@@ -298,6 +301,9 @@ func (tr *TestRunner) executeInstruction(instruction string) error {
 		// 创建一个nil角色（用于测试nil情况）
 		tr.context.Characters["character"] = nil
 		return nil
+	} else if strings.Contains(instruction, "创建一个") && strings.Contains(instruction, "队伍") {
+		// 创建多人队伍（如"创建一个3人队伍：战士(HP=100)、牧师(HP=100)、法师(HP=100)"）
+		return tr.createTeam(instruction)
 	} else if strings.Contains(instruction, "创建一个") && strings.Contains(instruction, "角色") {
 		return tr.createCharacter(instruction)
 	} else if (strings.Contains(instruction, "创建一个") || strings.Contains(instruction, "创建")) && strings.Contains(instruction, "怪物") {
@@ -342,6 +348,9 @@ func (tr *TestRunner) executeInstruction(instruction string) error {
 		return tr.executeCalculateDamage(instruction)
 	} else if strings.Contains(instruction, "学习技能") || strings.Contains(instruction, "角色学习技能") {
 		return tr.executeLearnSkill(instruction)
+	} else if strings.Contains(instruction, "怪物使用") && strings.Contains(instruction, "技能") {
+		// 怪物使用技能（包括Buff、Debuff、AOE、治疗等，必须在角色使用技能之前检查）
+		return tr.executeMonsterUseSkill(instruction)
 	} else if strings.Contains(instruction, "使用技能") || strings.Contains(instruction, "角色使用技能") || (strings.Contains(instruction, "使用") && strings.Contains(instruction, "技能")) {
 		return tr.executeUseSkill(instruction)
 	} else if strings.Contains(instruction, "创建一个") && strings.Contains(instruction, "技能") {
@@ -366,6 +375,12 @@ func (tr *TestRunner) executeInstruction(instruction string) error {
 	} else if strings.Contains(instruction, "检查角色属性") || strings.Contains(instruction, "检查角色") {
 		// 检查角色属性，确保所有属性都基于角色属性正确计算
 		return tr.executeCheckCharacterAttributes()
+	} else if strings.Contains(instruction, "给怪物添加") && strings.Contains(instruction, "技能") {
+		// 给怪物添加技能
+		return tr.executeAddMonsterSkill(instruction)
+	} else if strings.Contains(instruction, "初始化战斗系统") {
+		// 初始化战斗系统（空操作，战斗系统在开始战斗时自动初始化）
+		return nil
 	}
 	return nil
 }
@@ -454,6 +469,56 @@ func (tr *TestRunner) updateAssertionContext() {
 		tr.assertion.SetContext("character.speed", speed)
 		tr.assertion.SetContext("speed", speed)
 		
+		// 同步从Variables中存储的计算属性（如果存在，优先使用）
+		// 这些值可能是通过"计算物理攻击力"等步骤计算出来的
+		if physicalAttack, exists := tr.context.Variables["physical_attack"]; exists {
+			tr.assertion.SetContext("physical_attack", physicalAttack)
+		}
+		if magicAttack, exists := tr.context.Variables["magic_attack"]; exists {
+			tr.assertion.SetContext("magic_attack", magicAttack)
+		}
+		if maxHP, exists := tr.context.Variables["max_hp"]; exists {
+			tr.assertion.SetContext("max_hp", maxHP)
+		}
+		if physCritRate, exists := tr.context.Variables["phys_crit_rate"]; exists {
+			tr.assertion.SetContext("phys_crit_rate", physCritRate)
+		}
+		if spellCritRate, exists := tr.context.Variables["spell_crit_rate"]; exists {
+			tr.assertion.SetContext("spell_crit_rate", spellCritRate)
+		}
+		if dodgeRate, exists := tr.context.Variables["dodge_rate"]; exists {
+			tr.assertion.SetContext("dodge_rate", dodgeRate)
+		}
+		if physCritDamage, exists := tr.context.Variables["phys_crit_damage"]; exists {
+			tr.assertion.SetContext("phys_crit_damage", physCritDamage)
+			tr.assertion.SetContext("character.phys_crit_damage", physCritDamage)
+		}
+		if spellCritDamage, exists := tr.context.Variables["spell_crit_damage"]; exists {
+			tr.assertion.SetContext("spell_crit_damage", spellCritDamage)
+			tr.assertion.SetContext("character.spell_crit_damage", spellCritDamage)
+		}
+		if speedVal, exists := tr.context.Variables["speed"]; exists {
+			tr.assertion.SetContext("speed", speedVal)
+			tr.assertion.SetContext("character.speed", speedVal)
+		}
+		if manaRegen, exists := tr.context.Variables["mana_regen"]; exists {
+			tr.assertion.SetContext("mana_regen", manaRegen)
+		}
+		if rageGain, exists := tr.context.Variables["rage_gain"]; exists {
+			tr.assertion.SetContext("rage_gain", rageGain)
+		}
+		if energyRegen, exists := tr.context.Variables["energy_regen"]; exists {
+			tr.assertion.SetContext("energy_regen", energyRegen)
+		}
+		if physicalDefense, exists := tr.context.Variables["physical_defense"]; exists {
+			tr.assertion.SetContext("physical_defense", physicalDefense)
+			tr.assertion.SetContext("character.physical_defense", physicalDefense)
+		}
+		if magicDefense, exists := tr.context.Variables["magic_defense"]; exists {
+			tr.assertion.SetContext("magic_defense", magicDefense)
+			tr.assertion.SetContext("character.magic_defense", magicDefense)
+		}
+		
 		// 同步Buff信息（从上下文获取）
 		if buffModifier, exists := tr.context.Variables["character_buff_attack_modifier"]; exists {
 			tr.assertion.SetContext("character.buff_attack_modifier", buffModifier)
@@ -484,6 +549,29 @@ func (tr *TestRunner) updateAssertionContext() {
 		tr.assertion.SetContext("skill_damage_dealt", skillDamage)
 	}
 	
+	// 同步怪物技能相关值
+	if monsterSkillDamage, exists := tr.context.Variables["monster_skill_damage_dealt"]; exists {
+		tr.assertion.SetContext("monster_skill_damage_dealt", monsterSkillDamage)
+	}
+	if monsterHealing, exists := tr.context.Variables["monster_healing_dealt"]; exists {
+		tr.assertion.SetContext("monster_healing_dealt", monsterHealing)
+	}
+	if monsterResource, exists := tr.context.Variables["monster.resource"]; exists {
+		tr.assertion.SetContext("monster.resource", monsterResource)
+	}
+	if monsterSkillResourceCost, exists := tr.context.Variables["monster_skill_resource_cost"]; exists {
+		tr.assertion.SetContext("monster_skill_resource_cost", monsterSkillResourceCost)
+	}
+	if monsterSkillIsCrit, exists := tr.context.Variables["monster_skill_is_crit"]; exists {
+		tr.assertion.SetContext("monster_skill_is_crit", monsterSkillIsCrit)
+	}
+	if monsterSkillCritDamage, exists := tr.context.Variables["monster_skill_crit_damage"]; exists {
+		tr.assertion.SetContext("monster_skill_crit_damage", monsterSkillCritDamage)
+	}
+	if monsterDebuffDuration, exists := tr.context.Variables["character_debuff_duration"]; exists {
+		tr.assertion.SetContext("character_debuff_duration", monsterDebuffDuration)
+	}
+	
 	// 同步装备信息
 	tr.syncEquipmentToContext("equipment", tr.context.Variables["equipment"])
 	tr.syncEquipmentToContext("weapon", tr.context.Variables["weapon"])
@@ -505,7 +593,30 @@ func (tr *TestRunner) updateAssertionContext() {
 		tr.assertion.SetContext("equipped_main_hand_count", mainHandCount)
 	}
 	
-	// 同步变量
+	// 同步战斗状态相关变量
+	if battleState, exists := tr.context.Variables["battle_state"]; exists {
+		tr.assertion.SetContext("battle_state", battleState)
+	}
+	if isResting, exists := tr.context.Variables["is_resting"]; exists {
+		tr.assertion.SetContext("is_resting", isResting)
+	}
+	if turnOrder, exists := tr.context.Variables["turn_order"]; exists {
+		tr.assertion.SetContext("turn_order", turnOrder)
+	}
+	if turnOrderLength, exists := tr.context.Variables["turn_order_length"]; exists {
+		tr.assertion.SetContext("turn_order_length", turnOrderLength)
+	}
+	if enemyCount, exists := tr.context.Variables["enemy_count"]; exists {
+		tr.assertion.SetContext("enemy_count", enemyCount)
+	}
+	if enemyAliveCount, exists := tr.context.Variables["enemy_alive_count"]; exists {
+		tr.assertion.SetContext("enemy_alive_count", enemyAliveCount)
+	}
+	if currentRound, exists := tr.context.Variables["current_round"]; exists {
+		tr.assertion.SetContext("current_round", currentRound)
+	}
+	
+	// 同步所有变量（包括上面已经同步的，确保覆盖）
 	for key, value := range tr.context.Variables {
 		tr.assertion.SetContext(key, value)
 	}
@@ -1036,9 +1147,10 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 	}
 	
 	// 解析HP（如"HP=100/100"或"HP=100"）
+	// 注意：必须排除"基础HP="的情况，避免误解析
 	// 保存明确设置的HP值，以便后续使用
 	explicitHP := 0
-	if strings.Contains(instruction, "HP=") {
+	if strings.Contains(instruction, "HP=") && !strings.Contains(instruction, "基础HP=") {
 		parts := strings.Split(instruction, "HP=")
 		if len(parts) > 1 {
 			hpStr := strings.TrimSpace(strings.Split(parts[1], "，")[0])
@@ -1325,6 +1437,11 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 			if err := charRepo.Update(char); err != nil {
 				return fmt.Errorf("failed to update existing character in DB: %w", err)
 			}
+			// 从数据库重新加载角色（因为Update可能修改了某些字段）
+			reloadedChar, err := charRepo.GetByID(char.ID)
+			if err == nil && reloadedChar != nil {
+				char = reloadedChar
+			}
 			// 恢复PhysicalAttack值（如果它被数据库更新覆盖了）
 			if savedPhysicalAttack > 0 {
 				char.PhysicalAttack = savedPhysicalAttack
@@ -1415,14 +1532,63 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after Create, restored Resource=%d (MaxResource is 100)\n", char.Resource)
 			}
 			// 恢复MaxHP和HP值（如果它们被Create覆盖了）
-			if savedMaxHP > 0 {
-				char.MaxHP = savedMaxHP
-				char.HP = savedHP
-				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after Create, restored MaxHP=%d, HP=%d\n", char.MaxHP, char.HP)
-				// 再次更新数据库，确保MaxHP和HP被保存
-				if err := charRepo.Update(char); err != nil {
-					fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: failed to update MaxHP/HP in DB: %v\n", err)
+			// 首先检查是否有明确设置的MaxHP值
+			restoreExplicitMaxHP := 0
+			if maxHPVal, exists := tr.context.Variables["character_explicit_max_hp"]; exists {
+				if maxHP, ok := maxHPVal.(int); ok && maxHP > 0 {
+					restoreExplicitMaxHP = maxHP
 				}
+			}
+			// 检查是否有明确设置的HP值
+			restoreExplicitHP := 0
+			if explicitHPVal, exists := tr.context.Variables["character_explicit_hp"]; exists {
+				if hp, ok := explicitHPVal.(int); ok && hp > 0 {
+					restoreExplicitHP = hp
+				}
+			}
+			
+			// 获取基础HP用于重新计算
+			restoreBaseHP := 35 // 默认战士基础HP
+			if baseHPVal, exists := tr.context.Variables["character_base_hp"]; exists {
+				if hp, ok := baseHPVal.(int); ok {
+					restoreBaseHP = hp
+				}
+			}
+			
+			// 重新计算MaxHP（基于当前属性）
+			restoreCalculatedMaxHP := tr.calculator.CalculateHP(char, restoreBaseHP)
+			
+			// 确定最终的MaxHP值
+			if restoreExplicitMaxHP > 0 {
+				char.MaxHP = restoreExplicitMaxHP
+			} else if savedMaxHP > 0 && savedMaxHP == restoreCalculatedMaxHP {
+				// 如果保存的MaxHP等于计算值，使用保存的值
+				char.MaxHP = savedMaxHP
+			} else if char.MaxHP != restoreCalculatedMaxHP {
+				// 如果当前MaxHP不等于计算值，使用计算值
+				char.MaxHP = restoreCalculatedMaxHP
+			}
+			
+			// 确定最终的HP值
+			if restoreExplicitHP > 0 {
+				char.HP = restoreExplicitHP
+				// 确保MaxHP至少等于HP
+				if char.MaxHP < restoreExplicitHP {
+					char.MaxHP = restoreExplicitHP
+				}
+			} else if savedHP > 0 && savedHP <= char.MaxHP {
+				char.HP = savedHP
+			} else if char.HP == 0 || char.HP > char.MaxHP {
+				// 如果HP为0或超过MaxHP，设置为MaxHP
+				char.HP = char.MaxHP
+			}
+			
+			fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after Create, final MaxHP=%d, HP=%d (calculatedMaxHP=%d, savedMaxHP=%d, explicitMaxHP=%d, explicitHP=%d)\n", 
+				char.MaxHP, char.HP, restoreCalculatedMaxHP, savedMaxHP, restoreExplicitMaxHP, restoreExplicitHP)
+			
+			// 再次更新数据库，确保MaxHP和HP被保存
+			if err := charRepo.Update(char); err != nil {
+				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: failed to update MaxHP/HP in DB: %v\n", err)
 			}
 		}
 	}
@@ -1492,12 +1658,15 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 				char.PhysicalAttack, char.Strength, char.Agility, oldAttack)
 		}
 	}
+	// 法术攻击力：如果未明确设置，总是基于主属性重新计算
 	if char.MagicAttack == 0 {
 		char.MagicAttack = tr.calculator.CalculateMagicAttack(char)
 	}
+	// 物理防御：如果未明确设置，总是基于主属性重新计算
 	if char.PhysicalDefense == 0 {
 		char.PhysicalDefense = tr.calculator.CalculatePhysicalDefense(char)
 	}
+	// 魔法防御：如果未明确设置，总是基于主属性重新计算
 	if char.MagicDefense == 0 {
 		char.MagicDefense = tr.calculator.CalculateMagicDefense(char)
 	}
@@ -1517,33 +1686,87 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 	if char.DodgeRate == 0 {
 		char.DodgeRate = tr.calculator.CalculateDodgeRate(char)
 	}
+	// 计算速度（speed = agility）
+	// 注意：速度不是Character模型的字段，但可以通过Calculator计算
+	// 这里我们确保速度值被正确计算并存储到上下文
+	speed := tr.calculator.CalculateSpeed(char)
+	tr.context.Variables["character_speed"] = speed
 	
 	// 计算MaxHP（如果为0，或者如果MaxHP小于明确设置的HP值）
 	// 但是，如果MaxHP已经被明确设置（通过"HP=95/100"），不要覆盖它
-	if char.MaxHP == 0 {
-		char.MaxHP = tr.calculator.CalculateHP(char, baseHP)
-		if char.HP == 0 {
-			char.HP = char.MaxHP
-		}
-	} else {
-		// 如果MaxHP已经被设置，确保HP不超过MaxHP
-		if char.HP > char.MaxHP {
-			char.HP = char.MaxHP
-		}
-		// 如果HP为0但MaxHP不为0，设置HP为MaxHP
-		if char.HP == 0 && char.MaxHP > 0 {
-			char.HP = char.MaxHP
+	finalCalculatedMaxHP := tr.calculator.CalculateHP(char, baseHP)
+	
+	// 检查是否有明确设置的MaxHP值
+	finalExplicitMaxHP := 0
+	if maxHPVal, exists := tr.context.Variables["character_explicit_max_hp"]; exists {
+		if maxHP, ok := maxHPVal.(int); ok && maxHP > 0 {
+			finalExplicitMaxHP = maxHP
 		}
 	}
+	
+	// 确定最终的MaxHP值
+	if finalExplicitMaxHP > 0 {
+		char.MaxHP = finalExplicitMaxHP
+	} else if char.MaxHP == 0 || char.MaxHP != finalCalculatedMaxHP {
+		// 如果MaxHP为0或与计算值不一致，使用计算值
+		char.MaxHP = finalCalculatedMaxHP
+	}
+	
+	// 检查是否有明确设置的HP值
+	finalExplicitHP := 0
+	if explicitHPVal, exists := tr.context.Variables["character_explicit_hp"]; exists {
+		if hp, ok := explicitHPVal.(int); ok && hp > 0 {
+			finalExplicitHP = hp
+		}
+	}
+	
+	// 确定最终的HP值
+	if finalExplicitHP > 0 {
+		char.HP = finalExplicitHP
+		// 确保MaxHP至少等于HP
+		if char.MaxHP < finalExplicitHP {
+			char.MaxHP = finalExplicitHP
+		}
+	} else if char.HP == 0 || char.HP > char.MaxHP {
+		// 如果HP为0或超过MaxHP，设置为MaxHP
+		char.HP = char.MaxHP
+	}
+	
+	fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: final calculation - MaxHP=%d, HP=%d (calculatedMaxHP=%d, explicitMaxHP=%d, explicitHP=%d)\n", 
+		char.MaxHP, char.HP, finalCalculatedMaxHP, finalExplicitMaxHP, finalExplicitHP)
 	
 	// 存储到上下文（确保所有属性正确）
 	tr.context.Characters["character"] = char
 	fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: stored character to context, PhysicalAttack=%d, MagicAttack=%d\n", char.PhysicalAttack, char.MagicAttack)
-	// 也存储到Variables，以防角色对象被修改
-	if char.PhysicalAttack > 0 {
-		tr.context.Variables["character_physical_attack"] = char.PhysicalAttack
-		fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: also stored PhysicalAttack=%d to Variables\n", char.PhysicalAttack)
-	}
+	
+	// 存储所有计算属性到Variables，以防角色对象被修改
+	tr.context.Variables["character_physical_attack"] = char.PhysicalAttack
+	tr.context.Variables["character_magic_attack"] = char.MagicAttack
+	tr.context.Variables["character_physical_defense"] = char.PhysicalDefense
+	tr.context.Variables["character_magic_defense"] = char.MagicDefense
+	tr.context.Variables["character_phys_crit_rate"] = char.PhysCritRate
+	tr.context.Variables["character_phys_crit_damage"] = char.PhysCritDamage
+	tr.context.Variables["character_spell_crit_rate"] = char.SpellCritRate
+	tr.context.Variables["character_spell_crit_damage"] = char.SpellCritDamage
+	tr.context.Variables["character_dodge_rate"] = char.DodgeRate
+	tr.context.Variables["character_speed"] = speed
+	tr.context.Variables["character_max_hp"] = char.MaxHP
+	tr.context.Variables["character_hp"] = char.HP
+	
+	// 同时存储简化键（不带character_前缀），以便测试用例可以直接访问
+	tr.context.Variables["physical_attack"] = char.PhysicalAttack
+	tr.context.Variables["magic_attack"] = char.MagicAttack
+	tr.context.Variables["physical_defense"] = char.PhysicalDefense
+	tr.context.Variables["magic_defense"] = char.MagicDefense
+	tr.context.Variables["phys_crit_rate"] = char.PhysCritRate
+	tr.context.Variables["phys_crit_damage"] = char.PhysCritDamage
+	tr.context.Variables["spell_crit_rate"] = char.SpellCritRate
+	tr.context.Variables["spell_crit_damage"] = char.SpellCritDamage
+	tr.context.Variables["dodge_rate"] = char.DodgeRate
+	tr.context.Variables["speed"] = speed
+	tr.context.Variables["max_hp"] = char.MaxHP
+	
+	fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: stored all calculated attributes to Variables\n")
 	
 	return nil
 }
@@ -1634,14 +1857,50 @@ func (tr *TestRunner) createMonster(instruction string) error {
 			}
 		}
 		
-		// 解析HP（如"HP=100"）
+		// 解析HP（如"HP=100"或"HP=50/100"）
 		if strings.Contains(instruction, "HP=") {
 			parts := strings.Split(instruction, "HP=")
 			if len(parts) > 1 {
 				hpStr := strings.TrimSpace(strings.Split(parts[1], "，")[0])
-				if hp, err := strconv.Atoi(hpStr); err == nil {
-					monster.HP = hp
-					monster.MaxHP = hp
+				if strings.Contains(hpStr, "/") {
+					// 处理 "50/100" 格式
+					hpParts := strings.Split(hpStr, "/")
+					if len(hpParts) >= 1 {
+						if hp, err := strconv.Atoi(strings.TrimSpace(hpParts[0])); err == nil {
+							monster.HP = hp
+						}
+					}
+					if len(hpParts) >= 2 {
+						if maxHP, err := strconv.Atoi(strings.TrimSpace(hpParts[1])); err == nil {
+							monster.MaxHP = maxHP
+						}
+					}
+				} else {
+					// 处理 "100" 格式
+					if hp, err := strconv.Atoi(hpStr); err == nil {
+						monster.HP = hp
+						monster.MaxHP = hp
+					}
+				}
+			}
+		}
+		
+		// 解析资源（如"资源=100/100"）
+		if strings.Contains(instruction, "资源=") {
+			parts := strings.Split(instruction, "资源=")
+			if len(parts) > 1 {
+				resourceStr := strings.TrimSpace(strings.Split(parts[1], "，")[0])
+				if strings.Contains(resourceStr, "/") {
+					resourceParts := strings.Split(resourceStr, "/")
+					if len(resourceParts) >= 1 {
+						if resource, err := strconv.Atoi(strings.TrimSpace(resourceParts[0])); err == nil {
+							tr.context.Variables["monster.resource"] = resource
+						}
+					}
+				} else {
+					if resource, err := strconv.Atoi(resourceStr); err == nil {
+						tr.context.Variables["monster.resource"] = resource
+					}
 				}
 			}
 		}
@@ -1732,6 +1991,117 @@ func (tr *TestRunner) createTestCharacter(userID, level int) (*models.Character,
 	return char, nil
 }
 
+// createTeam 创建多人队伍
+// 支持格式：如"创建一个3人队伍：战士(HP=100)、牧师(HP=100)、法师(HP=100)"
+func (tr *TestRunner) createTeam(instruction string) error {
+	// 确保用户存在
+	user, err := tr.createTestUser()
+	if err != nil {
+		return fmt.Errorf("failed to create user: %w", err)
+	}
+	
+	// 解析队伍成员（通过冒号或逗号分隔）
+	// 格式：战士(HP=100)、牧师(HP=100)、法师(HP=100)
+	var members []string
+	if strings.Contains(instruction, "：") {
+		parts := strings.Split(instruction, "：")
+		if len(parts) > 1 {
+			members = strings.Split(parts[1], "、")
+		}
+	} else if strings.Contains(instruction, ":") {
+		parts := strings.Split(instruction, ":")
+		if len(parts) > 1 {
+			members = strings.Split(parts[1], ",")
+		}
+	}
+	
+	charRepo := repository.NewCharacterRepository()
+	slot := 1
+	
+	for _, memberDesc := range members {
+		memberDesc = strings.TrimSpace(memberDesc)
+		if memberDesc == "" {
+			continue
+		}
+		
+		// 解析职业（战士、牧师、法师等）
+		classID := "warrior"
+		if strings.Contains(memberDesc, "战士") {
+			classID = "warrior"
+		} else if strings.Contains(memberDesc, "牧师") {
+			classID = "priest"
+		} else if strings.Contains(memberDesc, "法师") {
+			classID = "mage"
+		} else if strings.Contains(memberDesc, "盗贼") {
+			classID = "rogue"
+		}
+		
+		// 解析HP（如"HP=100"）
+		hp := 100
+		if strings.Contains(memberDesc, "HP=") {
+			parts := strings.Split(memberDesc, "HP=")
+			if len(parts) > 1 {
+				hpStr := strings.TrimSpace(strings.Split(parts[1], ")")[0])
+				if h, err := strconv.Atoi(hpStr); err == nil {
+					hp = h
+				}
+			}
+		}
+		
+		// 创建角色
+		char := &models.Character{
+			UserID:   user.ID,
+			Name:     fmt.Sprintf("测试角色%d", slot),
+			RaceID:   "human",
+			ClassID:  classID,
+			Faction:  "alliance",
+			TeamSlot: slot,
+			Level:    1,
+			HP:       hp,
+			MaxHP:    hp,
+			Strength: 10,
+			Agility:  10,
+			Intellect: 10,
+			Stamina:   10,
+			Spirit:    10,
+		}
+		
+		// 根据职业设置资源类型
+		if classID == "warrior" {
+			char.ResourceType = "rage"
+			char.MaxResource = 100
+			char.Resource = 0
+		} else if classID == "rogue" {
+			char.ResourceType = "energy"
+			char.MaxResource = 100
+			char.Resource = 100
+		} else {
+			char.ResourceType = "mana"
+			char.MaxResource = 100
+			char.Resource = 100
+		}
+		
+		// 保存到数据库
+		createdChar, err := charRepo.Create(char)
+		if err != nil {
+			return fmt.Errorf("failed to create character in team: %w", err)
+		}
+		
+		// 保存到上下文（使用character_1, character_2等作为key）
+		key := fmt.Sprintf("character_%d", slot)
+		tr.context.Characters[key] = createdChar
+		
+		// 第一个角色也保存为"character"（向后兼容）
+		if slot == 1 {
+			tr.context.Characters["character"] = createdChar
+		}
+		
+		slot++
+	}
+	
+	return nil
+}
+
 // executeCalculatePhysicalAttack 计算物理攻击力
 func (tr *TestRunner) executeCalculatePhysicalAttack() error {
 	char, ok := tr.context.Characters["character"]
@@ -1740,8 +2110,15 @@ func (tr *TestRunner) executeCalculatePhysicalAttack() error {
 	}
 	
 	physicalAttack := tr.calculator.CalculatePhysicalAttack(char)
+	// 更新角色的属性
+	char.PhysicalAttack = physicalAttack
+	tr.context.Characters["character"] = char
+	
+	// 存储到断言上下文和Variables
 	tr.assertion.SetContext("physical_attack", physicalAttack)
+	tr.assertion.SetContext("character.physical_attack", physicalAttack)
 	tr.context.Variables["physical_attack"] = physicalAttack
+	tr.context.Variables["character_physical_attack"] = physicalAttack
 	return nil
 }
 
@@ -1753,8 +2130,15 @@ func (tr *TestRunner) executeCalculateMagicAttack() error {
 	}
 	
 	magicAttack := tr.calculator.CalculateMagicAttack(char)
+	// 更新角色的属性
+	char.MagicAttack = magicAttack
+	tr.context.Characters["character"] = char
+	
+	// 存储到断言上下文和Variables
 	tr.assertion.SetContext("magic_attack", magicAttack)
+	tr.assertion.SetContext("character.magic_attack", magicAttack)
 	tr.context.Variables["magic_attack"] = magicAttack
+	tr.context.Variables["character_magic_attack"] = magicAttack
 	return nil
 }
 
@@ -1779,8 +2163,27 @@ func (tr *TestRunner) executeCalculateMaxHP() error {
 	}
 	
 	maxHP := tr.calculator.CalculateHP(char, baseHP)
+	// 更新角色的MaxHP
+	char.MaxHP = maxHP
+	// 如果HP为0或超过MaxHP，设置为MaxHP
+	if char.HP == 0 || char.HP > char.MaxHP {
+		char.HP = char.MaxHP
+	}
+	
+	// 更新数据库
+	charRepo := repository.NewCharacterRepository()
+	if err := charRepo.Update(char); err != nil {
+		fmt.Fprintf(os.Stderr, "[DEBUG] executeCalculateMaxHP: failed to update character: %v\n", err)
+	}
+	
+	// 更新上下文
+	tr.context.Characters["character"] = char
+	
+	// 设置到断言上下文和Variables
 	tr.assertion.SetContext("max_hp", maxHP)
+	tr.assertion.SetContext("character.max_hp", maxHP)
 	tr.context.Variables["max_hp"] = maxHP
+	tr.context.Variables["character_max_hp"] = maxHP
 	return nil
 }
 
@@ -1792,8 +2195,15 @@ func (tr *TestRunner) executeCalculatePhysCritRate() error {
 	}
 	
 	critRate := tr.calculator.CalculatePhysCritRate(char)
+	// 更新角色的属性
+	char.PhysCritRate = critRate
+	tr.context.Characters["character"] = char
+	
+	// 存储到断言上下文和Variables
 	tr.assertion.SetContext("phys_crit_rate", critRate)
+	tr.assertion.SetContext("character.phys_crit_rate", critRate)
 	tr.context.Variables["phys_crit_rate"] = critRate
+	tr.context.Variables["character_phys_crit_rate"] = critRate
 	return nil
 }
 
@@ -1805,8 +2215,15 @@ func (tr *TestRunner) executeCalculateSpellCritRate() error {
 	}
 	
 	critRate := tr.calculator.CalculateSpellCritRate(char)
+	// 更新角色的属性
+	char.SpellCritRate = critRate
+	tr.context.Characters["character"] = char
+	
+	// 存储到断言上下文和Variables
 	tr.assertion.SetContext("spell_crit_rate", critRate)
+	tr.assertion.SetContext("character.spell_crit_rate", critRate)
 	tr.context.Variables["spell_crit_rate"] = critRate
+	tr.context.Variables["character_spell_crit_rate"] = critRate
 	return nil
 }
 
@@ -1818,8 +2235,15 @@ func (tr *TestRunner) executeCalculateDodgeRate() error {
 	}
 	
 	dodgeRate := tr.calculator.CalculateDodgeRate(char)
+	// 更新角色的属性
+	char.DodgeRate = dodgeRate
+	tr.context.Characters["character"] = char
+	
+	// 存储到断言上下文和Variables
 	tr.assertion.SetContext("dodge_rate", dodgeRate)
+	tr.assertion.SetContext("character.dodge_rate", dodgeRate)
 	tr.context.Variables["dodge_rate"] = dodgeRate
+	tr.context.Variables["character_dodge_rate"] = dodgeRate
 	return nil
 }
 
@@ -1831,8 +2255,15 @@ func (tr *TestRunner) executeCalculatePhysCritDamage() error {
 	}
 	
 	critDamage := tr.calculator.CalculatePhysCritDamage(char)
+	// 更新角色的属性
+	char.PhysCritDamage = critDamage
+	tr.context.Characters["character"] = char
+	
+	// 存储到断言上下文和Variables
 	tr.assertion.SetContext("phys_crit_damage", critDamage)
+	tr.assertion.SetContext("character.phys_crit_damage", critDamage)
 	tr.context.Variables["phys_crit_damage"] = critDamage
+	tr.context.Variables["character_phys_crit_damage"] = critDamage
 	return nil
 }
 
@@ -1844,8 +2275,15 @@ func (tr *TestRunner) executeCalculatePhysicalDefense() error {
 	}
 	
 	defense := tr.calculator.CalculatePhysicalDefense(char)
+	// 更新角色的属性
+	char.PhysicalDefense = defense
+	tr.context.Characters["character"] = char
+	
+	// 存储到断言上下文和Variables
 	tr.assertion.SetContext("physical_defense", defense)
+	tr.assertion.SetContext("character.physical_defense", defense)
 	tr.context.Variables["physical_defense"] = defense
+	tr.context.Variables["character_physical_defense"] = defense
 	return nil
 }
 
@@ -1857,8 +2295,15 @@ func (tr *TestRunner) executeCalculateMagicDefense() error {
 	}
 	
 	defense := tr.calculator.CalculateMagicDefense(char)
+	// 更新角色的属性
+	char.MagicDefense = defense
+	tr.context.Characters["character"] = char
+	
+	// 存储到断言上下文和Variables
 	tr.assertion.SetContext("magic_defense", defense)
+	tr.assertion.SetContext("character.magic_defense", defense)
 	tr.context.Variables["magic_defense"] = defense
+	tr.context.Variables["character_magic_defense"] = defense
 	return nil
 }
 
@@ -1870,8 +2315,15 @@ func (tr *TestRunner) executeCalculateSpellCritDamage() error {
 	}
 	
 	critDamage := tr.calculator.CalculateSpellCritDamage(char)
+	// 更新角色的属性
+	char.SpellCritDamage = critDamage
+	tr.context.Characters["character"] = char
+	
+	// 存储到断言上下文和Variables
 	tr.assertion.SetContext("spell_crit_damage", critDamage)
+	tr.assertion.SetContext("character.spell_crit_damage", critDamage)
 	tr.context.Variables["spell_crit_damage"] = critDamage
+	tr.context.Variables["character_spell_crit_damage"] = critDamage
 	return nil
 }
 
@@ -3238,6 +3690,80 @@ func (tr *TestRunner) executeStartBattle() error {
 			char.Strength, char.Agility, char.Intellect, char.Stamina, char.Spirit, char.UnspentPoints, char.TotalKills)
 	}
 	
+	// 设置战斗状态到上下文
+	tr.assertion.SetContext("battle_state", "in_progress")
+	tr.context.Variables["battle_state"] = "in_progress"
+	tr.assertion.SetContext("is_resting", false)
+	tr.context.Variables["is_resting"] = false
+	
+	// 计算并设置回合顺序（turn_order）
+	turnOrder := make([]interface{}, 0)
+	
+	// 添加角色到回合顺序
+	if char != nil {
+		speed := tr.calculator.CalculateSpeed(char)
+		charEntry := map[string]interface{}{
+			"type":    "character",
+			"id":      fmt.Sprintf("character_%d", char.ID),
+			"speed":   speed,
+			"hp":      char.HP,
+			"max_hp":  char.MaxHP,
+		}
+		turnOrder = append(turnOrder, charEntry)
+		// 同时设置单独的键以便访问
+		tr.assertion.SetContext("turn_order[0].type", "character")
+		tr.assertion.SetContext("turn_order[0].character.id", fmt.Sprintf("character_%d", char.ID))
+		tr.assertion.SetContext("turn_order[0].speed", speed)
+		tr.context.Variables["turn_order[0].type"] = "character"
+		tr.context.Variables["turn_order[0].character.id"] = fmt.Sprintf("character_%d", char.ID)
+		tr.context.Variables["turn_order[0].speed"] = speed
+	}
+	
+	// 添加怪物到回合顺序
+	monsterIndex := 0
+	for key, monster := range tr.context.Monsters {
+		if monster != nil {
+			idx := len(turnOrder)
+			monsterEntry := map[string]interface{}{
+				"type":    "monster",
+				"id":      fmt.Sprintf("monster_%s", key),
+				"speed":   monster.Speed,
+				"hp":      monster.HP,
+				"max_hp":  monster.MaxHP,
+			}
+			turnOrder = append(turnOrder, monsterEntry)
+			// 同时设置单独的键以便访问
+			tr.assertion.SetContext(fmt.Sprintf("turn_order[%d].type", idx), "monster")
+			tr.assertion.SetContext(fmt.Sprintf("turn_order[%d].monster.id", idx), fmt.Sprintf("monster_%s", key))
+			tr.assertion.SetContext(fmt.Sprintf("turn_order[%d].speed", idx), monster.Speed)
+			tr.context.Variables[fmt.Sprintf("turn_order[%d].type", idx)] = "monster"
+			tr.context.Variables[fmt.Sprintf("turn_order[%d].monster.id", idx)] = fmt.Sprintf("monster_%s", key)
+			tr.context.Variables[fmt.Sprintf("turn_order[%d].speed", idx)] = monster.Speed
+			monsterIndex++
+		}
+	}
+	
+	// 设置完整的turn_order数组
+	tr.assertion.SetContext("turn_order", turnOrder)
+	tr.context.Variables["turn_order"] = turnOrder
+	tr.assertion.SetContext("turn_order_length", len(turnOrder))
+	tr.context.Variables["turn_order_length"] = len(turnOrder)
+	
+	// 设置敌人数量
+	enemyCount := len(tr.context.Monsters)
+	tr.assertion.SetContext("enemy_count", enemyCount)
+	tr.context.Variables["enemy_count"] = enemyCount
+	
+	// 计算存活敌人数量
+	aliveEnemyCount := 0
+	for _, monster := range tr.context.Monsters {
+		if monster != nil && monster.HP > 0 {
+			aliveEnemyCount++
+		}
+	}
+	tr.assertion.SetContext("enemy_alive_count", aliveEnemyCount)
+	tr.context.Variables["enemy_alive_count"] = aliveEnemyCount
+	
 	// 更新上下文
 	tr.context.Characters["character"] = char
 	return nil
@@ -3304,8 +3830,16 @@ func (tr *TestRunner) executeAttackMonster() error {
 		return fmt.Errorf("monster not found")
 	}
 	
-	// 计算伤害
-	damage := char.PhysicalAttack - targetMonster.PhysicalDefense
+	// 计算伤害（考虑Debuff减成）
+	baseAttack := float64(char.PhysicalAttack)
+	// 检查是否有Debuff减成
+	if debuffModifier, exists := tr.context.Variables["monster_debuff_attack_modifier"]; exists {
+		if modifier, ok := debuffModifier.(float64); ok && modifier < 0 {
+			baseAttack = baseAttack * (1.0 + modifier) // modifier是负数，所以是1.0 + (-0.3) = 0.7
+			fmt.Fprintf(os.Stderr, "[DEBUG] executeAttackMonster: Debuff applied, modifier=%f, baseAttack=%f\n", modifier, baseAttack)
+		}
+	}
+	damage := int(math.Round(baseAttack)) - targetMonster.PhysicalDefense
 	if damage < 1 {
 		damage = 1
 	}
@@ -3315,6 +3849,10 @@ func (tr *TestRunner) executeAttackMonster() error {
 	if targetMonster.HP < 0 {
 		targetMonster.HP = 0
 	}
+	
+	// 设置伤害值到上下文
+	tr.assertion.SetContext("damage_dealt", damage)
+	tr.context.Variables["damage_dealt"] = damage
 	
 	// 战士攻击时获得怒气（假设获得10点）
 	if char.ResourceType == "rage" {
@@ -3326,7 +3864,13 @@ func (tr *TestRunner) executeAttackMonster() error {
 	
 	// 更新上下文
 	tr.context.Characters["character"] = char
-	tr.context.Monsters["monster"] = targetMonster
+	// 更新怪物到上下文（找到正确的key）
+	for key, m := range tr.context.Monsters {
+		if m == targetMonster {
+			tr.context.Monsters[key] = targetMonster
+			break
+		}
+	}
 	
 	// 如果怪物HP为0，战斗结束，战士怒气归0
 	if targetMonster.HP == 0 {
@@ -3359,8 +3903,16 @@ func (tr *TestRunner) executeMonsterAttack() error {
 		return fmt.Errorf("monster not found")
 	}
 	
-	// 计算伤害
-	damage := attackerMonster.PhysicalAttack - char.PhysicalDefense
+	// 计算伤害（考虑Buff加成）
+	baseAttack := float64(attackerMonster.PhysicalAttack)
+	// 检查是否有Buff加成
+	if buffModifier, exists := tr.context.Variables["monster_buff_attack_modifier"]; exists {
+		if modifier, ok := buffModifier.(float64); ok && modifier > 0 {
+			baseAttack = baseAttack * (1.0 + modifier)
+			fmt.Fprintf(os.Stderr, "[DEBUG] executeMonsterAttack: Buff applied, modifier=%f, baseAttack=%f\n", modifier, baseAttack)
+		}
+	}
+	damage := int(math.Round(baseAttack)) - char.PhysicalDefense
 	if damage < 1 {
 		damage = 1
 	}
@@ -3376,6 +3928,10 @@ func (tr *TestRunner) executeMonsterAttack() error {
 	if char.HP < 0 {
 		char.HP = 0
 	}
+	
+	// 设置伤害值到上下文
+	tr.assertion.SetContext("monster_damage_dealt", damage)
+	tr.context.Variables["monster_damage_dealt"] = damage
 	
 	fmt.Fprintf(os.Stderr, "[DEBUG] executeMonsterAttack: after damage - char.HP=%d, char.Resource=%d\n", char.HP, char.Resource)
 	
@@ -3526,7 +4082,7 @@ func (tr *TestRunner) handleBuffSkill(char *models.Character, skill *models.Skil
 
 // executeBattleRound 执行战斗回合（减少冷却时间）
 func (tr *TestRunner) executeBattleRound(instruction string) error {
-	// 解析回合数（如"执行第2回合"）
+	// 解析回合数（如"执行第2回合"或"执行一个回合"）
 	roundNum := 1
 	if strings.Contains(instruction, "第") {
 		parts := strings.Split(instruction, "第")
@@ -3536,6 +4092,15 @@ func (tr *TestRunner) executeBattleRound(instruction string) error {
 				roundNum = round
 			}
 		}
+	} else {
+		// 如果没有指定回合数，从上下文获取当前回合数并递增
+		if currentRound, exists := tr.context.Variables["current_round"]; exists {
+			if cr, ok := currentRound.(int); ok {
+				roundNum = cr + 1
+			}
+		}
+		tr.context.Variables["current_round"] = roundNum
+		tr.assertion.SetContext("current_round", roundNum)
 	}
 	
 	// 减少技能冷却时间
@@ -3585,6 +4150,442 @@ func (tr *TestRunner) executeBattleRound(instruction string) error {
 			}
 		}
 	}
+	
+	// 处理怪物技能冷却时间
+	monsterSkillVal, exists := tr.context.Variables["monster_skill"]
+	if exists {
+		if monsterSkill, ok := monsterSkillVal.(*models.Skill); ok {
+			// 获取怪物技能冷却时间
+			monsterCooldown := monsterSkill.Cooldown
+			// 获取上次使用技能的回合数
+			lastUsedRound := 1
+			if lastRound, exists := tr.context.Variables["monster_skill_last_used_round"]; exists {
+				if lr, ok := lastRound.(int); ok {
+					lastUsedRound = lr
+				}
+			}
+			// 计算冷却剩余时间
+			cooldownLeft := monsterCooldown - (roundNum - lastUsedRound)
+			if cooldownLeft < 0 {
+				cooldownLeft = 0
+			}
+			tr.assertion.SetContext(fmt.Sprintf("monster_skill_cooldown_round_%d", roundNum), cooldownLeft)
+			tr.context.Variables[fmt.Sprintf("monster_skill_cooldown_round_%d", roundNum)] = cooldownLeft
+		}
+	}
+	
+	return nil
+}
+
+// executeAddMonsterSkill 给怪物添加技能
+func (tr *TestRunner) executeAddMonsterSkill(instruction string) error {
+	// 解析技能信息（如"给怪物添加一个造成150%攻击力伤害的技能"）
+	skill := &models.Skill{
+		ID:          "monster_skill",
+		Name:        "怪物技能",
+		Type:        "attack",
+		ResourceCost: 0,
+		Cooldown:    0,
+	}
+	
+	// 解析伤害倍率（如"造成150%攻击力伤害"）
+	if strings.Contains(instruction, "造成") && strings.Contains(instruction, "%") {
+		parts := strings.Split(instruction, "造成")
+		if len(parts) > 1 {
+			damageStr := strings.TrimSpace(strings.Split(parts[1], "%")[0])
+			if multiplier, err := strconv.ParseFloat(damageStr, 64); err == nil {
+				skill.ScalingRatio = multiplier / 100.0
+				tr.context.Variables["monster_skill_scaling_ratio"] = skill.ScalingRatio
+			}
+		}
+	}
+	
+	// 解析冷却时间（如"冷却时间为2回合"）
+	if strings.Contains(instruction, "冷却时间") {
+		parts := strings.Split(instruction, "冷却时间")
+		if len(parts) > 1 {
+			cooldownStr := strings.TrimSpace(strings.Split(parts[1], "回合")[0])
+			if strings.Contains(cooldownStr, "为") {
+				cooldownParts := strings.Split(cooldownStr, "为")
+				if len(cooldownParts) > 1 {
+					cooldownStr = strings.TrimSpace(cooldownParts[1])
+				}
+			}
+			if cooldown, err := strconv.Atoi(cooldownStr); err == nil {
+				skill.Cooldown = cooldown
+				tr.context.Variables["monster_skill_cooldown"] = cooldown
+			}
+		}
+	}
+	
+	// 解析资源消耗（如"消耗40点资源"）
+	if strings.Contains(instruction, "消耗") && strings.Contains(instruction, "点资源") {
+		parts := strings.Split(instruction, "消耗")
+		if len(parts) > 1 {
+			costStr := strings.TrimSpace(strings.Split(parts[1], "点")[0])
+			if cost, err := strconv.Atoi(costStr); err == nil {
+				skill.ResourceCost = cost
+				tr.context.Variables["monster_skill_resource_cost"] = cost
+			}
+		}
+	}
+	
+	// 解析Buff效果（如"攻击力+50%"）
+	if strings.Contains(instruction, "攻击力") && (strings.Contains(instruction, "+") || strings.Contains(instruction, "提升")) {
+		parts := strings.Split(instruction, "攻击力")
+		if len(parts) > 1 {
+			buffStr := strings.TrimSpace(parts[1])
+			if strings.Contains(buffStr, "+") {
+				buffParts := strings.Split(buffStr, "+")
+				if len(buffParts) > 1 {
+					percentStr := strings.TrimSpace(strings.Split(buffParts[1], "%")[0])
+					if percent, err := strconv.ParseFloat(percentStr, 64); err == nil {
+						buffModifier := percent / 100.0
+						tr.context.Variables["monster_buff_attack_modifier"] = buffModifier
+						tr.assertion.SetContext("monster_buff_attack_modifier", buffModifier)
+					}
+				}
+			}
+		}
+	}
+	
+	// 解析Buff持续时间（如"持续3回合"）
+	if strings.Contains(instruction, "持续") && strings.Contains(instruction, "回合") {
+		parts := strings.Split(instruction, "持续")
+		if len(parts) > 1 {
+			durationStr := strings.TrimSpace(strings.Split(parts[1], "回合")[0])
+			if duration, err := strconv.Atoi(durationStr); err == nil {
+				tr.context.Variables["monster_buff_duration"] = duration
+				tr.assertion.SetContext("monster_buff_duration", duration)
+			}
+		}
+	}
+	
+	// 解析Debuff效果（如"降低角色攻击力-30%"）
+	if strings.Contains(instruction, "降低") && strings.Contains(instruction, "攻击力") {
+		parts := strings.Split(instruction, "降低")
+		if len(parts) > 1 {
+			debuffStr := strings.TrimSpace(parts[1])
+			if strings.Contains(debuffStr, "-") {
+				debuffParts := strings.Split(debuffStr, "-")
+				if len(debuffParts) > 1 {
+					percentStr := strings.TrimSpace(strings.Split(debuffParts[1], "%")[0])
+					if percent, err := strconv.ParseFloat(percentStr, 64); err == nil {
+						debuffModifier := -percent / 100.0
+						tr.context.Variables["monster_debuff_attack_modifier"] = debuffModifier
+						tr.assertion.SetContext("monster_debuff_attack_modifier", debuffModifier)
+					}
+				}
+			}
+		}
+		// 解析Debuff持续时间（如"持续2回合"）
+		if strings.Contains(instruction, "持续") && strings.Contains(instruction, "回合") {
+			parts := strings.Split(instruction, "持续")
+			if len(parts) > 1 {
+				durationStr := strings.TrimSpace(strings.Split(parts[1], "回合")[0])
+				if duration, err := strconv.Atoi(durationStr); err == nil {
+					tr.context.Variables["character_debuff_duration"] = duration
+					tr.assertion.SetContext("character_debuff_duration", duration)
+				}
+			}
+		}
+	}
+	
+	// 解析治疗技能（如"恢复30点HP的治疗技能"）
+	if strings.Contains(instruction, "恢复") && strings.Contains(instruction, "点HP") {
+		skill.Type = "heal"
+		parts := strings.Split(instruction, "恢复")
+		if len(parts) > 1 {
+			healStr := strings.TrimSpace(strings.Split(parts[1], "点")[0])
+			if heal, err := strconv.Atoi(healStr); err == nil {
+				skill.BaseValue = heal
+				tr.context.Variables["monster_skill_heal_amount"] = heal
+			}
+		}
+	}
+	
+	// 存储怪物技能到上下文
+	tr.context.Variables["monster_skill"] = skill
+	tr.context.Variables["monster_skill_id"] = skill.ID
+	
+	return nil
+}
+
+// executeMonsterUseSkill 怪物使用技能攻击角色
+func (tr *TestRunner) executeMonsterUseSkill(instruction string) error {
+	char, ok := tr.context.Characters["character"]
+	if !ok || char == nil {
+		return fmt.Errorf("character not found")
+	}
+	
+	// 获取第一个怪物
+	var monster *models.Monster
+	var monsterKey string
+	for key, m := range tr.context.Monsters {
+		if m != nil {
+			monster = m
+			monsterKey = key
+			break
+		}
+	}
+	if monster == nil {
+		return fmt.Errorf("monster not found")
+	}
+	
+	// 获取怪物技能
+	skillVal, exists := tr.context.Variables["monster_skill"]
+	if !exists {
+		return fmt.Errorf("monster skill not found")
+	}
+	skill, ok := skillVal.(*models.Skill)
+	if !ok || skill == nil {
+		return fmt.Errorf("invalid monster skill")
+	}
+	
+	// 确保ResourceCost从上下文变量中恢复（如果skill.ResourceCost为0）
+	if skill.ResourceCost == 0 {
+		if resourceCostVal, exists := tr.context.Variables["monster_skill_resource_cost"]; exists {
+			if cost, ok := resourceCostVal.(int); ok && cost > 0 {
+				skill.ResourceCost = cost
+				fmt.Fprintf(os.Stderr, "[DEBUG] executeMonsterUseSkill: restored ResourceCost=%d from Variables\n", cost)
+			}
+		}
+	}
+	
+	// 解析回合数（如"怪物使用技能（第1回合）"）
+	roundNum := 1
+	if strings.Contains(instruction, "第") {
+		parts := strings.Split(instruction, "第")
+		if len(parts) > 1 {
+			roundStr := strings.TrimSpace(strings.Split(parts[1], "回合")[0])
+			if round, err := strconv.Atoi(roundStr); err == nil {
+				roundNum = round
+			}
+		}
+	} else {
+		// 如果没有指定回合数，从上下文获取当前回合数
+		if currentRound, exists := tr.context.Variables["current_round"]; exists {
+			if cr, ok := currentRound.(int); ok {
+				roundNum = cr
+			}
+		}
+	}
+	
+	// 记录技能使用回合
+	tr.context.Variables["monster_skill_last_used_round"] = roundNum
+	
+	// 处理不同类型的技能
+	// 检查是否是Buff技能
+	if strings.Contains(instruction, "Buff") || strings.Contains(instruction, "buff") {
+		// Buff技能：只设置Buff信息，不造成伤害
+		// Buff信息已经在executeAddMonsterSkill中设置到上下文
+		// 这里只需要确保Buff信息被正确同步
+		if buffModifier, exists := tr.context.Variables["monster_buff_attack_modifier"]; exists {
+			tr.assertion.SetContext("monster_buff_attack_modifier", buffModifier)
+		}
+		if buffDuration, exists := tr.context.Variables["monster_buff_duration"]; exists {
+			tr.assertion.SetContext("monster_buff_duration", buffDuration)
+		}
+		// Buff后，怪物的攻击力会提升，但这里我们只记录Buff信息
+		// 实际的攻击力提升需要在怪物攻击时应用
+		return nil
+	}
+	
+	// 检查是否是Debuff技能
+	if strings.Contains(instruction, "Debuff") || strings.Contains(instruction, "debuff") {
+		// Debuff技能：只设置Debuff信息，不造成伤害
+		// Debuff信息已经在executeAddMonsterSkill中设置到上下文
+		if debuffModifier, exists := tr.context.Variables["monster_debuff_attack_modifier"]; exists {
+			tr.assertion.SetContext("monster_debuff_attack_modifier", debuffModifier)
+		}
+		if debuffDuration, exists := tr.context.Variables["character_debuff_duration"]; exists {
+			tr.assertion.SetContext("character_debuff_duration", debuffDuration)
+		}
+		// Debuff后，角色的攻击力会降低，但这里我们只记录Debuff信息
+		// 实际的攻击力降低需要在角色攻击时应用
+		return nil
+	}
+	
+	// 检查是否是AOE技能
+	if strings.Contains(instruction, "AOE") || strings.Contains(instruction, "aoe") || strings.Contains(instruction, "范围") {
+		// AOE技能：对所有角色造成伤害
+		// 计算伤害
+		baseAttack := float64(monster.PhysicalAttack)
+		damageMultiplier := 0.8 // 默认80%
+		if skill.ScalingRatio > 0 {
+			damageMultiplier = skill.ScalingRatio
+		} else if scalingRatio, exists := tr.context.Variables["monster_skill_scaling_ratio"]; exists {
+			if ratio, ok := scalingRatio.(float64); ok {
+				damageMultiplier = ratio
+			}
+		}
+		
+		baseDamage := baseAttack * damageMultiplier
+		totalDamage := 0
+		characterIndex := 1
+		for key, character := range tr.context.Characters {
+			if character != nil && strings.HasPrefix(key, "character") {
+				damage := int(math.Round(baseDamage)) - character.PhysicalDefense
+				if damage < 1 {
+					damage = 1
+				}
+				character.HP -= damage
+				if character.HP < 0 {
+					character.HP = 0
+				}
+				totalDamage += damage
+				tr.context.Characters[key] = character
+				characterIndex++
+			}
+		}
+		
+		tr.assertion.SetContext("monster_aoe_damage_dealt", totalDamage)
+		tr.context.Variables["monster_aoe_damage_dealt"] = totalDamage
+		return nil
+	}
+	
+	// 检查是否是治疗技能（从技能类型或上下文变量判断）
+	isHealSkill := skill.Type == "heal"
+	if !isHealSkill {
+		if healAmountVal, exists := tr.context.Variables["monster_skill_heal_amount"]; exists {
+			if healAmount, ok := healAmountVal.(int); ok && healAmount > 0 {
+				isHealSkill = true
+			}
+		}
+	}
+	if isHealSkill || strings.Contains(instruction, "治疗") || strings.Contains(instruction, "恢复") {
+		// 治疗技能
+		healAmount := 30 // 默认
+		if skill.BaseValue > 0 {
+			healAmount = skill.BaseValue
+		} else if healAmountVal, exists := tr.context.Variables["monster_skill_heal_amount"]; exists {
+			if h, ok := healAmountVal.(int); ok && h > 0 {
+				healAmount = h
+			}
+		} else {
+			// 从指令中解析治疗量（如"恢复30点HP"）
+			if strings.Contains(instruction, "恢复") {
+				parts := strings.Split(instruction, "恢复")
+				if len(parts) > 1 {
+					healStr := strings.TrimSpace(strings.Split(parts[1], "点")[0])
+					if h, err := strconv.Atoi(healStr); err == nil {
+						healAmount = h
+					}
+				}
+			}
+		}
+		initialHP := monster.HP
+		monster.HP += healAmount
+		if monster.HP > monster.MaxHP {
+			monster.HP = monster.MaxHP
+		}
+		actualHeal := monster.HP - initialHP
+		tr.assertion.SetContext("monster_healing_dealt", actualHeal)
+		tr.context.Variables["monster_healing_dealt"] = actualHeal
+		tr.context.Monsters[monsterKey] = monster
+		fmt.Fprintf(os.Stderr, "[DEBUG] executeMonsterUseSkill: heal skill, initialHP=%d, healAmount=%d, finalHP=%d, actualHeal=%d\n", initialHP, healAmount, monster.HP, actualHeal)
+	} else {
+		// 攻击技能
+		// 计算伤害
+		baseAttack := float64(monster.PhysicalAttack)
+		damageMultiplier := 1.0
+		if skill.ScalingRatio > 0 {
+			damageMultiplier = skill.ScalingRatio
+		} else if scalingRatio, exists := tr.context.Variables["monster_skill_scaling_ratio"]; exists {
+			if ratio, ok := scalingRatio.(float64); ok {
+				damageMultiplier = ratio
+			}
+		}
+		
+		baseDamage := baseAttack * damageMultiplier
+		// 先计算基础伤害（未减防御）
+		baseDamageValue := int(math.Round(baseDamage))
+		// 然后减去防御
+		actualDamage := baseDamageValue - char.PhysicalDefense
+		if actualDamage < 1 {
+			actualDamage = 1
+		}
+		
+		// 检查是否暴击（简化处理，10%概率）
+		isCrit := false
+		if strings.Contains(instruction, "暴击") || strings.Contains(instruction, "必定暴击") || strings.Contains(instruction, "攻击角色（必定暴击）") {
+			isCrit = true
+		}
+		
+		// 计算暴击伤害（在基础伤害上应用暴击倍率，然后减防御）
+		critDamage := actualDamage
+		if isCrit {
+			// 暴击伤害 = (基础伤害 * 暴击倍率) - 防御
+			// 假设暴击倍率为1.5（150%）
+			critBaseDamage := int(float64(baseDamageValue) * 1.5)
+			critDamage = critBaseDamage - char.PhysicalDefense
+			if critDamage < 1 {
+				critDamage = 1
+			}
+			actualDamage = critDamage
+		}
+		
+		// 应用伤害到角色
+		char.HP -= actualDamage
+		if char.HP < 0 {
+			char.HP = 0
+		}
+		
+		// 设置伤害值到上下文
+		tr.assertion.SetContext("monster_skill_damage_dealt", actualDamage)
+		tr.context.Variables["monster_skill_damage_dealt"] = actualDamage
+		if isCrit {
+			tr.assertion.SetContext("monster_skill_is_crit", true)
+			tr.context.Variables["monster_skill_is_crit"] = true
+			tr.assertion.SetContext("monster_skill_crit_damage", critDamage)
+			tr.context.Variables["monster_skill_crit_damage"] = critDamage
+			fmt.Fprintf(os.Stderr, "[DEBUG] executeMonsterUseSkill: crit triggered, baseDamage=%d, critDamage=%d\n", baseDamageValue, critDamage)
+		}
+	}
+	
+	// 处理资源消耗
+	// 首先检查skill.ResourceCost，如果没有，从上下文变量获取
+	resourceCost := skill.ResourceCost
+	if resourceCost == 0 {
+		if resourceCostVal, exists := tr.context.Variables["monster_skill_resource_cost"]; exists {
+			if cost, ok := resourceCostVal.(int); ok && cost > 0 {
+				resourceCost = cost
+			}
+		}
+	}
+	
+	if resourceCost > 0 {
+		// 假设怪物有资源系统（简化处理）
+		monsterResource := 100 // 默认
+		if resourceVal, exists := tr.context.Variables["monster.resource"]; exists {
+			if r, ok := resourceVal.(int); ok {
+				monsterResource = r
+			}
+		} else {
+			// 如果没有设置，初始化为100
+			tr.context.Variables["monster.resource"] = 100
+			monsterResource = 100
+		}
+		fmt.Fprintf(os.Stderr, "[DEBUG] executeMonsterUseSkill: before resource consumption, monsterResource=%d, resourceCost=%d\n", monsterResource, resourceCost)
+		monsterResource -= resourceCost
+		if monsterResource < 0 {
+			monsterResource = 0
+		}
+		fmt.Fprintf(os.Stderr, "[DEBUG] executeMonsterUseSkill: after resource consumption, monsterResource=%d\n", monsterResource)
+		tr.assertion.SetContext("monster.resource", monsterResource)
+		tr.context.Variables["monster.resource"] = monsterResource
+		tr.assertion.SetContext("monster_skill_resource_cost", resourceCost)
+		tr.context.Variables["monster_skill_resource_cost"] = resourceCost
+	}
+	
+	// 更新角色到数据库
+	charRepo := repository.NewCharacterRepository()
+	if err := charRepo.Update(char); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to update character HP after monster skill: %v\n", err)
+	}
+	
+	// 更新上下文
+	tr.context.Characters["character"] = char
 	
 	return nil
 }
