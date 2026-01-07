@@ -3401,7 +3401,14 @@ func (tr *TestRunner) handleAttackSkill(char *models.Character, skill *models.Sk
 	fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: context pointer=%p, context has %d characters, %d monsters, %d variables\n", 
 		tr.context, len(tr.context.Characters), len(tr.context.Monsters), len(tr.context.Variables))
 	for key, monster := range tr.context.Monsters {
-		fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: monster[%s] exists, HP=%d\n", key, monster.HP)
+		if monster != nil {
+			fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: monster[%s] exists, HP=%d, PhysicalDefense=%d\n", key, monster.HP, monster.PhysicalDefense)
+		} else {
+			fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: monster[%s] is nil\n", key)
+		}
+	}
+	if len(tr.context.Monsters) == 0 {
+		fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: WARNING - no monsters in context!\n")
 	}
 	// 确保使用最新的角色对象（从上下文重新获取，以防有更新）
 	if latestChar, exists := tr.context.Characters["character"]; exists && latestChar != nil {
@@ -3470,11 +3477,22 @@ func (tr *TestRunner) handleAttackSkill(char *models.Character, skill *models.Sk
 		if attackVal, exists := tr.context.Variables["character_physical_attack"]; exists {
 			if attack, ok := attackVal.(int); ok && attack > 0 {
 				baseAttack = attack
+				fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: restored baseAttack=%d from Variables[character_physical_attack]\n", baseAttack)
+			}
+		}
+		// 如果仍然为0，尝试从简化键获取
+		if baseAttack == 0 {
+			if attackVal, exists := tr.context.Variables["physical_attack"]; exists {
+				if attack, ok := attackVal.(int); ok && attack > 0 {
+					baseAttack = attack
+					fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: restored baseAttack=%d from Variables[physical_attack]\n", baseAttack)
+				}
 			}
 		}
 		// 如果仍然为0，使用计算值
 		if baseAttack == 0 {
 			baseAttack = tr.calculator.CalculatePhysicalAttack(char)
+			fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: calculated baseAttack=%d from Calculator\n", baseAttack)
 		}
 	}
 	fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: char.PhysicalAttack=%d, baseAttack=%d, damageMultiplier=%f\n", char.PhysicalAttack, baseAttack, damageMultiplier)
@@ -4159,6 +4177,14 @@ func (tr *TestRunner) handleBuffSkill(char *models.Character, skill *models.Skil
 	// 也存储到Variables中，以便updateAssertionContext可以访问
 	tr.context.Variables["character_buff_attack_modifier"] = attackModifier
 	tr.context.Variables["character_buff_duration"] = duration
+	
+	// 立即同步到断言上下文，确保测试可以正确断言
+	tr.assertion.SetContext("buff_attack_modifier", attackModifier)
+	tr.assertion.SetContext("buff_duration", duration)
+	tr.context.Variables["buff_attack_modifier"] = attackModifier
+	tr.context.Variables["buff_duration"] = duration
+	
+	fmt.Fprintf(os.Stderr, "[DEBUG] handleBuffSkill: set buff_attack_modifier=%f, buff_duration=%d\n", attackModifier, duration)
 	
 	// 注意：实际的Buff应用需要在战斗系统中处理
 	// 这里只是设置测试上下文，供断言使用
