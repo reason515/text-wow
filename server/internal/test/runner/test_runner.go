@@ -1446,6 +1446,10 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 			if savedPhysicalAttack > 0 {
 				char.PhysicalAttack = savedPhysicalAttack
 				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after Update, restored PhysicalAttack=%d\n", char.PhysicalAttack)
+			} else if char.PhysicalAttack == 0 {
+				// 如果PhysicalAttack为0，重新计算
+				char.PhysicalAttack = tr.calculator.CalculatePhysicalAttack(char)
+				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after Update, re-calculated PhysicalAttack=%d (was 0)\n", char.PhysicalAttack)
 			} else {
 				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after Update, char.PhysicalAttack=%d (not restored)\n", char.PhysicalAttack)
 			}
@@ -1502,6 +1506,10 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 			if savedPhysicalAttack > 0 {
 				char.PhysicalAttack = savedPhysicalAttack
 				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after Create, restored PhysicalAttack=%d\n", char.PhysicalAttack)
+			} else if char.PhysicalAttack == 0 {
+				// 如果PhysicalAttack为0，重新计算
+				char.PhysicalAttack = tr.calculator.CalculatePhysicalAttack(char)
+				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after Create, re-calculated PhysicalAttack=%d (was 0)\n", char.PhysicalAttack)
 			} else {
 				fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: after Create, char.PhysicalAttack=%d (not restored)\n", char.PhysicalAttack)
 			}
@@ -1652,15 +1660,18 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 	if !explicitPhysicalAttack {
 		oldAttack := char.PhysicalAttack
 		calculatedAttack := tr.calculator.CalculatePhysicalAttack(char)
-		if oldAttack != calculatedAttack {
+		// 如果当前值为0或与计算值不同，使用计算值
+		if oldAttack == 0 || oldAttack != calculatedAttack {
 			char.PhysicalAttack = calculatedAttack
 			fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: re-calculated PhysicalAttack=%d (from Strength=%d, Agility=%d, was %d)\n", 
 				char.PhysicalAttack, char.Strength, char.Agility, oldAttack)
 		}
 	}
-	// 法术攻击力：如果未明确设置，总是基于主属性重新计算
+	// 法术攻击力：如果未明确设置或为0，总是基于主属性重新计算
 	if char.MagicAttack == 0 {
 		char.MagicAttack = tr.calculator.CalculateMagicAttack(char)
+		fmt.Fprintf(os.Stderr, "[DEBUG] createCharacter: calculated MagicAttack=%d (from Intellect=%d, Spirit=%d)\n", 
+			char.MagicAttack, char.Intellect, char.Spirit)
 	}
 	// 物理防御：如果未明确设置，总是基于主属性重新计算
 	if char.PhysicalDefense == 0 {
@@ -3479,8 +3490,36 @@ func (tr *TestRunner) handleAttackSkill(char *models.Character, skill *models.Sk
 	if isAOE {
 		// AOE技能：对所有怪物造成伤害
 		fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: ENTERING AOE branch, processing %d monsters\n", len(tr.context.Monsters))
+		
+		// 按key排序怪物，确保顺序一致（monster, monster_1, monster_2, ...）
+		monsterKeys := make([]string, 0, len(tr.context.Monsters))
+		for key := range tr.context.Monsters {
+			monsterKeys = append(monsterKeys, key)
+		}
+		// 排序：monster在前，然后是monster_1, monster_2, ...
+		for i := 0; i < len(monsterKeys)-1; i++ {
+			for j := i + 1; j < len(monsterKeys); j++ {
+				if monsterKeys[i] == "monster" {
+					// monster应该在前
+					continue
+				}
+				if monsterKeys[j] == "monster" {
+					// 交换，让monster在前
+					monsterKeys[i], monsterKeys[j] = monsterKeys[j], monsterKeys[i]
+				} else if strings.HasPrefix(monsterKeys[i], "monster_") && strings.HasPrefix(monsterKeys[j], "monster_") {
+					// 比较数字部分
+					numI := extractMonsterNumber(monsterKeys[i])
+					numJ := extractMonsterNumber(monsterKeys[j])
+					if numI > numJ {
+						monsterKeys[i], monsterKeys[j] = monsterKeys[j], monsterKeys[i]
+					}
+				}
+			}
+		}
+		
 		monsterIndex := 1
-		for key, monster := range tr.context.Monsters {
+		for _, key := range monsterKeys {
+			monster := tr.context.Monsters[key]
 			fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: processing monster[%s], index=%d\n", key, monsterIndex)
 			if monster != nil {
 				// 记录初始HP
@@ -3520,9 +3559,9 @@ func (tr *TestRunner) handleAttackSkill(char *models.Character, skill *models.Sk
 					hpDamage = 0
 				}
 				
-				// 设置伤害值到上下文
+				// 设置伤害值到上下文（使用monsterIndex，从1开始）
 				damageKey := fmt.Sprintf("monster_%d.hp_damage", monsterIndex)
-				fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: setting %s=%d\n", damageKey, hpDamage)
+				fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: setting %s=%d for monster[%s]\n", damageKey, hpDamage, key)
 				tr.assertion.SetContext(damageKey, hpDamage)
 				tr.context.Variables[damageKey] = hpDamage
 				fmt.Fprintf(os.Stderr, "[DEBUG] handleAttackSkill: set %s in Variables and assertion context\n", damageKey)
@@ -3651,6 +3690,15 @@ func (tr *TestRunner) handleHealSkill(char *models.Character, skill *models.Skil
 	
 	// 设置治疗量到上下文
 	tr.assertion.SetContext("skill_healing_done", healAmount)
+	tr.context.Variables["skill_healing_done"] = healAmount
+	
+	// 立即同步HP到断言上下文，确保测试可以正确断言
+	tr.assertion.SetContext("character.hp", char.HP)
+	tr.assertion.SetContext("hp", char.HP)
+	tr.context.Variables["character_hp"] = char.HP
+	tr.context.Variables["hp"] = char.HP
+	
+	fmt.Fprintf(os.Stderr, "[DEBUG] handleHealSkill: synced HP=%d to assertion context\n", char.HP)
 }
 
 // executeStartBattle 开始战斗
@@ -3968,6 +4016,20 @@ func (tr *TestRunner) executeMonsterAttack() error {
 	return nil
 }
 
+// extractMonsterNumber 从怪物key中提取编号（如"monster_1" -> 1, "monster" -> 0）
+func extractMonsterNumber(key string) int {
+	if key == "monster" {
+		return 0
+	}
+	if strings.HasPrefix(key, "monster_") {
+		numStr := strings.TrimPrefix(key, "monster_")
+		if num, err := strconv.Atoi(numStr); err == nil {
+			return num
+		}
+	}
+	return 999 // 默认返回大数，确保排序在后面
+}
+
 // executeGetCharacterData 获取角色数据
 func (tr *TestRunner) executeGetCharacterData() error {
 	char, ok := tr.context.Characters["character"]
@@ -4049,6 +4111,20 @@ func (tr *TestRunner) executeCheckCharacterAttributes() error {
 	tr.context.Characters["character"] = char
 	
 	return nil
+}
+
+// extractMonsterNumber 从怪物key中提取编号（如"monster_1" -> 1, "monster" -> 0）
+func extractMonsterNumber(key string) int {
+	if key == "monster" {
+		return 0
+	}
+	if strings.HasPrefix(key, "monster_") {
+		numStr := strings.TrimPrefix(key, "monster_")
+		if num, err := strconv.Atoi(numStr); err == nil {
+			return num
+		}
+	}
+	return 999 // 默认返回大数，确保排序在后面
 }
 
 // handleBuffSkill 处理Buff技能
@@ -4588,5 +4664,19 @@ func (tr *TestRunner) executeMonsterUseSkill(instruction string) error {
 	tr.context.Characters["character"] = char
 	
 	return nil
+}
+
+// extractMonsterNumber 从怪物key中提取编号（如"monster_1" -> 1, "monster" -> 0）
+func extractMonsterNumber(key string) int {
+	if key == "monster" {
+		return 0
+	}
+	if strings.HasPrefix(key, "monster_") {
+		numStr := strings.TrimPrefix(key, "monster_")
+		if num, err := strconv.Atoi(numStr); err == nil {
+			return num
+		}
+	}
+	return 999 // 默认返回大数，确保排序在后面
 }
 
