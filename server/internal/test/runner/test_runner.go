@@ -2905,8 +2905,16 @@ func (tr *TestRunner) createSkill(instruction string) error {
 	tr.context.Variables["skill"] = skill
 	// 也存储技能类型和伤害倍率到上下文，以便executeUseSkill可以访问
 	tr.context.Variables["skill_type"] = skill.Type
-	tr.context.Variables["skill_scaling_ratio"] = skill.ScalingRatio
-	fmt.Fprintf(os.Stderr, "[DEBUG] createSkill: stored skill, ScalingRatio=%f\n", skill.ScalingRatio)
+	// 确保skill_scaling_ratio被正确存储（如果为0，使用默认值1.0）
+	if skill.ScalingRatio > 0 {
+		tr.context.Variables["skill_scaling_ratio"] = skill.ScalingRatio
+	} else {
+		// 如果ScalingRatio为0，使用默认值1.0
+		skill.ScalingRatio = 1.0
+		tr.context.Variables["skill_scaling_ratio"] = 1.0
+		fmt.Fprintf(os.Stderr, "[DEBUG] createSkill: ScalingRatio was 0, using default 1.0\n")
+	}
+	fmt.Fprintf(os.Stderr, "[DEBUG] createSkill: stored skill, ScalingRatio=%f, skill_scaling_ratio=%v\n", skill.ScalingRatio, tr.context.Variables["skill_scaling_ratio"])
 	return nil
 }
 
