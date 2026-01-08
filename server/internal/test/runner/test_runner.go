@@ -6401,12 +6401,23 @@ func (tr *TestRunner) syncTeamToContext() {
 	for _, char := range tr.context.Characters {
 		if char != nil {
 			// 确保MaxHP不为0（如果为0，尝试从HP或计算）
-			if char.MaxHP == 0 && char.HP > 0 {
-				char.MaxHP = char.HP
-			}
-			// 如果仍然为0，尝试计算
 			if char.MaxHP == 0 {
-				char.MaxHP = tr.calculator.CalculateHP(char, 35) // 使用默认基础HP
+				if char.HP > 0 {
+					char.MaxHP = char.HP
+				} else {
+					// 如果HP也为0，尝试计算MaxHP
+					baseHP := 35 // 默认基础HP
+					if baseHPVal, exists := tr.context.Variables["character_base_hp"]; exists {
+						if hp, ok := baseHPVal.(int); ok && hp > 0 {
+							baseHP = hp
+						}
+					}
+					char.MaxHP = tr.calculator.CalculateHP(char, baseHP)
+					// 如果计算后仍然为0，使用默认值
+					if char.MaxHP == 0 {
+						char.MaxHP = 100 // 默认MaxHP
+					}
+				}
 			}
 			
 			// 确保攻击力不为0（如果为0，尝试计算）
@@ -6599,6 +6610,8 @@ func (tr *TestRunner) executeCreateTeamWithMembers(instruction string) error {
 				}
 				tr.context.Variables["team.character_count"] = count
 				tr.assertion.SetContext("team.character_count", count)
+				// 创建队伍后，同步队伍信息到上下文
+				tr.syncTeamToContext()
 			}
 		}
 	}
