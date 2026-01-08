@@ -375,6 +375,41 @@ func (tr *TestRunner) executeInstruction(instruction string) error {
 		return tr.executeCalculateSpeed()
 	} else if strings.Contains(instruction, "计算资源回复") || strings.Contains(instruction, "计算法力回复") || strings.Contains(instruction, "计算法力恢复") || strings.Contains(instruction, "计算怒气获得") || strings.Contains(instruction, "计算能量回复") || strings.Contains(instruction, "计算能量恢复") {
 		return tr.executeCalculateResourceRegen(instruction)
+	} else if strings.Contains(instruction, "计算队伍总攻击力") || strings.Contains(instruction, "计算队伍总生命值") {
+		// 计算队伍属性（会调用syncTeamToContext）
+		tr.syncTeamToContext()
+		return nil
+	} else if strings.Contains(instruction, "有队伍攻击力") || strings.Contains(instruction, "有队伍生命值") {
+		// 解析"角色1有队伍攻击力+10%的被动技能"或"角色2有队伍生命值+15%的被动技能"
+		if strings.Contains(instruction, "队伍攻击力") && strings.Contains(instruction, "+") && strings.Contains(instruction, "%") {
+			// 解析攻击力加成百分比
+			parts := strings.Split(instruction, "队伍攻击力")
+			if len(parts) > 1 {
+				bonusPart := parts[1]
+				if plusIdx := strings.Index(bonusPart, "+"); plusIdx >= 0 {
+					bonusStr := bonusPart[plusIdx+1:]
+					bonusStr = strings.TrimSpace(strings.Split(bonusStr, "%")[0])
+					if bonus, err := strconv.ParseFloat(bonusStr, 64); err == nil {
+						tr.context.Variables["team_attack_bonus"] = bonus / 100.0 // 转换为小数（10% -> 0.1）
+					}
+				}
+			}
+		}
+		if strings.Contains(instruction, "队伍生命值") && strings.Contains(instruction, "+") && strings.Contains(instruction, "%") {
+			// 解析生命值加成百分比
+			parts := strings.Split(instruction, "队伍生命值")
+			if len(parts) > 1 {
+				bonusPart := parts[1]
+				if plusIdx := strings.Index(bonusPart, "+"); plusIdx >= 0 {
+					bonusStr := bonusPart[plusIdx+1:]
+					bonusStr = strings.TrimSpace(strings.Split(bonusStr, "%")[0])
+					if bonus, err := strconv.ParseFloat(bonusStr, 64); err == nil {
+						tr.context.Variables["team_hp_bonus"] = bonus / 100.0 // 转换为小数（15% -> 0.15）
+					}
+				}
+			}
+		}
+		return nil
 	} else if strings.Contains(instruction, "计算基础伤害") {
 		return tr.executeCalculateBaseDamage()
 	} else if strings.Contains(instruction, "应用防御减伤") {
@@ -6365,6 +6400,23 @@ func (tr *TestRunner) syncTeamToContext() {
 	// 遍历所有角色计算属性
 	for _, char := range tr.context.Characters {
 		if char != nil {
+			// 确保MaxHP不为0（如果为0，尝试从HP或计算）
+			if char.MaxHP == 0 && char.HP > 0 {
+				char.MaxHP = char.HP
+			}
+			// 如果仍然为0，尝试计算
+			if char.MaxHP == 0 {
+				char.MaxHP = tr.calculator.CalculateHP(char, 35) // 使用默认基础HP
+			}
+			
+			// 确保攻击力不为0（如果为0，尝试计算）
+			if char.PhysicalAttack == 0 {
+				char.PhysicalAttack = tr.calculator.CalculatePhysicalAttack(char)
+			}
+			if char.MagicAttack == 0 {
+				char.MagicAttack = tr.calculator.CalculateMagicAttack(char)
+			}
+			
 			// 基础总攻击力（物理+魔法，无加成）
 			baseTotalAttack += char.PhysicalAttack + char.MagicAttack
 			// 基础总生命值（无加成）
