@@ -504,6 +504,14 @@ func (tr *TestRunner) executeStrategyDecision(instruction string) error {
 		return fmt.Errorf("character not found")
 	}
 
+	// 防御性检查：确保MaxHP和MaxResource不为0
+	if char.MaxHP == 0 {
+		char.MaxHP = 1
+	}
+	if char.MaxResource == 0 {
+		char.MaxResource = 1
+	}
+
 	// 获取策略配置
 	selectedSkillType := "basic_attack" // 默认
 
@@ -513,7 +521,7 @@ func (tr *TestRunner) executeStrategyDecision(instruction string) error {
 			hpPercent := float64(char.HP) / float64(char.MaxHP) * 100
 			if hpPercent < float64(threshold) {
 				if skillType, exists := tr.context.Variables["strategy_skill_type"]; exists {
-					if st, ok := skillType.(string); ok {
+					if st, ok := skillType.(string); ok && st != "" {
 						selectedSkillType = st
 					}
 				}
@@ -527,7 +535,7 @@ func (tr *TestRunner) executeStrategyDecision(instruction string) error {
 			mpPercent := float64(char.Resource) / float64(char.MaxResource) * 100
 			if mpPercent < float64(threshold) {
 				if skillType, exists := tr.context.Variables["strategy_skill_type"]; exists {
-					if st, ok := skillType.(string); ok {
+					if st, ok := skillType.(string); ok && st != "" {
 						selectedSkillType = st
 					}
 				}
@@ -541,7 +549,7 @@ func (tr *TestRunner) executeStrategyDecision(instruction string) error {
 			// 获取第一个怪物
 			var monster *models.Monster
 			for _, m := range tr.context.Monsters {
-				if m != nil && m.HP > 0 {
+				if m != nil && m.HP > 0 && m.MaxHP > 0 {
 					monster = m
 					break
 				}
@@ -550,7 +558,7 @@ func (tr *TestRunner) executeStrategyDecision(instruction string) error {
 				hpPercent := float64(monster.HP) / float64(monster.MaxHP) * 100
 				if hpPercent < float64(threshold) {
 					if skillType, exists := tr.context.Variables["strategy_skill_type"]; exists {
-						if st, ok := skillType.(string); ok {
+						if st, ok := skillType.(string); ok && st != "" {
 							selectedSkillType = st
 						}
 					}
@@ -559,7 +567,10 @@ func (tr *TestRunner) executeStrategyDecision(instruction string) error {
 		}
 	}
 
-	// 设置选中的技能
+	// 设置选中的技能（确保值不为空）
+	if selectedSkillType == "" {
+		selectedSkillType = "basic_attack"
+	}
 	tr.context.Variables["selected_skill.type"] = selectedSkillType
 	tr.assertion.SetContext("selected_skill.type", selectedSkillType)
 
@@ -594,12 +605,12 @@ func (tr *TestRunner) executeConfigureSkillPriority(instruction string) error {
 		}
 	}
 
-	// 存储到上下文
-	tr.context.Variables["skill_priority_order"] = skillPriorities
-	tr.assertion.SetContext("skill_priority_order", skillPriorities)
-
-	// 同时设置第一个技能的名称（用于断言）
+	// 存储到上下文（确保数据结构可序列化）
 	if len(skillPriorities) > 0 {
+		tr.context.Variables["skill_priority_order"] = skillPriorities
+		tr.assertion.SetContext("skill_priority_order", skillPriorities)
+
+		// 同时设置第一个技能的名称（用于断言）
 		if name, ok := skillPriorities[0]["name"].(string); ok {
 			tr.context.Variables["skill_priority_order[0].name"] = name
 			tr.assertion.SetContext("skill_priority_order[0].name", name)
@@ -610,6 +621,10 @@ func (tr *TestRunner) executeConfigureSkillPriority(instruction string) error {
 				tr.assertion.SetContext("skill_priority_order[1].name", name)
 			}
 		}
+	} else {
+		// 如果没有解析到技能，设置空数组
+		tr.context.Variables["skill_priority_order"] = []interface{}{}
+		tr.assertion.SetContext("skill_priority_order", []interface{}{})
 	}
 
 	return nil
