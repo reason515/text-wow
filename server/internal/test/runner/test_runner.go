@@ -4789,11 +4789,13 @@ func (tr *TestRunner) executeAttackMonster() error {
 		return fmt.Errorf("character not found")
 	}
 
-	// 找到第一个怪物
+	// 找到第一个存活的怪物
 	var targetMonster *models.Monster
-	for _, monster := range tr.context.Monsters {
-		if monster != nil {
+	var targetKey string
+	for key, monster := range tr.context.Monsters {
+		if monster != nil && monster.HP > 0 {
 			targetMonster = monster
+			targetKey = key
 			break
 		}
 	}
@@ -4846,12 +4848,9 @@ func (tr *TestRunner) executeAttackMonster() error {
 
 	// 更新上下文
 	tr.context.Characters["character"] = char
-	// 更新怪物到上下文（找到正确的key）
-	for key, m := range tr.context.Monsters {
-		if m == targetMonster {
-			tr.context.Monsters[key] = targetMonster
-			break
-		}
+	// 更新怪物到上下文
+	if targetKey != "" {
+		tr.context.Monsters[targetKey] = targetMonster
 	}
 
 	// 如果怪物HP为0，战斗结束，战士怒气归0
@@ -4872,11 +4871,13 @@ func (tr *TestRunner) executeMonsterAttack() error {
 		return fmt.Errorf("character not found")
 	}
 
-	// 找到第一个怪物
+	// 找到第一个存活的怪物
 	var attackerMonster *models.Monster
-	for _, monster := range tr.context.Monsters {
-		if monster != nil {
+	var attackerKey string
+	for key, monster := range tr.context.Monsters {
+		if monster != nil && monster.HP > 0 {
 			attackerMonster = monster
+			attackerKey = key
 			break
 		}
 	}
