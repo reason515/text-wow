@@ -4873,11 +4873,9 @@ func (tr *TestRunner) executeMonsterAttack() error {
 
 	// 找到第一个存活的怪物
 	var attackerMonster *models.Monster
-	var attackerKey string
-	for key, monster := range tr.context.Monsters {
+	for _, monster := range tr.context.Monsters {
 		if monster != nil && monster.HP > 0 {
 			attackerMonster = monster
-			attackerKey = key
 			break
 		}
 	}
