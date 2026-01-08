@@ -699,6 +699,40 @@ func (tr *TestRunner) updateAssertionContext() {
 		}
 	}
 
+	// 同步所有角色信息（character, character_1, character_2等）
+	for key, char := range tr.context.Characters {
+		if char != nil {
+			// 设置角色的基本属性
+			tr.assertion.SetContext(fmt.Sprintf("%s.hp", key), char.HP)
+			tr.assertion.SetContext(fmt.Sprintf("%s.max_hp", key), char.MaxHP)
+			tr.assertion.SetContext(fmt.Sprintf("%s.level", key), char.Level)
+			tr.assertion.SetContext(fmt.Sprintf("%s.resource", key), char.Resource)
+			tr.assertion.SetContext(fmt.Sprintf("%s.max_resource", key), char.MaxResource)
+			tr.assertion.SetContext(fmt.Sprintf("%s.physical_attack", key), char.PhysicalAttack)
+			tr.assertion.SetContext(fmt.Sprintf("%s.magic_attack", key), char.MagicAttack)
+			tr.assertion.SetContext(fmt.Sprintf("%s.id", key), char.ID)
+			tr.assertion.SetContext(fmt.Sprintf("%s.name", key), char.Name)
+			
+			// 如果key是职业名称（如warrior, mage, priest），也设置
+			// 这需要从角色名称或ClassID推断
+			if strings.Contains(strings.ToLower(char.Name), "战士") || char.ClassID == "warrior" {
+				tr.assertion.SetContext("warrior.hp", char.HP)
+				tr.assertion.SetContext("warrior.max_hp", char.MaxHP)
+				tr.assertion.SetContext("warrior.id", char.ID)
+			}
+			if strings.Contains(strings.ToLower(char.Name), "法师") || char.ClassID == "mage" {
+				tr.assertion.SetContext("mage.hp", char.HP)
+				tr.assertion.SetContext("mage.max_hp", char.MaxHP)
+				tr.assertion.SetContext("mage.id", char.ID)
+			}
+			if strings.Contains(strings.ToLower(char.Name), "牧师") || char.ClassID == "priest" {
+				tr.assertion.SetContext("priest.hp", char.HP)
+				tr.assertion.SetContext("priest.max_hp", char.MaxHP)
+				tr.assertion.SetContext("priest.id", char.ID)
+			}
+		}
+	}
+
 	// 同步怪物信息
 	for key, monster := range tr.context.Monsters {
 		if monster != nil {
@@ -859,6 +893,8 @@ func (tr *TestRunner) updateAssertionContext() {
 	if enemyAliveCount, exists := tr.context.Variables["enemy_alive_count"]; exists {
 		if isSerializable(enemyAliveCount) {
 			tr.assertion.SetContext("enemy_alive_count", enemyAliveCount)
+			// 同时设置别名 enemies_alive_count（复数形式）
+			tr.assertion.SetContext("enemies_alive_count", enemyAliveCount)
 		}
 	}
 	if currentRound, exists := tr.context.Variables["current_round"]; exists {
@@ -4735,6 +4771,9 @@ func (tr *TestRunner) executeStartBattle() error {
 	}
 	tr.assertion.SetContext("enemy_alive_count", aliveEnemyCount)
 	tr.context.Variables["enemy_alive_count"] = aliveEnemyCount
+	// 同时设置别名 enemies_alive_count（复数形式）
+	tr.assertion.SetContext("enemies_alive_count", aliveEnemyCount)
+	tr.context.Variables["enemies_alive_count"] = aliveEnemyCount
 
 	// 更新上下文
 	tr.context.Characters["character"] = char
@@ -5710,6 +5749,9 @@ func (tr *TestRunner) executeContinueBattleUntil(instruction string) error {
 
 		tr.assertion.SetContext("enemy_alive_count", aliveCount)
 		tr.context.Variables["enemy_alive_count"] = aliveCount
+		// 同时设置别名 enemies_alive_count（复数形式）
+		tr.assertion.SetContext("enemies_alive_count", aliveCount)
+		tr.context.Variables["enemies_alive_count"] = aliveCount
 
 		if allMonstersDead {
 			// 所有怪物死亡
