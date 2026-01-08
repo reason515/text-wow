@@ -829,8 +829,44 @@ func (tr *TestRunner) updateAssertionContext() {
 	tr.syncTeamToContext()
 
 	// 同步所有变量（包括上面已经同步的，确保覆盖）
+	// 只复制可序列化的基本类型，避免序列化错误
 	for key, value := range tr.context.Variables {
-		tr.assertion.SetContext(key, value)
+		if isSerializable(value) {
+			tr.assertion.SetContext(key, value)
+		}
+	}
+}
+
+// isSerializable 检查值是否可序列化（只允许基本类型和基本类型的数组/切片）
+func isSerializable(v interface{}) bool {
+	if v == nil {
+		return true
+	}
+	switch val := v.(type) {
+	case bool, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64, string:
+		return true
+	case []interface{}:
+		// 检查数组/切片中的每个元素是否可序列化
+		for _, elem := range val {
+			if !isSerializable(elem) {
+				return false
+			}
+		}
+		return true
+	case []string, []int, []float64, []bool:
+		// 基本类型的切片是可序列化的
+		return true
+	case map[string]interface{}:
+		// 检查map中的每个值是否可序列化
+		for _, mapVal := range val {
+			if !isSerializable(mapVal) {
+				return false
+			}
+		}
+		return true
+	default:
+		// 其他类型（包括指针、结构体等）不可序列化
+		return false
 	}
 }
 
