@@ -13,6 +13,13 @@ import (
 
 var DB *sql.DB
 
+// debugLog 只在 TEST_DEBUG=1 时输出日志，避免序列化错误
+func debugLog(format string, args ...interface{}) {
+	if os.Getenv("TEST_DEBUG") == "1" || os.Getenv("TEST_DEBUG") == "true" {
+		log.Printf(format, args...)
+	}
+}
+
 // Init 初始化数据库连接
 func Init() error {
 	var err error
@@ -39,15 +46,15 @@ func Init() error {
 
 	// 运行数据库迁移
 	if err := runMigrations(); err != nil {
-		log.Printf("⚠️ Migration warning: %v", err)
+		debugLog("Migration warning: %v", err)
 	}
 
 	// 导入种子数据（如果需要）
 	if err := seedData(); err != nil {
-		log.Printf("⚠️ Seed data warning: %v", err)
+		debugLog("Seed data warning: %v", err)
 	}
 
-	log.Println("✅ 数据库初始化完成")
+	debugLog("Database initialized successfully")
 	return nil
 }
 
@@ -87,12 +94,12 @@ func initSchema() error {
 		if _, err := DB.Exec(string(content)); err != nil {
 			return fmt.Errorf("failed to execute schema: %w", err)
 		}
-		log.Println("📄 Schema loaded from file")
+		debugLog("Schema loaded from file")
 		return nil
 	}
 
 	// 如果没有schema文件，使用内置的基础schema
-	log.Println("📄 Using embedded schema")
+	debugLog("Using embedded schema")
 	return createBasicTables()
 }
 
@@ -178,14 +185,14 @@ func seedData() error {
 	var count int
 	err := DB.QueryRow("SELECT COUNT(*) FROM races").Scan(&count)
 	if err == nil && count > 0 {
-		log.Println("📊 Seed data already exists")
+		debugLog("Seed data already exists")
 		// 即使已有基础数据，也检查是否需要加载战士技能数据
 		var skillCount int
 		err := DB.QueryRow("SELECT COUNT(*) FROM skills WHERE class_id = 'warrior'").Scan(&skillCount)
 		if err == nil && skillCount == 0 {
-			log.Println("⚠️ Warrior skills not found, loading...")
+			debugLog("Warrior skills not found, loading...")
 			if err := loadWarriorSkills(); err != nil {
-				log.Printf("⚠️ Failed to load warrior skills: %v", err)
+				debugLog("Failed to load warrior skills: %v", err)
 			}
 		}
 		return nil
@@ -201,12 +208,12 @@ func seedData() error {
 		if _, err := DB.Exec(string(content)); err != nil {
 			return fmt.Errorf("failed to execute seed: %w", err)
 		}
-		log.Println("🌱 Seed data loaded from file")
+		debugLog("Seed data loaded from file")
 	}
 
 	// 加载战士技能数据
 	if err := loadWarriorSkills(); err != nil {
-		log.Printf("⚠️ Failed to load warrior skills: %v", err)
+		debugLog("Failed to load warrior skills: %v", err)
 		// 不返回错误，因为技能数据可能已经存在
 	}
 
@@ -230,7 +237,7 @@ func loadWarriorSkills() error {
 		return fmt.Errorf("failed to execute warrior_skills.sql: %w", err)
 	}
 
-	log.Println("⚔️ Warrior skills loaded")
+	debugLog("Warrior skills loaded")
 	return nil
 }
 
@@ -295,12 +302,12 @@ func migrateDodgeRate() error {
 	}
 
 	if !hasDodgeRate {
-		log.Println("🔄 Adding dodge_rate column to characters table...")
+		debugLog("Adding dodge_rate column to characters table...")
 		_, err := DB.Exec("ALTER TABLE characters ADD COLUMN dodge_rate REAL DEFAULT 0.05")
 		if err != nil {
 			return fmt.Errorf("failed to add dodge_rate column: %w", err)
 		}
-		log.Println("✅ dodge_rate column added successfully")
+		debugLog("dodge_rate column added successfully")
 	}
 
 	return nil
@@ -347,7 +354,7 @@ func migrateBattleStrategies() error {
 
 	// 如果缺少新列，需要重建表
 	if !hasSkillPriority || !hasSkillTargetOverrides || !hasAutoTargetSettings {
-		log.Println("🔄 Migrating battle_strategies table...")
+		debugLog("Migrating battle_strategies table...")
 
 		// SQLite 不支持 DROP COLUMN，需要重建表
 		// 1. 重命名旧表
@@ -388,21 +395,21 @@ func migrateBattleStrategies() error {
 			FROM battle_strategies_old
 		`)
 		if err != nil {
-			log.Printf("⚠️ Failed to migrate data: %v", err)
+			debugLog("Failed to migrate data: %v", err)
 			// 不是致命错误，继续
 		}
 
 		// 4. 删除旧表
 		_, err = DB.Exec("DROP TABLE battle_strategies_old")
 		if err != nil {
-			log.Printf("⚠️ Failed to drop old table: %v", err)
+			debugLog("Failed to drop old table: %v", err)
 		}
 
 		// 5. 创建索引
 		DB.Exec("CREATE INDEX IF NOT EXISTS idx_battle_strategies_character ON battle_strategies(character_id)")
 		DB.Exec("CREATE INDEX IF NOT EXISTS idx_battle_strategies_active ON battle_strategies(character_id, is_active)")
 
-		log.Println("✅ battle_strategies table migrated successfully")
+		debugLog("battle_strategies table migrated successfully")
 	}
 
 	return nil
@@ -422,7 +429,7 @@ func migrateMonsterStrengthConfig() error {
 	}
 
 	// 创建配置表
-	log.Println("🔄 Creating monster_strength_config table...")
+	debugLog("Creating monster_strength_config table...")
 	_, err = DB.Exec(`
 		CREATE TABLE IF NOT EXISTS monster_strength_config (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -460,10 +467,10 @@ func migrateMonsterStrengthConfig() error {
 		(51, 60, 1.35, 1.3, 1.3, 0.03, '50-60级：HP +35%, 攻击 +30%, 防御 +30%, 暴击率 +3%')
 	`)
 	if err != nil {
-		log.Printf("⚠️ Failed to insert default configs: %v", err)
+		debugLog("Failed to insert default configs: %v", err)
 	}
 
-	log.Println("✅ monster_strength_config table created successfully")
+	debugLog("monster_strength_config table created successfully")
 	return nil
 }
 
@@ -481,7 +488,7 @@ func migrateConfigVersions() error {
 	}
 
 	// 创建配置版本表
-	log.Println("🔄 Creating config_versions table...")
+	debugLog("Creating config_versions table...")
 	_, err = DB.Exec(`
 		CREATE TABLE IF NOT EXISTS config_versions (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -502,6 +509,6 @@ func migrateConfigVersions() error {
 	DB.Exec("CREATE INDEX IF NOT EXISTS idx_config_versions_type ON config_versions(config_type)")
 	DB.Exec("CREATE INDEX IF NOT EXISTS idx_config_versions_version ON config_versions(config_type, version DESC)")
 
-	log.Println("✅ config_versions table created successfully")
+	debugLog("config_versions table created successfully")
 	return nil
 }

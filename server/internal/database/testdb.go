@@ -10,6 +10,13 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+// debugPrint 只在 TEST_DEBUG=1 时输出，避免序列化错误
+func debugPrint(format string, args ...interface{}) {
+	if os.Getenv("TEST_DEBUG") == "1" || os.Getenv("TEST_DEBUG") == "true" {
+		fmt.Printf(format, args...)
+	}
+}
+
 // Helper function for min
 func min(a, b int) int {
 	if a < b {
@@ -145,10 +152,10 @@ func SetupTestDB() (*sql.DB, error) {
 							// 某些错误可能是预期的（如重复插入），可以忽略
 							if strings.Contains(err.Error(), "FOREIGN KEY") {
 								// 外键约束错误，说明effects可能没有正确加载
-								fmt.Printf("Warning: Foreign key constraint error when loading skill data (statement %d/%d): %v\n", i+1, len(statements), err)
+								debugPrint("Warning: Foreign key constraint error when loading skill data (statement %d/%d): %v\n", i+1, len(statements), err)
 							} else if !strings.Contains(err.Error(), "UNIQUE constraint") && !strings.Contains(err.Error(), "no such table") {
 								// 忽略UNIQUE约束错误和表不存在错误（INSERT OR REPLACE可能产生的）
-								fmt.Printf("Warning: Error loading skill data (statement %d/%d): %v\n", i+1, len(statements), err)
+								debugPrint("Warning: Error loading skill data (statement %d/%d): %v\n", i+1, len(statements), err)
 							}
 						}
 					}

@@ -262,9 +262,11 @@ func (tr *TestRunner) generateEquipmentWithAttributes(instruction string) error 
 		}
 	}
 	
-	// 存储到上下文
-	tr.context.Variables["equipment"] = equipment
+	// 存储到上下文（只存储基本字段，不存储整个对象）
 	tr.context.Variables["equipment_id"] = equipment.ID
+	tr.context.Variables["equipment_item_id"] = equipment.ItemID
+	tr.context.Variables["equipment_quality"] = equipment.Quality
+	tr.context.Variables["equipment_slot"] = equipment.Slot
 	tr.context.Equipments[fmt.Sprintf("%d", equipment.ID)] = equipment
 	
 	// 如果指令中提到"已装备"，直接装备

@@ -144,6 +144,11 @@ func (tr *TestRunner) RunTestSuite(suitePath string) (*TestSuiteResult, error) {
 		return nil, fmt.Errorf("failed to read test suite file: %w", err)
 	}
 
+	// 移除UTF-8 BOM（如果存在）
+	if len(data) >= 3 && data[0] == 0xEF && data[1] == 0xBB && data[2] == 0xBF {
+		data = data[3:]
+	}
+
 	// 解析YAML
 	var suite TestSuite
 	if err := yaml.Unmarshal(data, &suite); err != nil {
@@ -1028,10 +1033,12 @@ func (tr *TestRunner) generateMultipleEquipments(action string) error {
 		combination := fmt.Sprintf("%s_%s", prefixID, suffixID)
 		uniqueCombinations[combination] = true
 
-		// 存储最后一件装备到上下文
+			// 存储最后一件装备到上下文（只存储基本字段，不存储整个对象）
 		if i == count-1 {
-			tr.context.Variables["equipment"] = equipment
 			tr.context.Variables["equipment_id"] = equipment.ID
+			tr.context.Variables["equipment_item_id"] = equipment.ItemID
+			tr.context.Variables["equipment_quality"] = equipment.Quality
+			tr.context.Variables["equipment_slot"] = equipment.Slot
 		}
 	}
 
@@ -1110,9 +1117,11 @@ func (tr *TestRunner) generateEquipmentFromMonster(action string) error {
 		return fmt.Errorf("failed to generate equipment: %w", err)
 	}
 
-	// 存储到上下文
-	tr.context.Variables["equipment"] = equipment
+	// 存储到上下文（只存储基本字段，不存储整个对象）
 	tr.context.Variables["equipment_id"] = equipment.ID
+	tr.context.Variables["equipment_item_id"] = equipment.ItemID
+	tr.context.Variables["equipment_quality"] = equipment.Quality
+	tr.context.Variables["equipment_slot"] = equipment.Slot
 	tr.context.Equipments[fmt.Sprintf("%d", equipment.ID)] = equipment
 
 	return nil
@@ -3475,10 +3484,10 @@ func (tr *TestRunner) createSkill(instruction string) error {
 		skill.Type = "attack"
 	}
 
-	// 存储到上下文
-	tr.context.Variables["skill"] = skill
-	// 也存储技能类型和伤害倍率到上下文，以便executeUseSkill可以访问
+	// 存储到上下文（只存储基本字段，不存储整个对象）
+	tr.context.Variables["skill_id"] = skill.ID
 	tr.context.Variables["skill_type"] = skill.Type
+	tr.context.Variables["skill_name"] = skill.Name
 	// 确保skill_scaling_ratio被正确存储（如果为0，使用默认值1.0）
 	if skill.ScalingRatio > 0 {
 		tr.context.Variables["skill_scaling_ratio"] = skill.ScalingRatio
@@ -3607,8 +3616,9 @@ func (tr *TestRunner) executeUseSkill(instruction string) error {
 				debugPrint("[DEBUG] executeUseSkill: skill_scaling_ratio NOT found in Variables\n")
 			}
 			debugPrint("[DEBUG] executeUseSkill: after restore, skill.ScalingRatio=%f\n", skill.ScalingRatio)
-			// 立即更新上下文，确保值不会丢失
-			tr.context.Variables["skill"] = skill
+			// 立即更新上下文，确保值不会丢失（只存储基本字段）
+			tr.context.Variables["skill_id"] = skill.ID
+			tr.context.Variables["skill_type"] = skill.Type
 			if skill.ScalingRatio > 0 {
 				tr.context.Variables["skill_scaling_ratio"] = skill.ScalingRatio
 			}
@@ -3848,8 +3858,9 @@ func (tr *TestRunner) executeUseSkill(instruction string) error {
 	// 在调用handleAttackSkill之前，立即更新上下文（确保值不会丢失）
 	// 更新上下文中的角色（使用当前的char对象，确保PhysicalAttack正确）
 	tr.context.Characters["character"] = char
-	// 更新上下文中的技能（使用当前的skill对象，确保ScalingRatio正确）
-	tr.context.Variables["skill"] = skill
+	// 更新上下文中的技能（只存储基本字段，不存储整个对象）
+	tr.context.Variables["skill_id"] = skill.ID
+	tr.context.Variables["skill_type"] = skill.Type
 	// 在调用 handleAttackSkill 之前，最后一次确保 skill_scaling_ratio 正确
 	// 优先从 Variables 恢复，确保值正确
 	if ratioVal, exists := tr.context.Variables["skill_scaling_ratio"]; exists {
@@ -5074,9 +5085,10 @@ func (tr *TestRunner) executeAddMonsterSkill(instruction string) error {
 		}
 	}
 
-	// 存储怪物技能到上下文
-	tr.context.Variables["monster_skill"] = skill
+	// 存储怪物技能到上下文（只存储基本字段，不存储整个对象）
 	tr.context.Variables["monster_skill_id"] = skill.ID
+	tr.context.Variables["monster_skill_type"] = skill.Type
+	tr.context.Variables["monster_skill_name"] = skill.Name
 
 	return nil
 }

@@ -148,3 +148,12 @@ python adjust_monster_strength.py --apply
 
 
 
+
+
+
+
+
+
+
+
+

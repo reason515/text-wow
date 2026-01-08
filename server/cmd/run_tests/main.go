@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"os"
 
@@ -11,14 +12,22 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Println("Usage: go run main.go <test_directory>")
-		fmt.Println("Example: go run main.go ../../test/cases/calculator")
+		fmt.Fprintf(os.Stdout, "Usage: go run main.go <test_directory>\n")
+		fmt.Fprintf(os.Stdout, "Example: go run main.go ../../test/cases/calculator\n")
 		os.Exit(1)
+	}
+
+	// 在测试模式下，禁用log输出（避免emoji字符导致序列化错误）
+	// 只有在TEST_DEBUG=1时才输出日志
+	if os.Getenv("TEST_DEBUG") != "1" && os.Getenv("TEST_DEBUG") != "true" {
+		log.SetOutput(io.Discard)
 	}
 
 	// 初始化数据库
 	if err := database.Init(); err != nil {
-		log.Fatalf("❌ Failed to initialize database: %v", err)
+		// 使用fmt.Fprintf到stderr，避免使用log.Fatalf（可能包含特殊字符）
+		fmt.Fprintf(os.Stderr, "Failed to initialize database: %v\n", err)
+		os.Exit(1)
 	}
 	defer database.Close()
 
@@ -30,7 +39,7 @@ func main() {
 	// 运行所有测试
 	results, err := tr.RunAllTests(testDir)
 	if err != nil {
-		fmt.Printf("Error running tests: %v\n", err)
+		fmt.Fprintf(os.Stdout, "Error running tests: %v\n", err)
 		os.Exit(1)
 	}
 

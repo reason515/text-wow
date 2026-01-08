@@ -23,6 +23,11 @@ func (yp *YAMLParser) ParseTestSuite(filePath string) (*TestSuite, error) {
 		return nil, fmt.Errorf("failed to read file: %w", err)
 	}
 
+	// 移除UTF-8 BOM（如果存在）
+	if len(data) >= 3 && data[0] == 0xEF && data[1] == 0xBB && data[2] == 0xBF {
+		data = data[3:]
+	}
+
 	var suite TestSuite
 	if err := yaml.Unmarshal(data, &suite); err != nil {
 		return nil, fmt.Errorf("failed to parse YAML: %w", err)
