@@ -4530,7 +4530,13 @@ func (tr *TestRunner) handleHealSkill(char *models.Character, skill *models.Skil
 
 	debugPrint("[DEBUG] handleHealSkill: char.HP after=%d, actualHeal=%d, overhealing=%d\n", char.HP, actualHeal, overhealing)
 
-	// 设置过量治疗到上下文
+	// 设置治疗相关值到上下文
+	tr.assertion.SetContext("healing_dealt", actualHeal)
+	tr.context.Variables["healing_dealt"] = actualHeal
+	tr.assertion.SetContext("final_healing", healAmount) // 最终治疗量（可能包含过量治疗）
+	tr.context.Variables["final_healing"] = healAmount
+	tr.assertion.SetContext("actual_healing", actualHeal) // 实际治疗量（不超过最大HP）
+	tr.context.Variables["actual_healing"] = actualHeal
 	tr.assertion.SetContext("overhealing", overhealing)
 	tr.context.Variables["overhealing"] = overhealing
 
