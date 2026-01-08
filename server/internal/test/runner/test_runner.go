@@ -867,6 +867,47 @@ func (tr *TestRunner) updateAssertionContext() {
 		}
 	}
 
+	// 同步战斗日志
+	if battleLogs, exists := tr.context.Variables["battle_logs"]; exists {
+		if isSerializable(battleLogs) {
+			tr.assertion.SetContext("battle_logs", battleLogs)
+		}
+	}
+
+	// 同步战斗结果
+	if battleResultVictory, exists := tr.context.Variables["battle_result.is_victory"]; exists {
+		if isSerializable(battleResultVictory) {
+			tr.assertion.SetContext("battle_result.is_victory", battleResultVictory)
+		}
+	}
+	if battleResultDuration, exists := tr.context.Variables["battle_result.duration_seconds"]; exists {
+		if isSerializable(battleResultDuration) {
+			tr.assertion.SetContext("battle_result.duration_seconds", battleResultDuration)
+		}
+	}
+
+	// 同步角色状态
+	if isDead, exists := tr.context.Variables["character.is_dead"]; exists {
+		if isSerializable(isDead) {
+			tr.assertion.SetContext("character.is_dead", isDead)
+		}
+	}
+	if expGained, exists := tr.context.Variables["character.exp_gained"]; exists {
+		if isSerializable(expGained) {
+			tr.assertion.SetContext("character.exp_gained", expGained)
+		}
+	}
+	if goldGained, exists := tr.context.Variables["character.gold_gained"]; exists {
+		if isSerializable(goldGained) {
+			tr.assertion.SetContext("character.gold_gained", goldGained)
+		}
+	}
+	if battleRounds, exists := tr.context.Variables["battle_rounds"]; exists {
+		if isSerializable(battleRounds) {
+			tr.assertion.SetContext("battle_rounds", battleRounds)
+		}
+	}
+
 	// 同步队伍信息
 	tr.syncTeamToContext()
 
@@ -4650,6 +4691,14 @@ func (tr *TestRunner) executeStartBattle() error {
 		return fmt.Errorf("failed to start battle: %w", err)
 	}
 
+	// 初始化战斗日志和战斗开始时间
+	battleLogs := []string{"战斗开始"}
+	tr.context.Variables["battle_logs"] = battleLogs
+	tr.context.Variables["battle_start_time"] = time.Now().Unix()
+	tr.context.Variables["battle_rounds"] = 0
+	// 记录战斗前的经验值（用于计算exp_gained）
+	tr.context.Variables["character.exp_before_battle"] = char.Exp
+
 	// 确保战士的怒气为0
 	if char.ResourceType == "rage" {
 		char.Resource = 0
@@ -4773,6 +4822,16 @@ func (tr *TestRunner) executeAttackMonster() error {
 		targetMonster.HP = 0
 	}
 
+	// 添加战斗日志
+	if battleLogs, exists := tr.context.Variables["battle_logs"]; exists {
+		if logs, ok := battleLogs.([]string); ok {
+			logs = append(logs, fmt.Sprintf("角色攻击怪物，造成%d点伤害", damage))
+			tr.context.Variables["battle_logs"] = logs
+		}
+	} else {
+		tr.context.Variables["battle_logs"] = []string{fmt.Sprintf("角色攻击怪物，造成%d点伤害", damage)}
+	}
+
 	// 设置伤害值到上下文
 	tr.assertion.SetContext("damage_dealt", damage)
 	tr.context.Variables["damage_dealt"] = damage
@@ -4849,6 +4908,16 @@ func (tr *TestRunner) executeMonsterAttack() error {
 	char.HP -= damage
 	if char.HP < 0 {
 		char.HP = 0
+	}
+
+	// 添加战斗日志
+	if battleLogs, exists := tr.context.Variables["battle_logs"]; exists {
+		if logs, ok := battleLogs.([]string); ok {
+			logs = append(logs, fmt.Sprintf("怪物攻击角色，造成%d点伤害", damage))
+			tr.context.Variables["battle_logs"] = logs
+		}
+	} else {
+		tr.context.Variables["battle_logs"] = []string{fmt.Sprintf("怪物攻击角色，造成%d点伤害", damage)}
 	}
 
 	// 设置伤害值到上下文
@@ -5610,6 +5679,7 @@ func (tr *TestRunner) executeContinueBattleUntil(instruction string) error {
 	for round < maxRounds {
 		round++
 		tr.context.Variables["current_round"] = round
+		tr.context.Variables["battle_rounds"] = round
 		tr.assertion.SetContext("current_round", round)
 
 		// 检查角色是否存活
@@ -5646,29 +5716,7 @@ func (tr *TestRunner) executeContinueBattleUntil(instruction string) error {
 			// 所有怪物死亡
 			if aliveCount == 0 {
 				// 战斗胜利
-				tr.assertion.SetContext("battle_state", "victory")
-				tr.context.Variables["battle_state"] = "victory"
-				// 检查是否应该进入休息状态
-				if err := tr.checkAndEnterRest(); err != nil {
-					debugPrint("Warning: failed to enter rest state: %v\n", err)
-				}
-				// 给予经验和金币奖励（简化处理）
-				if char != nil {
-					// 计算经验奖励（基于怪物数量）
-					expGain := len(tr.context.Monsters) * 10 // 简化：每个怪物10经验
-					char.Exp += expGain
-					tr.assertion.SetContext("character.exp", char.Exp)
-					tr.context.Variables["character.exp"] = char.Exp
-					// 设置team_total_exp（单角色时等于character.exp）
-					tr.assertion.SetContext("team_total_exp", char.Exp)
-					tr.context.Variables["team_total_exp"] = char.Exp
-				}
-				// 设置team_alive_count（单角色时等于1）
-				tr.assertion.SetContext("team_alive_count", 1)
-				tr.context.Variables["team_alive_count"] = 1
-				// 设置enemy_death_count
-				tr.assertion.SetContext("enemy_death_count", len(tr.context.Monsters))
-				tr.context.Variables["enemy_death_count"] = len(tr.context.Monsters)
+				tr.setBattleResult(true, char)
 				break
 			}
 		} else if singleMonsterDead {
@@ -5676,26 +5724,7 @@ func (tr *TestRunner) executeContinueBattleUntil(instruction string) error {
 			firstMonster := tr.getFirstAliveMonster()
 			if firstMonster == nil || firstMonster.HP <= 0 {
 				// 第一个怪物死亡
-				tr.assertion.SetContext("battle_state", "victory")
-				tr.context.Variables["battle_state"] = "victory"
-				if err := tr.checkAndEnterRest(); err != nil {
-					debugPrint("Warning: failed to enter rest state: %v\n", err)
-				}
-				if char != nil {
-					expGain := 10
-					char.Exp += expGain
-					tr.assertion.SetContext("character.exp", char.Exp)
-					tr.context.Variables["character.exp"] = char.Exp
-					// 设置team_total_exp
-					tr.assertion.SetContext("team_total_exp", char.Exp)
-					tr.context.Variables["team_total_exp"] = char.Exp
-				}
-				// 设置team_alive_count
-				tr.assertion.SetContext("team_alive_count", 1)
-				tr.context.Variables["team_alive_count"] = 1
-				// 设置enemy_death_count
-				tr.assertion.SetContext("enemy_death_count", 1)
-				tr.context.Variables["enemy_death_count"] = 1
+				tr.setBattleResult(true, char)
 				break
 			}
 		}
@@ -5710,8 +5739,7 @@ func (tr *TestRunner) executeContinueBattleUntil(instruction string) error {
 
 		// 再次检查角色是否存活
 		if char != nil && char.HP <= 0 {
-			tr.assertion.SetContext("battle_state", "defeat")
-			tr.context.Variables["battle_state"] = "defeat"
+			tr.setBattleResult(false, char)
 			break
 		}
 	}
@@ -6004,6 +6032,126 @@ func (tr *TestRunner) checkAndEnterRest() error {
 	}
 
 	return nil
+}
+
+// setBattleResult 设置战斗结果
+func (tr *TestRunner) setBattleResult(isVictory bool, char *models.Character) {
+	// 设置战斗状态
+	if isVictory {
+		tr.assertion.SetContext("battle_state", "victory")
+		tr.context.Variables["battle_state"] = "victory"
+		// 添加战斗日志
+		if battleLogs, exists := tr.context.Variables["battle_logs"]; exists {
+			if logs, ok := battleLogs.([]string); ok {
+				logs = append(logs, "战斗胜利")
+				tr.context.Variables["battle_logs"] = logs
+			}
+		}
+		// 检查是否应该进入休息状态
+		if err := tr.checkAndEnterRest(); err != nil {
+			debugPrint("Warning: failed to enter rest state: %v\n", err)
+		}
+	} else {
+		tr.assertion.SetContext("battle_state", "defeat")
+		tr.context.Variables["battle_state"] = "defeat"
+		// 添加战斗日志
+		if battleLogs, exists := tr.context.Variables["battle_logs"]; exists {
+			if logs, ok := battleLogs.([]string); ok {
+				logs = append(logs, "战败")
+				tr.context.Variables["battle_logs"] = logs
+			}
+		}
+	}
+
+	// 设置战斗结果
+	tr.assertion.SetContext("battle_result.is_victory", isVictory)
+	tr.context.Variables["battle_result.is_victory"] = isVictory
+
+	// 计算战斗时长
+	if startTime, exists := tr.context.Variables["battle_start_time"]; exists {
+		if start, ok := startTime.(int64); ok {
+			duration := time.Now().Unix() - start
+			tr.assertion.SetContext("battle_result.duration_seconds", duration)
+			tr.context.Variables["battle_result.duration_seconds"] = duration
+		}
+	}
+
+	// 设置角色死亡状态
+	if char != nil {
+		isDead := char.HP <= 0
+		tr.assertion.SetContext("character.is_dead", isDead)
+		tr.context.Variables["character.is_dead"] = isDead
+
+		// 如果胜利，给予经验和金币奖励
+		if isVictory {
+			// 计算经验奖励（基于怪物数量）
+			expGain := len(tr.context.Monsters) * 10 // 简化：每个怪物10经验
+			char.Exp += expGain
+			tr.assertion.SetContext("character.exp", char.Exp)
+			tr.context.Variables["character.exp"] = char.Exp
+			tr.assertion.SetContext("character.exp_gained", expGain)
+			tr.context.Variables["character.exp_gained"] = expGain
+
+			// 计算金币奖励（简化：每个怪物10-30金币）
+			goldGain := len(tr.context.Monsters) * 15 // 简化：每个怪物15金币
+			userRepo := repository.NewUserRepository()
+			if user, err := userRepo.GetByID(char.UserID); err == nil && user != nil {
+				newGold := user.Gold + goldGain
+				userRepo.UpdateGold(char.UserID, newGold)
+				tr.assertion.SetContext("character.gold", newGold)
+				tr.context.Variables["character.gold"] = newGold
+				tr.assertion.SetContext("character.gold_gained", goldGain)
+				tr.context.Variables["character.gold_gained"] = goldGain
+			}
+
+			// 设置team_total_exp（单角色时等于character.exp）
+			tr.assertion.SetContext("team_total_exp", char.Exp)
+			tr.context.Variables["team_total_exp"] = char.Exp
+		} else {
+			// 失败时，exp_gained和gold_gained为0
+			tr.assertion.SetContext("character.exp_gained", 0)
+			tr.context.Variables["character.exp_gained"] = 0
+			tr.assertion.SetContext("character.gold_gained", 0)
+			tr.context.Variables["character.gold_gained"] = 0
+		}
+
+		// 设置team_alive_count（单角色时，如果角色死亡则为0，否则为1）
+		aliveCount := 0
+		if char.HP > 0 {
+			aliveCount = 1
+		}
+		tr.assertion.SetContext("team_alive_count", aliveCount)
+		tr.context.Variables["team_alive_count"] = aliveCount
+
+		// 设置enemy_death_count
+		enemyDeathCount := 0
+		for _, monster := range tr.context.Monsters {
+			if monster != nil && monster.HP <= 0 {
+				enemyDeathCount++
+			}
+		}
+		tr.assertion.SetContext("enemy_death_count", enemyDeathCount)
+		tr.context.Variables["enemy_death_count"] = enemyDeathCount
+
+		// 如果角色是战士，确保怒气归0
+		if char.ResourceType == "rage" {
+			char.Resource = 0
+			char.MaxResource = 100
+			// 更新数据库
+			charRepo := repository.NewCharacterRepository()
+			charRepo.UpdateAfterBattle(char.ID, char.HP, char.Resource, char.Exp, char.Level,
+				char.ExpToNext, char.MaxHP, char.MaxResource, char.PhysicalAttack, char.MagicAttack, char.PhysicalDefense, char.MagicDefense,
+				char.Strength, char.Agility, char.Intellect, char.Stamina, char.Spirit, char.UnspentPoints, char.TotalKills)
+		}
+		tr.context.Characters["character"] = char
+	}
+
+	// 设置battle_rounds
+	if rounds, exists := tr.context.Variables["battle_rounds"]; exists {
+		if r, ok := rounds.(int); ok {
+			tr.assertion.SetContext("battle_rounds", r)
+		}
+	}
 }
 
 // getFirstAliveMonster 获取第一个存活的怪物
