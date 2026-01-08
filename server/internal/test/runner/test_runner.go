@@ -996,30 +996,41 @@ func isSerializable(v interface{}) bool {
 	if v == nil {
 		return true
 	}
-	switch val := v.(type) {
-	case bool, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64, string:
+	
+	// 使用反射检查类型，更严格
+	val := reflect.ValueOf(v)
+	kind := val.Kind()
+	
+	// 基本类型
+	switch kind {
+	case reflect.Bool, reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		 reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+		 reflect.Float32, reflect.Float64, reflect.String:
 		return true
-	case []interface{}:
-		// 检查数组/切片中的每个元素是否可序列化
-		for _, elem := range val {
+	case reflect.Slice, reflect.Array:
+		// 检查切片/数组中的每个元素是否可序列化
+		for i := 0; i < val.Len(); i++ {
+			elem := val.Index(i).Interface()
 			if !isSerializable(elem) {
 				return false
 			}
 		}
 		return true
-	case []string, []int, []float64, []bool:
-		// 基本类型的切片是可序列化的
-		return true
-	case map[string]interface{}:
+	case reflect.Map:
+		// 只允许 map[string]interface{} 类型
+		if val.Type().Key().Kind() != reflect.String {
+			return false
+		}
 		// 检查map中的每个值是否可序列化
-		for _, mapVal := range val {
+		for _, key := range val.MapKeys() {
+			mapVal := val.MapIndex(key).Interface()
 			if !isSerializable(mapVal) {
 				return false
 			}
 		}
 		return true
 	default:
-		// 其他类型（包括指针、结构体等）不可序列化
+		// 其他类型（包括指针、结构体、函数、通道等）不可序列化
 		return false
 	}
 }
