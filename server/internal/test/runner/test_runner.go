@@ -5173,13 +5173,41 @@ func (tr *TestRunner) executeBattleRound(instruction string) error {
 		tr.assertion.SetContext("current_round", roundNum)
 	}
 
-	// 减少技能冷却时间
-	skillManager := game.NewSkillManager()
-	char, ok := tr.context.Characters["character"]
-	if ok && char != nil {
-		if err := skillManager.LoadCharacterSkills(char.ID); err == nil {
-			// 先减少冷却时间
-			skillManager.TickCooldowns(char.ID)
+		// 减少技能冷却时间
+		skillManager := game.NewSkillManager()
+		char, ok := tr.context.Characters["character"]
+		if ok && char != nil {
+			if err := skillManager.LoadCharacterSkills(char.ID); err == nil {
+				// 先减少冷却时间
+				skillManager.TickCooldowns(char.ID)
+				
+				// 减少Buff持续时间（每回合减1）
+				if buffDuration, exists := tr.context.Variables["character_buff_duration"]; exists {
+					if duration, ok := buffDuration.(int); ok && duration > 0 {
+						newDuration := duration - 1
+						if newDuration < 0 {
+							newDuration = 0
+						}
+						tr.context.Variables["character_buff_duration"] = newDuration
+						tr.assertion.SetContext("character.buff_duration", newDuration)
+						tr.assertion.SetContext(fmt.Sprintf("buff_duration_round_%d", roundNum), newDuration)
+						tr.context.Variables[fmt.Sprintf("buff_duration_round_%d", roundNum)] = newDuration
+					}
+				}
+				
+				// 减少护盾持续时间（每回合减1）
+				if shieldDuration, exists := tr.context.Variables["character.shield_duration"]; exists {
+					if duration, ok := shieldDuration.(int); ok && duration > 0 {
+						newDuration := duration - 1
+						if newDuration < 0 {
+							newDuration = 0
+						}
+						tr.context.Variables["character.shield_duration"] = newDuration
+						tr.assertion.SetContext("character.shield_duration", newDuration)
+						tr.assertion.SetContext(fmt.Sprintf("character.shield_duration_round_%d", roundNum), newDuration)
+						tr.context.Variables[fmt.Sprintf("character.shield_duration_round_%d", roundNum)] = newDuration
+					}
+				}
 
 			// 获取技能状态，检查是否可用（不再从Variables读取Skill对象，避免序列化错误）
 			skillID, exists := tr.context.Variables["skill_id"]
@@ -5753,6 +5781,18 @@ func (tr *TestRunner) executeContinueBattleUntil(instruction string) error {
 		if err := tr.executeAttackMonster(); err != nil {
 			// 如果没有怪物，战斗结束
 			break
+		}
+
+		// 记录当前回合的HP值（用于测试断言）
+		if char != nil {
+			tr.assertion.SetContext(fmt.Sprintf("character.hp_round_%d", round), char.HP)
+			tr.context.Variables[fmt.Sprintf("character.hp_round_%d", round)] = char.HP
+		}
+		for key, monster := range tr.context.Monsters {
+			if monster != nil {
+				tr.assertion.SetContext(fmt.Sprintf("%s.hp_round_%d", key, round), monster.HP)
+				tr.context.Variables[fmt.Sprintf("%s.hp_round_%d", key, round)] = monster.HP
+			}
 		}
 
 		// 更新上下文
