@@ -322,8 +322,17 @@ func (tr *TestRunner) executeEquipItem(instruction string) error {
 	equipmentRepo := repository.NewEquipmentRepository()
 	oldEquipment, err := equipmentRepo.GetByCharacterAndSlot(char.ID, equipment.Slot)
 	if err == nil && oldEquipment != nil {
-		tr.context.Variables["old_weapon"] = oldEquipment
-		tr.context.Variables["old_equipment"] = oldEquipment
+		// 只存储基本字段，不存储整个对象
+		tr.context.Variables["old_weapon_id"] = oldEquipment.ID
+		tr.context.Variables["old_weapon_item_id"] = oldEquipment.ItemID
+		tr.context.Variables["old_weapon_quality"] = oldEquipment.Quality
+		tr.context.Variables["old_weapon_slot"] = oldEquipment.Slot
+		tr.context.Variables["old_equipment_id"] = oldEquipment.ID
+		tr.context.Variables["old_equipment_item_id"] = oldEquipment.ItemID
+		tr.context.Variables["old_equipment_quality"] = oldEquipment.Quality
+		tr.context.Variables["old_equipment_slot"] = oldEquipment.Slot
+		// 同时存储到 Equipments map 中以便后续使用
+		tr.context.Equipments[fmt.Sprintf("%d", oldEquipment.ID)] = oldEquipment
 	}
 	
 	// 记录穿戴前的攻击力（用于断言）
@@ -346,9 +355,19 @@ func (tr *TestRunner) executeEquipItem(instruction string) error {
 	// 重新加载装备以获取更新后的character_id
 	updatedEquipment, err := equipmentRepo.GetByID(equipment.ID)
 	if err == nil {
-		tr.context.Variables["equipment"] = updatedEquipment
-		tr.context.Variables["new_weapon"] = updatedEquipment
-		tr.context.Variables["new_equipment"] = updatedEquipment
+		// 只存储基本字段，不存储整个对象
+		tr.context.Variables["equipment_id"] = updatedEquipment.ID
+		tr.context.Variables["equipment_item_id"] = updatedEquipment.ItemID
+		tr.context.Variables["equipment_quality"] = updatedEquipment.Quality
+		tr.context.Variables["equipment_slot"] = updatedEquipment.Slot
+		tr.context.Variables["new_weapon_id"] = updatedEquipment.ID
+		tr.context.Variables["new_weapon_item_id"] = updatedEquipment.ItemID
+		tr.context.Variables["new_weapon_quality"] = updatedEquipment.Quality
+		tr.context.Variables["new_weapon_slot"] = updatedEquipment.Slot
+		tr.context.Variables["new_equipment_id"] = updatedEquipment.ID
+		tr.context.Variables["new_equipment_item_id"] = updatedEquipment.ItemID
+		tr.context.Variables["new_equipment_quality"] = updatedEquipment.Quality
+		tr.context.Variables["new_equipment_slot"] = updatedEquipment.Slot
 		tr.context.Equipments[fmt.Sprintf("%d", updatedEquipment.ID)] = updatedEquipment
 	}
 	
@@ -356,8 +375,16 @@ func (tr *TestRunner) executeEquipItem(instruction string) error {
 	if oldEquipment != nil {
 		updatedOldEquipment, err := equipmentRepo.GetByID(oldEquipment.ID)
 		if err == nil {
-			tr.context.Variables["old_weapon"] = updatedOldEquipment
-			tr.context.Variables["old_equipment"] = updatedOldEquipment
+			// 只存储基本字段，不存储整个对象
+			tr.context.Variables["old_weapon_id"] = updatedOldEquipment.ID
+			tr.context.Variables["old_weapon_item_id"] = updatedOldEquipment.ItemID
+			tr.context.Variables["old_weapon_quality"] = updatedOldEquipment.Quality
+			tr.context.Variables["old_weapon_slot"] = updatedOldEquipment.Slot
+			tr.context.Variables["old_equipment_id"] = updatedOldEquipment.ID
+			tr.context.Variables["old_equipment_item_id"] = updatedOldEquipment.ItemID
+			tr.context.Variables["old_equipment_quality"] = updatedOldEquipment.Quality
+			tr.context.Variables["old_equipment_slot"] = updatedOldEquipment.Slot
+			tr.context.Equipments[fmt.Sprintf("%d", updatedOldEquipment.ID)] = updatedOldEquipment
 		}
 	}
 	
@@ -416,8 +443,15 @@ func (tr *TestRunner) executeUnequipItem(instruction string) error {
 	equipmentRepo := repository.NewEquipmentRepository()
 	updatedEquipment, err := equipmentRepo.GetByID(equipment.ID)
 	if err == nil {
-		tr.context.Variables["equipment"] = updatedEquipment
-		tr.context.Variables["weapon"] = updatedEquipment
+		// 只存储基本字段，不存储整个对象
+		tr.context.Variables["equipment_id"] = updatedEquipment.ID
+		tr.context.Variables["equipment_item_id"] = updatedEquipment.ItemID
+		tr.context.Variables["equipment_quality"] = updatedEquipment.Quality
+		tr.context.Variables["equipment_slot"] = updatedEquipment.Slot
+		tr.context.Variables["weapon_id"] = updatedEquipment.ID
+		tr.context.Variables["weapon_item_id"] = updatedEquipment.ItemID
+		tr.context.Variables["weapon_quality"] = updatedEquipment.Quality
+		tr.context.Variables["weapon_slot"] = updatedEquipment.Slot
 		tr.context.Equipments[fmt.Sprintf("%d", updatedEquipment.ID)] = updatedEquipment
 	}
 	

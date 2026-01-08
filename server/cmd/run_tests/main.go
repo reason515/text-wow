@@ -5,12 +5,40 @@ import (
 	"io"
 	"log"
 	"os"
+	"runtime"
+	"syscall"
 
 	"text-wow/internal/database"
 	"text-wow/internal/test/runner"
 )
 
+var (
+	kernel32                = syscall.NewLazyDLL("kernel32.dll")
+	setConsoleOutputCP      = kernel32.NewProc("SetConsoleOutputCP")
+	getConsoleOutputCP      = kernel32.NewProc("GetConsoleOutputCP")
+)
+
+// setUTF8Output 设置控制台输出为 UTF-8 编码（Windows 特定）
+func setUTF8Output() {
+	if runtime.GOOS == "windows" {
+		// UTF-8 代码页是 65001
+		const CP_UTF8 = 65001
+		
+		// 获取当前代码页
+		currentCP, _, _ := getConsoleOutputCP.Call()
+		
+		// 如果当前代码页不是 UTF-8，则设置为 UTF-8
+		if currentCP != CP_UTF8 {
+			// 设置控制台输出代码页为 UTF-8
+			setConsoleOutputCP.Call(CP_UTF8)
+		}
+	}
+}
+
 func main() {
+	// 设置 UTF-8 输出编码
+	setUTF8Output()
+
 	if len(os.Args) < 2 {
 		fmt.Fprintf(os.Stdout, "Usage: go run main.go <test_directory>\n")
 		fmt.Fprintf(os.Stdout, "Example: go run main.go ../../test/cases/calculator\n")

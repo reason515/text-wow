@@ -31,11 +31,19 @@ func (tr *TestRunner) executeLoadZone(instruction string) error {
 			return fmt.Errorf("failed to load zone %s: %w", zoneID, err)
 		}
 		
-		// 存储到上下文
-		tr.context.Variables["zone"] = zone
+		// 存储到上下文（只存储基本字段，不存储整个对象）
 		tr.context.Variables["zone_id"] = zoneID
-		tr.assertion.SetContext("zone", zone)
+		tr.context.Variables["zone_name"] = zone.Name
+		tr.context.Variables["zone_exp_multiplier"] = zone.ExpMulti
+		tr.context.Variables["zone_gold_multiplier"] = zone.GoldMulti
+		tr.context.Variables["zone_min_level"] = zone.MinLevel
+		tr.context.Variables["zone_faction"] = zone.Faction
 		tr.assertion.SetContext("zone_id", zoneID)
+		tr.assertion.SetContext("zone_name", zone.Name)
+		tr.assertion.SetContext("zone_exp_multiplier", zone.ExpMulti)
+		tr.assertion.SetContext("zone_gold_multiplier", zone.GoldMulti)
+		tr.assertion.SetContext("zone_min_level", zone.MinLevel)
+		tr.assertion.SetContext("zone_faction", zone.Faction)
 	}
 	return nil
 }
@@ -95,11 +103,21 @@ func (tr *TestRunner) executeSwitchZone(instruction string) error {
 		return fmt.Errorf("failed to update user zone: %w", err)
 	}
 
-	// 更新上下文
+	// 更新上下文（只存储基本字段，不存储整个对象）
 	tr.context.Variables["current_zone_id"] = zoneID
+	tr.context.Variables["zone_id"] = zoneID
+	tr.context.Variables["zone_name"] = zone.Name
+	tr.context.Variables["zone_exp_multiplier"] = zone.ExpMulti
+	tr.context.Variables["zone_gold_multiplier"] = zone.GoldMulti
+	tr.context.Variables["zone_min_level"] = zone.MinLevel
+	tr.context.Variables["zone_faction"] = zone.Faction
 	tr.assertion.SetContext("current_zone_id", zoneID)
-	tr.context.Variables["zone"] = zone
-	tr.assertion.SetContext("zone", zone)
+	tr.assertion.SetContext("zone_id", zoneID)
+	tr.assertion.SetContext("zone_name", zone.Name)
+	tr.assertion.SetContext("zone_exp_multiplier", zone.ExpMulti)
+	tr.assertion.SetContext("zone_gold_multiplier", zone.GoldMulti)
+	tr.assertion.SetContext("zone_min_level", zone.MinLevel)
+	tr.assertion.SetContext("zone_faction", zone.Faction)
 
 	return nil
 }
@@ -140,13 +158,19 @@ func (tr *TestRunner) executeCreateZone(instruction string) error {
 		GoldMulti: goldMulti,
 	}
 
-	// 存储到上下文
-	tr.context.Variables["zone"] = zone
+	// 存储到上下文（只存储基本字段，不存储整个对象）
+	tr.context.Variables["zone_id"] = zone.ID
+	tr.context.Variables["zone_name"] = zone.Name
 	tr.context.Variables["exp_multiplier"] = expMulti
 	tr.context.Variables["gold_multiplier"] = goldMulti
-	tr.assertion.SetContext("zone", zone)
+	tr.context.Variables["zone_exp_multiplier"] = expMulti
+	tr.context.Variables["zone_gold_multiplier"] = goldMulti
+	tr.assertion.SetContext("zone_id", zone.ID)
+	tr.assertion.SetContext("zone_name", zone.Name)
 	tr.assertion.SetContext("exp_multiplier", expMulti)
 	tr.assertion.SetContext("gold_multiplier", goldMulti)
+	tr.assertion.SetContext("zone_exp_multiplier", expMulti)
+	tr.assertion.SetContext("zone_gold_multiplier", goldMulti)
 
 	return nil
 }

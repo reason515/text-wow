@@ -751,13 +751,37 @@ func (tr *TestRunner) updateAssertionContext() {
 		tr.assertion.SetContext("character_debuff_duration", monsterDebuffDuration)
 	}
 
-	// 同步装备信息
-	tr.syncEquipmentToContext("equipment", tr.context.Variables["equipment"])
-	tr.syncEquipmentToContext("weapon", tr.context.Variables["weapon"])
-	tr.syncEquipmentToContext("old_weapon", tr.context.Variables["old_weapon"])
-	tr.syncEquipmentToContext("old_equipment", tr.context.Variables["old_equipment"])
-	tr.syncEquipmentToContext("new_weapon", tr.context.Variables["new_weapon"])
-	tr.syncEquipmentToContext("new_equipment", tr.context.Variables["new_equipment"])
+	// 同步装备信息（从 Equipments map 或 Variables 中的 equipment_id 获取）
+	if eqID, ok := tr.context.Variables["equipment_id"].(int); ok {
+		if eq, exists := tr.context.Equipments[fmt.Sprintf("%d", eqID)]; exists {
+			tr.syncEquipmentToContext("equipment", eq)
+		}
+	}
+	if weaponID, ok := tr.context.Variables["weapon_id"].(int); ok {
+		if eq, exists := tr.context.Equipments[fmt.Sprintf("%d", weaponID)]; exists {
+			tr.syncEquipmentToContext("weapon", eq)
+		}
+	}
+	if oldWeaponID, ok := tr.context.Variables["old_weapon_id"].(int); ok {
+		if eq, exists := tr.context.Equipments[fmt.Sprintf("%d", oldWeaponID)]; exists {
+			tr.syncEquipmentToContext("old_weapon", eq)
+		}
+	}
+	if oldEquipmentID, ok := tr.context.Variables["old_equipment_id"].(int); ok {
+		if eq, exists := tr.context.Equipments[fmt.Sprintf("%d", oldEquipmentID)]; exists {
+			tr.syncEquipmentToContext("old_equipment", eq)
+		}
+	}
+	if newWeaponID, ok := tr.context.Variables["new_weapon_id"].(int); ok {
+		if eq, exists := tr.context.Equipments[fmt.Sprintf("%d", newWeaponID)]; exists {
+			tr.syncEquipmentToContext("new_weapon", eq)
+		}
+	}
+	if newEquipmentID, ok := tr.context.Variables["new_equipment_id"].(int); ok {
+		if eq, exists := tr.context.Equipments[fmt.Sprintf("%d", newEquipmentID)]; exists {
+			tr.syncEquipmentToContext("new_equipment", eq)
+		}
+	}
 
 	// 同步装备槽位计数（用于测试槽位冲突）
 	if char, ok := tr.context.Characters["character"]; ok && char != nil {
