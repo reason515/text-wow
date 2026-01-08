@@ -1,0 +1,1237 @@
+﻿go : 2026/01/08 09:47:53 馃搫 Schema loaded from file
+所在位置 C:\Users\reaso\AppData\Local\Temp\ps-script-3609574f-4dee-450a-88d4-df70718f183e.ps1:7 字符: 26
++ ... /run_tests; go run main.go ../../internal/test/cases/calculator 2>&1  ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (2026/01/08 09:4...oaded from file:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+2026/01/08 09:47:53 鈿狅笍 Failed to load warrior skills: warrior_skills.sql not found: GetFileAttributesEx database\warri
+or_skills.sql: The system cannot find the path specified.
+2026/01/08 09:47:53 鉁?鏁版嵁搴撳垵濮嬪寲瀹屾垚
+[DEBUG] createCharacter: set Strength=20 and saved to Variables
+[DEBUG] createCharacter: set Agility=10 and saved to Variables
+[DEBUG] createCharacter: auto-calculated MaxHP=55, HP=55 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=1
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=1, Resource=40/100, MaxHP=55, HP=55
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=1
+[DEBUG] createCharacter: after Update, char.Resource=40/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=40/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=55, HP=55
+[DEBUG] createCharacter: restored Strength=20 from Variables before calculation
+[DEBUG] createCharacter: restored Agility=10 from Variables before calculation
+[DEBUG] createCharacter: re-calculated PhysicalAttack=10 (from Strength=20, Agility=10, was 1)
+[DEBUG] createCharacter: final calculation - MaxHP=55, HP=55 (calculatedMaxHP=55, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=10, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] RunTestCase: after setup for '鐗╃悊鏀诲嚮鍔涜绠楁祴璇? - characters=1, monsters=0, variables=27
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=10, character pointer=0xc00014c480
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=10
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=10, character pointer=0xc00014c480
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=10
+[DEBUG] createCharacter: set Intellect=15 and saved to Variables
+[DEBUG] createCharacter: set Spirit=10 and saved to Variables
+[DEBUG] createCharacter: auto-calculated MaxHP=55, HP=55 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=1
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=1, Resource=40/100, MaxHP=55, HP=55
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=1
+[DEBUG] createCharacter: after Update, char.Resource=40/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=40/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=55, HP=55
+[DEBUG] createCharacter: character_agility NOT found in Variables (keys: [last_instruction character_class_id character
+_intellect character_spirit])
+[DEBUG] createCharacter: re-calculated PhysicalAttack=10 (from Strength=20, Agility=10, was 1)
+[DEBUG] createCharacter: final calculation - MaxHP=55, HP=55 (calculatedMaxHP=55, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=10, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] RunTestCase: after setup for '榄旀硶鏀诲嚮鍔涜绠楁祴璇? - characters=1, monsters=0, variables=27
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=10, character pointer=0xc00014c900
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=10
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=10, character pointer=0xc00014c900
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=10
+[DEBUG] createCharacter: set Strength=20 and saved to Variables
+[DEBUG] createCharacter: set Stamina=15 and saved to Variables
+[DEBUG] createCharacter: auto-calculated MaxHP=65, HP=65 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, re-calculated MaxHP=65, HP=65 (explicitHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=1
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=1, Resource=40/100, MaxHP=65, HP=65
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=1
+[DEBUG] createCharacter: after Update, char.Resource=40/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=40/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=65, HP=65
+[DEBUG] createCharacter: restored Strength=20 from Variables before calculation
+[DEBUG] createCharacter: character_agility NOT found in Variables (keys: [last_instruction character_class_id character
+_strength character_stamina])
+[DEBUG] createCharacter: re-calculated PhysicalAttack=10 (from Strength=20, Agility=10, was 1)
+[DEBUG] createCharacter: final calculation - MaxHP=65, HP=65 (calculatedMaxHP=65, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=10, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] RunTestCase: after setup for '鐗╃悊闃插尽鍔涜绠楁祴璇? - characters=1, monsters=0, variables=27
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=10, character pointer=0xc00014cd80
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=10
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=10, character pointer=0xc00014cd80
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=10
+[DEBUG] createCharacter: set Intellect=15 and saved to Variables
+[DEBUG] createCharacter: set Spirit=10 and saved to Variables
+[DEBUG] createCharacter: auto-calculated MaxHP=55, HP=55 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=1
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=1, Resource=40/100, MaxHP=65, HP=65
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=1
+[DEBUG] createCharacter: after Update, char.Resource=40/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=40/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=65, HP=65
+[DEBUG] createCharacter: character_agility NOT found in Variables (keys: [last_instruction character_class_id character
+_intellect character_spirit])
+[DEBUG] createCharacter: re-calculated PhysicalAttack=10 (from Strength=20, Agility=10, was 1)
+[DEBUG] createCharacter: final calculation - MaxHP=65, HP=65 (calculatedMaxHP=65, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=10, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] RunTestCase: after setup for '榄旀硶闃插尽鍔涜绠楁祴璇? - characters=1, monsters=0, variables=27
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=10, character pointer=0xc00014d200
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=10
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=10, character pointer=0xc00014d200
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=10
+[DEBUG] createCharacter: set Agility=20 and saved to Variables
+[DEBUG] createCharacter: auto-calculated MaxHP=55, HP=55 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=1
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=1, Resource=40/100, MaxHP=65, HP=65
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=1
+[DEBUG] createCharacter: after Update, char.Resource=40/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=40/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=65, HP=65
+[DEBUG] createCharacter: restored Agility=20 from Variables before calculation
+[DEBUG] createCharacter: re-calculated PhysicalAttack=12 (from Strength=20, Agility=20, was 1)
+[DEBUG] createCharacter: final calculation - MaxHP=65, HP=65 (calculatedMaxHP=65, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=12, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] RunTestCase: after setup for '鐗╃悊鏆村嚮鐜囪绠楁祴璇? - characters=1, monsters=0, variables=26
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=12, character pointer=0xc00014d680
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=12
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=12, character pointer=0xc00014d680
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=12
+[DEBUG] createCharacter: set Strength=20 and saved to Variables
+[DEBUG] createCharacter: auto-calculated MaxHP=55, HP=55 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=1
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=1, Resource=40/100, MaxHP=65, HP=65
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=1
+[DEBUG] createCharacter: after Update, char.Resource=40/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=40/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=65, HP=65
+[DEBUG] createCharacter: restored Strength=20 from Variables before calculation
+[DEBUG] createCharacter: character_agility NOT found in Variables (keys: [last_instruction character_class_id character
+_strength])
+[DEBUG] createCharacter: re-calculated PhysicalAttack=12 (from Strength=20, Agility=20, was 1)
+[DEBUG] createCharacter: final calculation - MaxHP=65, HP=65 (calculatedMaxHP=65, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=12, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] RunTestCase: after setup for '鐗╃悊鏆村嚮浼ゅ璁＄畻娴嬭瘯' - characters=1, monsters=0, variables=26
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=12, character pointer=0xc00014db00
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=12
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=12, character pointer=0xc00014db00
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=12
+[DEBUG] createCharacter: set Spirit=20 and saved to Variables
+[DEBUG] createCharacter: auto-calculated MaxHP=55, HP=55 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=1
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=1, Resource=40/100, MaxHP=65, HP=65
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=1
+[DEBUG] createCharacter: after Update, char.Resource=40/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=40/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=65, HP=65
+[DEBUG] createCharacter: character_agility NOT found in Variables (keys: [last_instruction character_class_id character
+_spirit])
+[DEBUG] createCharacter: re-calculated PhysicalAttack=12 (from Strength=20, Agility=20, was 1)
+[DEBUG] createCharacter: final calculation - MaxHP=65, HP=65 (calculatedMaxHP=65, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=12, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] RunTestCase: after setup for '娉曟湳鏆村嚮鐜囪绠楁祴璇? - characters=1, monsters=0, variables=26
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=12, character pointer=0xc000242000
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=12
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=12, character pointer=0xc000242000
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=12
+[DEBUG] createCharacter: set Intellect=20 and saved to Variables
+[DEBUG] createCharacter: auto-calculated MaxHP=55, HP=55 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=1
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=1, Resource=40/100, MaxHP=65, HP=65
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=1
+[DEBUG] createCharacter: after Update, char.Resource=40/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=40/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=65, HP=65
+[DEBUG] createCharacter: character_agility NOT found in Variables (keys: [last_instruction character_class_id character
+_intellect])
+[DEBUG] createCharacter: re-calculated PhysicalAttack=12 (from Strength=20, Agility=20, was 1)
+[DEBUG] createCharacter: final calculation - MaxHP=65, HP=65 (calculatedMaxHP=65, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=12, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] RunTestCase: after setup for '娉曟湳鏆村嚮浼ゅ璁＄畻娴嬭瘯' - characters=1, monsters=0, variables=26
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=12, character pointer=0xc000242480
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=12
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=12, character pointer=0xc000242480
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=12
+[DEBUG] createCharacter: set Agility=20 and saved to Variables
+[DEBUG] createCharacter: auto-calculated MaxHP=55, HP=55 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=1
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=1, Resource=40/100, MaxHP=65, HP=65
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=1
+[DEBUG] createCharacter: after Update, char.Resource=40/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=40/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=65, HP=65
+[DEBUG] createCharacter: restored Agility=20 from Variables before calculation
+[DEBUG] createCharacter: re-calculated PhysicalAttack=12 (from Strength=20, Agility=20, was 1)
+[DEBUG] createCharacter: final calculation - MaxHP=65, HP=65 (calculatedMaxHP=65, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=12, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] RunTestCase: after setup for '闂伩鐜囪绠楁祴璇? - characters=1, monsters=0, variables=26
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=12, character pointer=0xc000242900
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=12
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=12, character pointer=0xc000242900
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=12
+[DEBUG] createCharacter: set Strength=20 and saved to Variables
+[DEBUG] createCharacter: set Agility=10 and saved to Variables
+[DEBUG] createCharacter: set Intellect=5 and saved to Variables
+[DEBUG] createCharacter: set Spirit=5 and saved to Variables
+[DEBUG] createCharacter: set Stamina=15 and saved to Variables
+[DEBUG] createCharacter: auto-calculated MaxHP=65, HP=65 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=1
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=1, Resource=40/100, MaxHP=65, HP=65
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=1
+[DEBUG] createCharacter: after Update, char.Resource=40/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=40/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=65, HP=65
+[DEBUG] createCharacter: restored Strength=20 from Variables before calculation
+[DEBUG] createCharacter: restored Agility=10 from Variables before calculation
+[DEBUG] createCharacter: re-calculated PhysicalAttack=10 (from Strength=20, Agility=10, was 1)
+[DEBUG] createCharacter: final calculation - MaxHP=65, HP=65 (calculatedMaxHP=65, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=10, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] RunTestCase: after setup for '灞炴€т负0鏃惰嚜鍔ㄤ慨澶嶆祴璇? - characters=1, monsters=0, variables=30
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=10, character pointer=0xc000242d80
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=10
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=10, character pointer=0xc000242d80
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=10
+[DEBUG] createCharacter: set Strength=30 and saved to Variables
+[DEBUG] createCharacter: set Agility=25 and saved to Variables
+[DEBUG] createCharacter: set Intellect=10 and saved to Variables
+[DEBUG] createCharacter: set Spirit=10 and saved to Variables
+[DEBUG] createCharacter: set Stamina=20 and saved to Variables
+[DEBUG] createCharacter: auto-calculated MaxHP=75, HP=75 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, re-calculated MaxHP=75, HP=75 (explicitHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=1
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=1, Resource=40/100, MaxHP=75, HP=75
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=1
+[DEBUG] createCharacter: after Update, char.Resource=40/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=40/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=75, HP=75
+[DEBUG] createCharacter: restored Strength=30 from Variables before calculation
+[DEBUG] createCharacter: restored Agility=25 from Variables before calculation
+[DEBUG] createCharacter: re-calculated PhysicalAttack=17 (from Strength=30, Agility=25, was 1)
+[DEBUG] createCharacter: final calculation - MaxHP=75, HP=75 (calculatedMaxHP=75, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=17, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] RunTestCase: after setup for '缁煎悎灞炴€ц绠楁祴璇? - characters=1, monsters=0, variables=30
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=17, character pointer=0xc000243200
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=17
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=17, character pointer=0xc000243200
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=17
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=17, character pointer=0xc000243200
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=17
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=17, character pointer=0xc000243200
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=17
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=17, character pointer=0xc000243200
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=17
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=17, character pointer=0xc000243200
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=17
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=17, character pointer=0xc000243200
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=17
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=17, character pointer=0xc000243200
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=17
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=17, character pointer=0xc000243200
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=17
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=17, character pointer=0xc000243200
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=17
+[DEBUG] createCharacter: set Strength=20 and saved to Variables
+[DEBUG] createCharacter: set Agility=10 and saved to Variables
+[DEBUG] createCharacter: auto-calculated MaxHP=55, HP=55 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=1
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=1, Resource=40/100, MaxHP=75, HP=75
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=1
+[DEBUG] createCharacter: after Update, char.Resource=40/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=40/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=75, HP=75
+[DEBUG] createCharacter: restored Strength=20 from Variables before calculation
+[DEBUG] createCharacter: restored Agility=10 from Variables before calculation
+[DEBUG] createCharacter: re-calculated PhysicalAttack=10 (from Strength=20, Agility=10, was 1)
+[DEBUG] createCharacter: final calculation - MaxHP=75, HP=75 (calculatedMaxHP=75, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=10, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] RunTestCase: after setup for '鐗╃悊鏀诲嚮鍔涜绠楁祴璇? - characters=1, monsters=0, variables=27
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=10, character pointer=0xc000243680
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=10
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=10, character pointer=0xc000243680
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=10
+[DEBUG] createCharacter: set Intellect=15 and saved to Variables
+[DEBUG] createCharacter: set Spirit=10 and saved to Variables
+[DEBUG] createCharacter: auto-calculated MaxHP=55, HP=55 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=1
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=1, Resource=40/100, MaxHP=75, HP=75
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=1
+[DEBUG] createCharacter: after Update, char.Resource=40/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=40/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=75, HP=75
+[DEBUG] createCharacter: character_agility NOT found in Variables (keys: [character_class_id character_intellect charac
+ter_spirit last_instruction])
+[DEBUG] createCharacter: re-calculated PhysicalAttack=10 (from Strength=20, Agility=10, was 1)
+[DEBUG] createCharacter: final calculation - MaxHP=75, HP=75 (calculatedMaxHP=75, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=10, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] RunTestCase: after setup for '娉曟湳鏀诲嚮鍔涜绠楁祴璇? - characters=1, monsters=0, variables=27
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=10, character pointer=0xc000243b00
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=10
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=10, character pointer=0xc000243b00
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=10
+[DEBUG] createCharacter: set Stamina=15 and saved to Variables
+[DEBUG] createCharacter: set baseHP=35
+[DEBUG] createCharacter: auto-calculated MaxHP=65, HP=65 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=1
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=1, Resource=40/100, MaxHP=75, HP=75
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=1
+[DEBUG] createCharacter: after Update, char.Resource=40/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=40/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=75, HP=75
+[DEBUG] createCharacter: character_agility NOT found in Variables (keys: [character_base_hp last_instruction character_
+class_id character_stamina])
+[DEBUG] createCharacter: re-calculated PhysicalAttack=10 (from Strength=20, Agility=10, was 1)
+[DEBUG] createCharacter: final calculation - MaxHP=65, HP=65 (calculatedMaxHP=65, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=10, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] RunTestCase: after setup for '鐢熷懡鍊艰绠楁祴璇? - characters=1, monsters=0, variables=27
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=10, character pointer=0xc00027e000
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=10
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=10, character pointer=0xc00027e000
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=10
+[DEBUG] createCharacter: set Agility=20 and saved to Variables
+[DEBUG] createCharacter: auto-calculated MaxHP=55, HP=55 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=10
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=10, Resource=40/100, MaxHP=65, HP=65
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=10
+[DEBUG] createCharacter: after Update, char.Resource=40/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=40/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=65, HP=65
+[DEBUG] createCharacter: restored Agility=20 from Variables before calculation
+[DEBUG] createCharacter: re-calculated PhysicalAttack=12 (from Strength=20, Agility=20, was 10)
+[DEBUG] createCharacter: final calculation - MaxHP=65, HP=65 (calculatedMaxHP=65, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=12, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] RunTestCase: after setup for '鐗╃悊鏆村嚮鐜囪绠楁祴璇? - characters=1, monsters=0, variables=26
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=12, character pointer=0xc0002a4300
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=12
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=12, character pointer=0xc0002a4300
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=12
+[DEBUG] createCharacter: set Agility=30 and saved to Variables
+[DEBUG] createCharacter: auto-calculated MaxHP=55, HP=55 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=10
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=10, Resource=40/100, MaxHP=65, HP=65
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=10
+[DEBUG] createCharacter: after Update, char.Resource=40/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=40/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=65, HP=65
+[DEBUG] createCharacter: restored Agility=30 from Variables before calculation
+[DEBUG] createCharacter: re-calculated PhysicalAttack=14 (from Strength=20, Agility=30, was 10)
+[DEBUG] createCharacter: final calculation - MaxHP=65, HP=65 (calculatedMaxHP=65, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=14, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] RunTestCase: after setup for '闂伩鐜囪绠楁祴璇? - characters=1, monsters=0, variables=26
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=14, character pointer=0xc0002a4780
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=14
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=14, character pointer=0xc0002a4780
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=14
+[DEBUG] createCharacter: set Agility=30 and saved to Variables
+[DEBUG] createCharacter: auto-calculated MaxHP=55, HP=55 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=10
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=10, Resource=40/100, MaxHP=65, HP=65
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=10
+[DEBUG] createCharacter: after Update, char.Resource=40/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=40/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=65, HP=65
+[DEBUG] createCharacter: restored Agility=30 from Variables before calculation
+[DEBUG] createCharacter: re-calculated PhysicalAttack=14 (from Strength=20, Agility=30, was 10)
+[DEBUG] createCharacter: final calculation - MaxHP=65, HP=65 (calculatedMaxHP=65, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=14, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] RunTestCase: after setup for '鐗╃悊鏆村嚮鐜囪绠楁祴璇? - characters=1, monsters=0, variables=26
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=14, character pointer=0xc0002a4c00
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=14
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=14, character pointer=0xc0002a4c00
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=14
+[DEBUG] createCharacter: set Spirit=40 and saved to Variables
+[DEBUG] createCharacter: auto-calculated MaxHP=55, HP=55 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=10
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=10, Resource=40/100, MaxHP=65, HP=65
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=10
+[DEBUG] createCharacter: after Update, char.Resource=40/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=40/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=65, HP=65
+[DEBUG] createCharacter: character_agility NOT found in Variables (keys: [last_instruction character_class_id character
+_spirit])
+[DEBUG] createCharacter: re-calculated PhysicalAttack=14 (from Strength=20, Agility=30, was 10)
+[DEBUG] createCharacter: final calculation - MaxHP=65, HP=65 (calculatedMaxHP=65, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=14, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] RunTestCase: after setup for '娉曟湳鏆村嚮鐜囪绠楁祴璇? - characters=1, monsters=0, variables=26
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=14, character pointer=0xc0002a5080
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=14
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=14, character pointer=0xc0002a5080
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=14
+[DEBUG] createCharacter: set Agility=1000 and saved to Variables
+[DEBUG] createCharacter: auto-calculated MaxHP=55, HP=55 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=10
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=10, Resource=40/100, MaxHP=65, HP=65
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=10
+[DEBUG] createCharacter: after Update, char.Resource=40/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=40/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=65, HP=65
+[DEBUG] createCharacter: restored Agility=1000 from Variables before calculation
+[DEBUG] createCharacter: re-calculated PhysicalAttack=208 (from Strength=20, Agility=1000, was 10)
+[DEBUG] createCharacter: final calculation - MaxHP=65, HP=65 (calculatedMaxHP=65, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=208, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] RunTestCase: after setup for '鏆村嚮鐜囦笂闄愭祴璇? - characters=1, monsters=0, variables=26
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=208, character pointer=0xc0002a5500
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=208
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=208, character pointer=0xc0002a5500
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=208
+[DEBUG] createCharacter: set Agility=50 and saved to Variables
+[DEBUG] createCharacter: auto-calculated MaxHP=55, HP=55 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=10
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=10, Resource=40/100, MaxHP=65, HP=65
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=10
+[DEBUG] createCharacter: after Update, char.Resource=40/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=40/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=65, HP=65
+[DEBUG] createCharacter: restored Agility=50 from Variables before calculation
+[DEBUG] createCharacter: re-calculated PhysicalAttack=18 (from Strength=20, Agility=50, was 10)
+[DEBUG] createCharacter: final calculation - MaxHP=65, HP=65 (calculatedMaxHP=65, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=18, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] RunTestCase: after setup for '闂伩鐜囪绠楁祴璇? - characters=1, monsters=0, variables=26
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=18, character pointer=0xc0002a5980
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=18
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=18, character pointer=0xc0002a5980
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=18
+[DEBUG] createCharacter: set Agility=1000 and saved to Variables
+[DEBUG] createCharacter: auto-calculated MaxHP=55, HP=55 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=10
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=10, Resource=40/100, MaxHP=65, HP=65
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=10
+[DEBUG] createCharacter: after Update, char.Resource=40/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=40/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=65, HP=65
+[DEBUG] createCharacter: restored Agility=1000 from Variables before calculation
+[DEBUG] createCharacter: re-calculated PhysicalAttack=208 (from Strength=20, Agility=1000, was 10)
+[DEBUG] createCharacter: final calculation - MaxHP=65, HP=65 (calculatedMaxHP=65, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=208, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] RunTestCase: after setup for '闂伩鐜囦笂闄愭祴璇? - characters=1, monsters=0, variables=26
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=208, character pointer=0xc0002a5e00
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=208
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=208, character pointer=0xc0002a5e00
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=208
+[DEBUG] createCharacter: set Strength=50 and saved to Variables
+[DEBUG] createCharacter: auto-calculated MaxHP=55, HP=55 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=10
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=10, Resource=40/100, MaxHP=65, HP=65
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=10
+[DEBUG] createCharacter: after Update, char.Resource=40/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=40/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=65, HP=65
+[DEBUG] createCharacter: restored Strength=50 from Variables before calculation
+[DEBUG] createCharacter: character_agility NOT found in Variables (keys: [last_instruction character_class_id character
+_strength])
+[DEBUG] createCharacter: re-calculated PhysicalAttack=220 (from Strength=50, Agility=1000, was 10)
+[DEBUG] createCharacter: final calculation - MaxHP=65, HP=65 (calculatedMaxHP=65, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=220, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] RunTestCase: after setup for '鏆村嚮浼ゅ鍊嶇巼璁＄畻娴嬭瘯' - characters=1, monsters=0, variables=26
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=220, character pointer=0xc00027e480
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=220
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=220, character pointer=0xc00027e480
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=220
+[DEBUG] createCharacter: auto-calculated MaxHP=55, HP=55 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=10
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=10, Resource=40/100, MaxHP=65, HP=65
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=10
+[DEBUG] createCharacter: after Update, char.Resource=40/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=40/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=65, HP=65
+[DEBUG] createCharacter: character_agility NOT found in Variables (keys: [last_instruction character_class_id])
+[DEBUG] createCharacter: re-calculated PhysicalAttack=220 (from Strength=50, Agility=1000, was 10)
+[DEBUG] createCharacter: final calculation - MaxHP=65, HP=65 (calculatedMaxHP=65, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=220, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] createMonster: called with instruction: 鍒涘缓涓€涓€墿
+[DEBUG] createMonster: stored monster[monster] with PhysicalDefense=5, HP=100
+[DEBUG] createMonster: total monsters in context: 1
+[DEBUG] RunTestCase: after setup for '鏆村嚮鍒ゅ畾娴嬭瘯' - characters=1, monsters=1, variables=26
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=220, character pointer=0xc00027e900
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=220
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=220, character pointer=0xc00027e900
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=220
+[DEBUG] createCharacter: set PhysicalAttack=20
+[DEBUG] createCharacter: auto-calculated MaxHP=55, HP=55 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=10
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=10, Resource=40/100, MaxHP=65, HP=65
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=10
+[DEBUG] createCharacter: after Update, char.Resource=40/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=40/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=65, HP=65
+[DEBUG] createCharacter: character_agility NOT found in Variables (keys: [last_instruction character_class_id character
+_physical_attack])
+[DEBUG] createCharacter: using explicit PhysicalAttack=20 from instruction
+[DEBUG] createCharacter: final calculation - MaxHP=65, HP=65 (calculatedMaxHP=65, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=20, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] createMonster: called with instruction: 鍒涘缓涓€涓€墿锛岄棯閬跨巼=30%
+[DEBUG] createMonster: stored monster[monster] with PhysicalDefense=5, HP=100
+[DEBUG] createMonster: total monsters in context: 1
+[DEBUG] RunTestCase: after setup for '闂伩鍒ゅ畾娴嬭瘯' - characters=1, monsters=1, variables=26
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=20, character pointer=0xc00027ed80
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=20
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=20, character pointer=0xc00027ed80
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=20
+[DEBUG] createCharacter: set PhysicalAttack=20
+[DEBUG] createCharacter: auto-calculated MaxHP=55, HP=55 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=10
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=10, Resource=40/100, MaxHP=65, HP=65
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=10
+[DEBUG] createCharacter: after Update, char.Resource=40/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=40/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=65, HP=65
+[DEBUG] createCharacter: character_agility NOT found in Variables (keys: [character_class_id character_physical_attack 
+last_instruction])
+[DEBUG] createCharacter: using explicit PhysicalAttack=20 from instruction
+[DEBUG] createCharacter: final calculation - MaxHP=65, HP=65 (calculatedMaxHP=65, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=20, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] createMonster: called with instruction: 鍒涘缓涓€涓槻寰″姏=10鐨勬€墿
+[DEBUG] createMonster: stored monster[monster] with PhysicalDefense=10, HP=100
+[DEBUG] createMonster: total monsters in context: 1
+[DEBUG] RunTestCase: after setup for '鍩虹浼ゅ璁＄畻娴嬭瘯' - characters=1, monsters=1, variables=26
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=20, character pointer=0xc00027f200
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=20
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=20, character pointer=0xc00027f200
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=20
+[DEBUG] createCharacter: set PhysicalAttack=20
+[DEBUG] createCharacter: auto-calculated MaxHP=55, HP=55 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=10
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=10, Resource=40/100, MaxHP=65, HP=65
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=10
+[DEBUG] createCharacter: after Update, char.Resource=40/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=40/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=65, HP=65
+[DEBUG] createCharacter: character_agility NOT found in Variables (keys: [last_instruction character_class_id character
+_physical_attack])
+[DEBUG] createCharacter: using explicit PhysicalAttack=20 from instruction
+[DEBUG] createCharacter: final calculation - MaxHP=65, HP=65 (calculatedMaxHP=65, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=20, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] createMonster: called with instruction: 鍒涘缓涓€涓槻寰″姏=10鐨勬€墿
+[DEBUG] createMonster: stored monster[monster] with PhysicalDefense=10, HP=100
+[DEBUG] createMonster: total monsters in context: 1
+[DEBUG] RunTestCase: after setup for '闃插尽鍑忎激璁＄畻娴嬭瘯' - characters=1, monsters=1, variables=26
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=20, character pointer=0xc00027f680
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=20
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=20, character pointer=0xc00027f680
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=20
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=20, character pointer=0xc00027f680
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=20
+[DEBUG] createCharacter: set PhysicalAttack=100
+[DEBUG] createCharacter: auto-calculated MaxHP=55, HP=55 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=10
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=10, Resource=40/100, MaxHP=65, HP=65
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=10
+[DEBUG] createCharacter: after Update, char.Resource=40/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=40/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=65, HP=65
+[DEBUG] createCharacter: character_agility NOT found in Variables (keys: [last_instruction character_class_id character
+_physical_attack])
+[DEBUG] createCharacter: using explicit PhysicalAttack=100 from instruction
+[DEBUG] createCharacter: final calculation - MaxHP=65, HP=65 (calculatedMaxHP=65, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=100, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] createMonster: called with instruction: 鍒涘缓涓€涓槻寰″姏=300鐨勬€墿锛堥槻寰￠珮浜庢敾鍑伙級
+[DEBUG] createMonster: stored monster[monster] with PhysicalDefense=300, HP=100
+[DEBUG] createMonster: total monsters in context: 1
+[DEBUG] RunTestCase: after setup for '闃插尽楂樹簬鏀诲嚮娴嬭瘯' - characters=1, monsters=1, variables=26
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=100, character pointer=0xc00027fb00
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=100
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=100, character pointer=0xc00027fb00
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=100
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=100, character pointer=0xc00027fb00
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=100
+[DEBUG] createCharacter: set PhysicalAttack=20
+[DEBUG] createCharacter: auto-calculated MaxHP=55, HP=55 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=10
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=10, Resource=40/100, MaxHP=65, HP=65
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=10
+[DEBUG] createCharacter: after Update, char.Resource=40/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=40/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=65, HP=65
+[DEBUG] createCharacter: character_agility NOT found in Variables (keys: [last_instruction character_class_id character
+_physical_attack])
+[DEBUG] createCharacter: using explicit PhysicalAttack=20 from instruction
+[DEBUG] createCharacter: final calculation - MaxHP=65, HP=65 (calculatedMaxHP=65, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=20, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] createMonster: called with instruction: 鍒涘缓涓€涓槻寰″姏=10鐨勬€墿
+[DEBUG] createMonster: stored monster[monster] with PhysicalDefense=10, HP=100
+[DEBUG] createMonster: total monsters in context: 1
+[DEBUG] RunTestCase: after setup for '鏆村嚮浼ゅ璁＄畻娴嬭瘯' - characters=1, monsters=1, variables=26
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=20, character pointer=0xc000342000
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=20
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=20, character pointer=0xc000342000
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=20
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=20, character pointer=0xc000342000
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=20
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=20, character pointer=0xc000342000
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=20
+[DEBUG] createCharacter: set PhysicalAttack=20
+[DEBUG] createCharacter: auto-calculated MaxHP=55, HP=55 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=10
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=10, Resource=40/100, MaxHP=65, HP=65
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=10
+[DEBUG] createCharacter: after Update, char.Resource=40/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=40/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=65, HP=65
+[DEBUG] createCharacter: character_agility NOT found in Variables (keys: [last_instruction character_class_id character
+_physical_attack])
+[DEBUG] createCharacter: using explicit PhysicalAttack=20 from instruction
+[DEBUG] createCharacter: final calculation - MaxHP=65, HP=65 (calculatedMaxHP=65, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=20, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] createMonster: called with instruction: 鍒涘缓涓€涓槻寰″姏=10锛岄棯閬跨巼=10%鐨勬€墿
+[DEBUG] createMonster: stored monster[monster] with PhysicalDefense=10, HP=100
+[DEBUG] createMonster: total monsters in context: 1
+[DEBUG] RunTestCase: after setup for '闂伩鍒ゅ畾娴嬭瘯' - characters=1, monsters=1, variables=26
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=20, character pointer=0xc000342480
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=20
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=20, character pointer=0xc000342480
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=20
+[DEBUG] createCharacter: set PhysicalAttack=5
+[DEBUG] createCharacter: auto-calculated MaxHP=55, HP=55 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=10
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=10, Resource=40/100, MaxHP=65, HP=65
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=10
+[DEBUG] createCharacter: after Update, char.Resource=40/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=40/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=65, HP=65
+[DEBUG] createCharacter: character_agility NOT found in Variables (keys: [last_instruction character_class_id character
+_physical_attack])
+[DEBUG] createCharacter: using explicit PhysicalAttack=5 from instruction
+[DEBUG] createCharacter: final calculation - MaxHP=65, HP=65 (calculatedMaxHP=65, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=5, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] createMonster: called with instruction: 鍒涘缓涓€涓槻寰″姏=10鐨勬€墿锛堥槻寰￠珮浜庢敾鍑伙級
+[DEBUG] createMonster: stored monster[monster] with PhysicalDefense=10, HP=100
+[DEBUG] createMonster: total monsters in context: 1
+[DEBUG] RunTestCase: after setup for '鑷冲皯1鐐逛激瀹虫祴璇? - characters=1, monsters=1, variables=26
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=5, character pointer=0xc000342900
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=5
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=5, character pointer=0xc000342900
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=5
+[DEBUG] createCharacter: set Strength=0 and saved to Variables
+[DEBUG] createCharacter: set Agility=0 and saved to Variables
+[DEBUG] createCharacter: set Intellect=0 and saved to Variables
+[DEBUG] createCharacter: set Spirit=0 and saved to Variables
+[DEBUG] createCharacter: set Stamina=0 and saved to Variables
+[DEBUG] createCharacter: auto-calculated MaxHP=35, HP=35 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=10
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=10, Resource=40/100, MaxHP=65, HP=65
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=10
+[DEBUG] createCharacter: after Update, char.Resource=40/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=40/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=65, HP=65
+[DEBUG] createCharacter: restored Strength=0 from Variables before calculation
+[DEBUG] createCharacter: restored Agility=0 from Variables before calculation
+[DEBUG] createCharacter: re-calculated PhysicalAttack=1 (from Strength=0, Agility=0, was 10)
+[DEBUG] createCharacter: final calculation - MaxHP=35, HP=35 (calculatedMaxHP=35, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=1, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] RunTestCase: after setup for '闆跺睘鎬у€兼祴璇? - characters=1, monsters=0, variables=30
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=1, character pointer=0xc000342d80
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=1
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=1, character pointer=0xc000342d80
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=1
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=1, character pointer=0xc000342d80
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=1
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=1, character pointer=0xc000342d80
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=1
+[DEBUG] createCharacter: set Agility=10000 and saved to Variables
+[DEBUG] createCharacter: auto-calculated MaxHP=55, HP=55 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=1
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=1, Resource=40/100, MaxHP=35, HP=35
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=1
+[DEBUG] createCharacter: after Update, char.Resource=40/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=40/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=35, HP=35
+[DEBUG] createCharacter: restored Agility=10000 from Variables before calculation
+[DEBUG] createCharacter: re-calculated PhysicalAttack=2000 (from Strength=0, Agility=10000, was 1)
+[DEBUG] createCharacter: final calculation - MaxHP=35, HP=35 (calculatedMaxHP=35, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=2000, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] RunTestCase: after setup for '鏋佺灞炴€у€兼祴璇? - characters=1, monsters=0, variables=26
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=2000, character pointer=0xc000342000
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=2000
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=2000, character pointer=0xc000342000
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=2000
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=2000, character pointer=0xc000342000
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=2000
+[DEBUG] createCharacter: set Strength=-10 and saved to Variables
+[DEBUG] createCharacter: set Agility=-10 and saved to Variables
+[DEBUG] createCharacter: set Intellect=-10 and saved to Variables
+[DEBUG] createCharacter: set Spirit=-10 and saved to Variables
+[DEBUG] createCharacter: set Stamina=-10 and saved to Variables
+[DEBUG] createCharacter: auto-calculated MaxHP=15, HP=15 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=1
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=1, Resource=40/100, MaxHP=35, HP=35
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=1
+[DEBUG] createCharacter: after Update, char.Resource=40/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=40/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=35, HP=35
+[DEBUG] createCharacter: restored Strength=-10 from Variables before calculation
+[DEBUG] createCharacter: restored Agility=-10 from Variables before calculation
+[DEBUG] createCharacter: final calculation - MaxHP=15, HP=15 (calculatedMaxHP=15, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=1, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] RunTestCase: after setup for '璐熸暟灞炴€у€兼祴璇? - characters=1, monsters=0, variables=30
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=1, character pointer=0xc000342480
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=1
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=1, character pointer=0xc000342480
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=1
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=1, character pointer=0xc000342480
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=1
+[DEBUG] createCharacter: set PhysicalAttack=100
+[DEBUG] createCharacter: auto-calculated MaxHP=55, HP=55 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=1
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=1, Resource=40/100, MaxHP=35, HP=35
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=1
+[DEBUG] createCharacter: after Update, char.Resource=40/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=40/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=35, HP=35
+[DEBUG] createCharacter: character_agility NOT found in Variables (keys: [last_instruction character_class_id character
+_physical_attack])
+[DEBUG] createCharacter: using explicit PhysicalAttack=100 from instruction
+[DEBUG] createCharacter: final calculation - MaxHP=15, HP=15 (calculatedMaxHP=15, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=100, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] createMonster: called with instruction: 鍒涘缓涓€涓槻寰″姏=1000鐨勬€墿锛堥槻寰¤繙楂樹簬鏀诲嚮锛?[DEBUG] createMonster: stored monste
+r[monster] with PhysicalDefense=1000, HP=100
+[DEBUG] createMonster: total monsters in context: 1
+[DEBUG] RunTestCase: after setup for '闃插尽楂樹簬鏀诲嚮娴嬭瘯' - characters=1, monsters=1, variables=26
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=100, character pointer=0xc000342900
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=100
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=100, character pointer=0xc000342900
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=100
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=100, character pointer=0xc000342900
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=100
+[DEBUG] createCharacter: set PhysicalAttack=1
+[DEBUG] createCharacter: auto-calculated MaxHP=55, HP=55 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=1
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=1, Resource=40/100, MaxHP=35, HP=35
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=1
+[DEBUG] createCharacter: after Update, char.Resource=40/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=40/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=35, HP=35
+[DEBUG] createCharacter: character_agility NOT found in Variables (keys: [last_instruction character_class_id character
+_physical_attack])
+[DEBUG] createCharacter: using explicit PhysicalAttack=1 from instruction
+[DEBUG] createCharacter: final calculation - MaxHP=15, HP=15 (calculatedMaxHP=15, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=1, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] createMonster: called with instruction: 鍒涘缓涓€涓槻寰″姏=10000鐨勬€墿锛堥槻寰℃瀬楂橈級
+[DEBUG] createMonster: stored monster[monster] with PhysicalDefense=10000, HP=100
+[DEBUG] createMonster: total monsters in context: 1
+[DEBUG] RunTestCase: after setup for '鑷冲皯1鐐逛激瀹虫祴璇? - characters=1, monsters=1, variables=26
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=1, character pointer=0xc000343080
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=1
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=1, character pointer=0xc000343080
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=1
+[DEBUG] createCharacter: set explicitMaxHP=100
+[DEBUG] createCharacter: set explicitHP=95
+[DEBUG] createCharacter: using explicitHP=95 from Variables
+[DEBUG] createCharacter: MaxHP=100 already set, keeping HP=95
+[DEBUG] createCharacter: after setting ID, using explicitMaxHP=100, HP=95 (explicitHP=95)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=1
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=1, Resource=40/100, MaxHP=100, HP=95
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=1
+[DEBUG] createCharacter: after Update, char.Resource=40/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=40/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=100, HP=95
+[DEBUG] createCharacter: character_agility NOT found in Variables (keys: [last_instruction character_class_id character
+_explicit_max_hp character_explicit_hp])
+[DEBUG] createCharacter: final calculation - MaxHP=100, HP=95 (calculatedMaxHP=15, explicitMaxHP=100, explicitHP=95)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=1, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] createSkill: checking for damage multiplier in instruction: 鍒涘缓涓€涓不鐤楁妧鑳斤紝娌荤枟閲?20
+[DEBUG] createSkill: parsed heal amount=20
+[DEBUG] createSkill: ScalingRatio was 0, using default 1.0
+[DEBUG] createSkill: stored skill, ScalingRatio=1.000000, skill_scaling_ratio=1
+[DEBUG] RunTestCase: after setup for '娌荤枟杩囬噺澶勭悊娴嬭瘯' - characters=1, monsters=0, variables=31
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=1, character pointer=0xc000343500
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=1
+[DEBUG] RunTestCase: skill_scaling_ratio=1
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=1, character pointer=0xc000343500
+[DEBUG] executeUseSkill: re-fetched char from context, PhysicalAttack=1
+[DEBUG] executeUseSkill: at start, Variables[character_physical_attack]=1
+[DEBUG] executeUseSkill: char.PhysicalAttack=1 (after restore check)
+[DEBUG] executeUseSkill: loaded skill from Variables, initial ScalingRatio=1.000000
+[DEBUG] executeUseSkill: found skill_scaling_ratio in Variables: 1 (type: float64)
+[DEBUG] executeUseSkill: restored ScalingRatio=1.000000 from Variables
+[DEBUG] executeUseSkill: after restore, skill.ScalingRatio=1.000000
+[DEBUG] executeUseSkill: before resource consumption, re-fetched char, PhysicalAttack=1
+[DEBUG] executeUseSkill: before resource consumption, Variables[character_physical_attack]=1
+[DEBUG] executeUseSkill: checking resource, char.Resource=40, skill.ResourceCost=30
+[DEBUG] executeUseSkill: resource sufficient, continuing...
+[DEBUG] executeUseSkill: after resource consumption, char.PhysicalAttack=1, skill.ScalingRatio=1.000000
+[DEBUG] executeUseSkill: before LoadCharacterSkills, re-fetched char, PhysicalAttack=1
+[DEBUG] executeUseSkill: before LoadCharacterSkills, char.PhysicalAttack=1, skill.ScalingRatio=1.000000
+[DEBUG] executeUseSkill: after LoadCharacterSkills, char.PhysicalAttack=1, skill.ScalingRatio=1.000000
+[DEBUG] executeUseSkill: after LoadCharacterSkills, re-fetched char, PhysicalAttack=1
+[DEBUG] executeUseSkill: updated skillState.Skill.ScalingRatio to 1.000000
+[DEBUG] executeUseSkill: skill.Type=heal, instruction=浣跨敤娌荤枟鎶€鑳?[DEBUG] executeUseSkill: before restore, re-fetched cha
+r, PhysicalAttack=1
+[DEBUG] executeUseSkill: before restore, char.PhysicalAttack=1, skill.ScalingRatio=1.000000
+[DEBUG] executeUseSkill: after restore, char.PhysicalAttack=1, skill.ScalingRatio=1.000000
+[DEBUG] executeUseSkill: FINAL sync ScalingRatio=1.000000 from Variables
+[DEBUG] executeUseSkill: updated context before handleAttackSkill - char.PhysicalAttack=1, skill.ScalingRatio=1.000000,
+ monsters=0
+[DEBUG] executeUseSkill: BEFORE handleAttackSkill - context state: characters=1, monsters=0, variables=31
+[DEBUG] executeUseSkill: context character.PhysicalAttack=1
+[DEBUG] executeUseSkill: context skill_scaling_ratio=1
+[DEBUG] Calling handleHealSkill
+[DEBUG] handleHealSkill: healAmount=20, char.HP before=95, MaxHP=100
+[DEBUG] handleHealSkill: char.HP after=100, actualHeal=5, overhealing=15
+[DEBUG] handleHealSkill: synced HP=100 to assertion context
+[DEBUG] executeUseSkill: updated character, PhysicalAttack=1
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=1
+[DEBUG] createCharacter: set Agility=20 and saved to Variables
+[DEBUG] createCharacter: auto-calculated MaxHP=55, HP=55 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=1
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=1, Resource=10/100, MaxHP=100, HP=100
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=1
+[DEBUG] createCharacter: after Update, char.Resource=10/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=10/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=100, HP=100
+[DEBUG] createCharacter: restored Agility=20 from Variables before calculation
+[DEBUG] createCharacter: final calculation - MaxHP=15, HP=15 (calculatedMaxHP=15, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=1, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] RunTestCase: after setup for '閫熷害璁＄畻娴嬭瘯' - characters=1, monsters=0, variables=26
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=1, character pointer=0xc000343980
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=1
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=1, character pointer=0xc000343980
+[DEBUG] executeCalculateSpeed: restored Agility=20 from Variables
+[DEBUG] executeCalculateSpeed: char.Agility=20
+[DEBUG] executeCalculateSpeed: calculated speed=20
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=1
+[DEBUG] createCharacter: set Agility=-100 and saved to Variables
+[DEBUG] createCharacter: auto-calculated MaxHP=55, HP=55 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=1
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=1, Resource=10/100, MaxHP=100, HP=100
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=1
+[DEBUG] createCharacter: after Update, char.Resource=10/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=10/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=100, HP=100
+[DEBUG] createCharacter: restored Agility=-100 from Variables before calculation
+[DEBUG] createCharacter: final calculation - MaxHP=15, HP=15 (calculatedMaxHP=15, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=1, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] RunTestCase: after setup for '閫熷害鏈€灏忓€兼祴璇? - characters=1, monsters=0, variables=26
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=1, character pointer=0xc000508180
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=1
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=1, character pointer=0xc000508180
+[DEBUG] executeCalculateSpeed: restored Agility=-100 from Variables
+[DEBUG] executeCalculateSpeed: char.Agility=-100
+[DEBUG] executeCalculateSpeed: calculated speed=1
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=1
+[DEBUG] createCharacter: set Stamina=0 and saved to Variables
+[DEBUG] createCharacter: set baseHP=0
+[DEBUG] createCharacter: auto-calculated MaxHP=1, HP=1 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=1
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=1, Resource=10/100, MaxHP=100, HP=100
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=1
+[DEBUG] createCharacter: after Update, char.Resource=10/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=10/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=100, HP=100
+[DEBUG] createCharacter: character_agility NOT found in Variables (keys: [last_instruction character_class_id character
+_stamina character_base_hp])
+[DEBUG] createCharacter: final calculation - MaxHP=1, HP=1 (calculatedMaxHP=1, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=1, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] RunTestCase: after setup for '瑙掕壊鍒涘缓鏃禡axHP涓?淇娴嬭瘯' - characters=1, monsters=0, variables=27
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=1, character pointer=0xc000508600
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=1
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=1, character pointer=0xc000508600
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=1
+[DEBUG] createCharacter: set Stamina=10 and saved to Variables
+[DEBUG] createCharacter: set baseHP=35
+[DEBUG] createCharacter: auto-calculated MaxHP=55, HP=55 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, re-calculated MaxHP=55, HP=55 (explicitHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=1
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=1, Resource=10/100, MaxHP=55, HP=55
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=1
+[DEBUG] createCharacter: after Update, char.Resource=10/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=10/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=55, HP=55
+[DEBUG] createCharacter: character_agility NOT found in Variables (keys: [last_instruction character_class_id character
+_stamina character_base_hp])
+[DEBUG] createCharacter: final calculation - MaxHP=55, HP=55 (calculatedMaxHP=55, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=1, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] RunTestCase: after setup for '瑙掕壊鍒涘缓鏃禜P鍒濆鍖栨祴璇? - characters=1, monsters=0, variables=27
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=1, character pointer=0xc000508a80
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=1
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=1, character pointer=0xc000508a80
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=1
+[DEBUG] createCharacter: set Stamina=10 and saved to Variables
+[DEBUG] createCharacter: set baseHP=35
+[DEBUG] createCharacter: auto-calculated MaxHP=55, HP=55 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=1
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=1, Resource=10/100, MaxHP=55, HP=55
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=1
+[DEBUG] createCharacter: after Update, char.Resource=10/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=10/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=55, HP=55
+[DEBUG] createCharacter: character_agility NOT found in Variables (keys: [character_stamina character_base_hp last_inst
+ruction character_class_id])
+[DEBUG] createCharacter: final calculation - MaxHP=55, HP=55 (calculatedMaxHP=55, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=1, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] RunTestCase: after setup for '瑙掕壊HP涓?鏃跺垱寤轰慨澶嶆祴璇? - characters=1, monsters=0, variables=27
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=1, character pointer=0xc000508f00
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=1
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=1, character pointer=0xc000508f00
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=1
+[DEBUG] createCharacter: set Stamina=10 and saved to Variables
+[DEBUG] createCharacter: set baseHP=35
+[DEBUG] createCharacter: auto-calculated MaxHP=55, HP=55 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=1
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=1, Resource=10/100, MaxHP=55, HP=55
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=1
+[DEBUG] createCharacter: after Update, char.Resource=10/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=10/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=55, HP=55
+[DEBUG] createCharacter: character_agility NOT found in Variables (keys: [last_instruction character_class_id character
+_stamina character_base_hp])
+[DEBUG] createCharacter: final calculation - MaxHP=55, HP=55 (calculatedMaxHP=55, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=1, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] RunTestCase: after setup for '瑙掕壊姝讳骸鍚庝紤鎭仮澶岺P娴嬭瘯' - characters=1, monsters=0, variables=27
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=1, character pointer=0xc000509380
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=1
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=1, character pointer=0xc000509380
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=1
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=1, character pointer=0xc000509380
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=1
+[DEBUG] createCharacter: set Stamina=10 and saved to Variables
+[DEBUG] createCharacter: set baseHP=35
+[DEBUG] createCharacter: auto-calculated MaxHP=55, HP=55 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=1
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=1, Resource=10/100, MaxHP=55, HP=55
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=1
+[DEBUG] createCharacter: after Update, char.Resource=10/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=10/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=55, HP=55
+[DEBUG] createCharacter: character_agility NOT found in Variables (keys: [character_class_id character_stamina characte
+r_base_hp last_instruction])
+[DEBUG] createCharacter: final calculation - MaxHP=55, HP=55 (calculatedMaxHP=55, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=1, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] RunTestCase: after setup for '瑙掕壊鍒涘缓鏃禡axHP鑷姩璁＄畻娴嬭瘯' - characters=1, monsters=0, variables=27
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=1, character pointer=0xc000509800
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=1
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=1, character pointer=0xc000509800
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=1
+[DEBUG] createCharacter: set Stamina=10 and saved to Variables
+[DEBUG] createCharacter: set baseHP=35
+[DEBUG] createCharacter: auto-calculated MaxHP=55, HP=55 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=1
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=1, Resource=10/100, MaxHP=55, HP=55
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=1
+[DEBUG] createCharacter: after Update, char.Resource=10/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=10/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=55, HP=55
+[DEBUG] createCharacter: character_agility NOT found in Variables (keys: [character_class_id character_stamina characte
+r_base_hp last_instruction])
+[DEBUG] createCharacter: final calculation - MaxHP=55, HP=55 (calculatedMaxHP=55, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=1, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] RunTestCase: after setup for '浼戞伅绯荤粺MaxHP涓?淇娴嬭瘯' - characters=1, monsters=0, variables=27
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=1, character pointer=0xc00014c300
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=1
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=1, character pointer=0xc00014c300
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=1
+[DEBUG] createCharacter: set Stamina=0 and saved to Variables
+[DEBUG] createCharacter: set baseHP=0
+[DEBUG] createCharacter: auto-calculated MaxHP=1, HP=1 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=1
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=1, Resource=10/100, MaxHP=55, HP=55
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=1
+[DEBUG] createCharacter: after Update, char.Resource=10/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=10/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=55, HP=55
+[DEBUG] createCharacter: character_agility NOT found in Variables (keys: [character_class_id character_stamina characte
+r_base_hp last_instruction])
+[DEBUG] createCharacter: final calculation - MaxHP=1, HP=1 (calculatedMaxHP=1, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=1, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] RunTestCase: after setup for '鏋佺鎯呭喌锛欱aseHP涓?涓擲tamina涓?娴嬭瘯' - characters=1, monsters=0, variables=27
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=1, character pointer=0xc00014c780
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=1
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=1, character pointer=0xc00014c780
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=1
+[DEBUG] createCharacter: set Stamina=10 and saved to Variables
+[DEBUG] createCharacter: set baseHP=35
+[DEBUG] createCharacter: auto-calculated MaxHP=55, HP=55 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, re-calculated MaxHP=55, HP=55 (explicitHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=1
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=1, Resource=10/100, MaxHP=55, HP=55
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=1
+[DEBUG] createCharacter: after Update, char.Resource=10/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=10/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=55, HP=55
+[DEBUG] createCharacter: character_agility NOT found in Variables (keys: [character_stamina character_base_hp last_inst
+ruction character_class_id])
+[DEBUG] createCharacter: final calculation - MaxHP=55, HP=55 (calculatedMaxHP=55, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=1, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] RunTestCase: after setup for '瑙掕壊鍒涘缓鍚嶮axHP鍜孒P涓€鑷存€ф祴璇? - characters=1, monsters=0, variables=27
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=1, character pointer=0xc00014cc00
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=1
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=1, character pointer=0xc00014cc00
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=1
+[DEBUG] createCharacter: set Spirit=20 and saved to Variables
+[DEBUG] createCharacter: auto-calculated MaxHP=55, HP=55 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=1
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=1, Resource=10/100, MaxHP=55, HP=55
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=1
+[DEBUG] createCharacter: after Update, char.Resource=10/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=10/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=55, HP=55
+[DEBUG] createCharacter: character_agility NOT found in Variables (keys: [last_instruction character_class_id character
+_spirit])
+[DEBUG] createCharacter: final calculation - MaxHP=55, HP=55 (calculatedMaxHP=55, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=1, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] RunTestCase: after setup for '娉曞姏鎭㈠璁＄畻娴嬭瘯' - characters=1, monsters=0, variables=26
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=1, character pointer=0xc00014d080
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=1
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=1, character pointer=0xc00014d080
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=1
+[DEBUG] createCharacter: set Spirit=0 and saved to Variables
+[DEBUG] createCharacter: auto-calculated MaxHP=55, HP=55 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=1
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=1, Resource=10/100, MaxHP=55, HP=55
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=1
+[DEBUG] createCharacter: after Update, char.Resource=10/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=10/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=55, HP=55
+[DEBUG] createCharacter: character_agility NOT found in Variables (keys: [character_spirit last_instruction character_c
+lass_id])
+[DEBUG] createCharacter: final calculation - MaxHP=55, HP=55 (calculatedMaxHP=55, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=1, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] RunTestCase: after setup for '娉曞姏鎭㈠闆剁簿绁炴祴璇? - characters=1, monsters=0, variables=26
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=1, character pointer=0xc00014d500
+=== 娴嬭瘯鎶ュ憡 ===
+娴嬭瘯濂椾欢: 灞炴€ц绠楃郴缁?- 瑙掕壊灞炴€ц绠?鎬绘祴璇曟暟: 11
+閫氳繃: 11
+澶辫触: 0
+璺宠繃: 0
+鑰楁椂: 73.8313ms
+
+[鉁揮 鐗╃悊鏀诲嚮鍔涜绠楁祴璇?(0s)
+[鉁揮 榄旀硶鏀诲嚮鍔涜绠楁祴璇?(0s)
+[鉁揮 鐗╃悊闃插尽鍔涜绠楁祴璇?(0s)
+[鉁揮 榄旀硶闃插尽鍔涜绠楁祴璇?(0s)
+[鉁揮 鐗╃悊鏆村嚮鐜囪绠楁祴璇?(0s)
+[鉁揮 鐗╃悊鏆村嚮浼ゅ璁＄畻娴嬭瘯 (0s)
+[鉁揮 娉曟湳鏆村嚮鐜囪绠楁祴璇?(0s)
+[鉁揮 娉曟湳鏆村嚮浼ゅ璁＄畻娴嬭瘯 (0s)
+[鉁揮 闂伩鐜囪绠楁祴璇?(0s)
+[鉁揮 灞炴€т负0鏃惰嚜鍔ㄤ慨澶嶆祴璇?(0s)
+[鉁揮 缁煎悎灞炴€ц绠楁祴璇?(0s)
+
+
+=== 娴嬭瘯鎶ュ憡 ===
+娴嬭瘯濂椾欢: 鏁板€艰绠楃郴缁?- 灞炴€ц浆鎹?鎬绘祴璇曟暟: 5
+閫氳繃: 5
+澶辫触: 0
+璺宠繃: 0
+鑰楁椂: 6.8733ms
+
+[鉁揮 鐗╃悊鏀诲嚮鍔涜绠楁祴璇?(0s)
+[鉁揮 娉曟湳鏀诲嚮鍔涜绠楁祴璇?(0s)
+[鉁揮 鐢熷懡鍊艰绠楁祴璇?(0s)
+[鉁揮 鐗╃悊鏆村嚮鐜囪绠楁祴璇?(0s)
+[鉁揮 闂伩鐜囪绠楁祴璇?(0s)
+
+
+=== 娴嬭瘯鎶ュ憡 ===
+娴嬭瘯濂椾欢: 鏁板€艰绠楃郴缁?- 鏆村嚮鍜岄棯閬?鎬绘祴璇曟暟: 8
+閫氳繃: 7
+澶辫触: 1
+璺宠繃: 0
+鑰楁椂: 14.2346ms
+
+[鉁揮 鐗╃悊鏆村嚮鐜囪绠楁祴璇?(0s)
+[鉁揮 娉曟湳鏆村嚮鐜囪绠楁祴璇?(0s)
+[鉁揮 鏆村嚮鐜囦笂闄愭祴璇?(0s)
+[鉁揮 闂伩鐜囪绠楁祴璇?(0s)
+[鉁揮 闂伩鐜囦笂闄愭祴璇?(0s)
+[鉁揮 鏆村嚮浼ゅ鍊嶇巼璁＄畻娴嬭瘯 (0s)
+[鉁梋 鏆村嚮鍒ゅ畾娴嬭瘯 (0s)
+  鏂█澶辫触: crit_rate_actual range [0.15, 0.25] (瀹為檯: 0.01)
+    瀹為檯鏆村嚮鐜囧簲璇ュ湪15%-25%涔嬮棿锛堣€冭檻闅忔満鎬э級
+[鉁揮 闂伩鍒ゅ畾娴嬭瘯 (0s)
+
+
+=== 娴嬭瘯鎶ュ憡 ===
+娴嬭瘯濂椾欢: 鏁板€艰绠楃郴缁?- 浼ゅ璁＄畻
+鎬绘祴璇曟暟: 6
+閫氳繃: 6
+澶辫触: 0
+璺宠繃: 0
+鑰楁椂: 16.5703ms
+
+[鉁揮 鍩虹浼ゅ璁＄畻娴嬭瘯 (0s)
+[鉁揮 闃插尽鍑忎激璁＄畻娴嬭瘯 (0s)
+[鉁揮 闃插尽楂樹簬鏀诲嚮娴嬭瘯 (0s)
+[鉁揮 鏆村嚮浼ゅ璁＄畻娴嬭瘯 (0s)
+[鉁揮 闂伩鍒ゅ畾娴嬭瘯 (0s)
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=1
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=1, character pointer=0xc00014d500
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=1
+[DEBUG] createCharacter: set Spirit=10 and saved to Variables
+[DEBUG] createCharacter: auto-calculated MaxHP=55, HP=55 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=1
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=1, Resource=10/100, MaxHP=55, HP=55
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=1
+[DEBUG] createCharacter: after Update, char.Resource=10/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=10/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=55, HP=55
+[DEBUG] createCharacter: character_agility NOT found in Variables (keys: [character_spirit last_instruction character_c
+lass_id])
+[DEBUG] createCharacter: final calculation - MaxHP=55, HP=55 (calculatedMaxHP=55, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=1, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] RunTestCase: after setup for '娉曞姏鎭㈠璐熸暟鍩虹鎭㈠娴嬭瘯' - characters=1, monsters=0, variables=26
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=1, character pointer=0xc00014d980
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=1
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=1, character pointer=0xc00014d980
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=1
+[DEBUG] RunTestCase: after setup for '娉曞姏鎭㈠nil瑙掕壊娴嬭瘯' - characters=1, monsters=0, variables=0
+[DEBUG] RunTestCase: after setup, character is nil
+[DEBUG] RunTestCase: after setup for '鎬掓皵鑾峰緱璁＄畻娴嬭瘯' - characters=0, monsters=0, variables=2
+[DEBUG] RunTestCase: after setup for '鎬掓皵鑾峰緱鏃犲姞鎴愭祴璇? - characters=0, monsters=0, variables=2
+[DEBUG] RunTestCase: after setup for '鎬掓皵鑾峰緱璐熸暟鍩虹鑾峰緱娴嬭瘯' - characters=0, monsters=0, variables=2
+[DEBUG] RunTestCase: after setup for '鎬掓皵鑾峰緱璐熸暟鍔犳垚娴嬭瘯' - characters=0, monsters=0, variables=2
+[DEBUG] createCharacter: set Spirit=20 and saved to Variables
+[DEBUG] createCharacter: auto-calculated MaxHP=55, HP=55 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=1
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=1, Resource=10/100, MaxHP=55, HP=55
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=1
+[DEBUG] createCharacter: after Update, char.Resource=10/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=10/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=55, HP=55
+[DEBUG] createCharacter: character_agility NOT found in Variables (keys: [last_instruction character_class_id character
+_spirit])
+[DEBUG] createCharacter: final calculation - MaxHP=55, HP=55 (calculatedMaxHP=55, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=1, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] RunTestCase: after setup for '鑳介噺鎭㈠璁＄畻娴嬭瘯' - characters=1, monsters=0, variables=26
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=1, character pointer=0xc00014de00
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=1
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=1, character pointer=0xc00014de00
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=1
+[DEBUG] createCharacter: set Spirit=10 and saved to Variables
+[DEBUG] createCharacter: auto-calculated MaxHP=55, HP=55 (savedHP=0)
+[DEBUG] createCharacter: after setting ID, char.PhysicalAttack=1
+[DEBUG] createCharacter: before Update, char.PhysicalAttack=1, Resource=10/100, MaxHP=55, HP=55
+[DEBUG] createCharacter: after Update, restored PhysicalAttack=1
+[DEBUG] createCharacter: after Update, char.Resource=10/100 (from DB)
+[DEBUG] createCharacter: after Update, restored Resource=10/100 (from saved values)
+[DEBUG] createCharacter: after Update, restored MaxHP=55, HP=55
+[DEBUG] createCharacter: character_agility NOT found in Variables (keys: [last_instruction character_class_id character
+_spirit])
+[DEBUG] createCharacter: final calculation - MaxHP=55, HP=55 (calculatedMaxHP=55, explicitMaxHP=0, explicitHP=0)
+[DEBUG] createCharacter: stored character to context, PhysicalAttack=1, MagicAttack=1
+[DEBUG] createCharacter: stored all calculated attributes to Variables
+[DEBUG] RunTestCase: after setup for '鑳介噺鎭㈠璐熸暟鍩虹鎭㈠娴嬭瘯' - characters=1, monsters=0, variables=26
+[DEBUG] RunTestCase: after setup, character.PhysicalAttack=1, character pointer=0xc000490300
+[DEBUG] RunTestCase: after setup, Variables[character_physical_attack]=1
+[DEBUG] RunTestCase: before executeStep, character.PhysicalAttack=1, character pointer=0xc000490300
+[DEBUG] RunTestCase: after executeStep, character.PhysicalAttack=1
+exit status 1
+[鉁揮 鑷冲皯1鐐逛激瀹虫祴璇?(0s)
+
+
+=== 娴嬭瘯鎶ュ憡 ===
+娴嬭瘯濂椾欢: 鏁板€艰绠楃郴缁?- 杈圭晫鎯呭喌
+鎬绘祴璇曟暟: 8
+閫氳繃: 7
+澶辫触: 1
+璺宠繃: 0
+鑰楁椂: 23.2183ms
+
+[鉁揮 闆跺睘鎬у€兼祴璇?(0s)
+[鉁揮 鏋佺灞炴€у€兼祴璇?(0s)
+[鉁揮 璐熸暟灞炴€у€兼祴璇?(0s)
+[鉁揮 闃插尽楂樹簬鏀诲嚮娴嬭瘯 (0s)
+[鉁梋 鑷冲皯1鐐逛激瀹虫祴璇?(0s)
+  鏂█澶辫触: final_damage greater_than_or_equal 1 (瀹為檯: 0)
+    鏈€缁堜激瀹冲簲璇ヨ嚦灏戜负1
+[鉁揮 娌荤枟杩囬噺澶勭悊娴嬭瘯 (0s)
+[鉁揮 閫熷害璁＄畻娴嬭瘯 (0s)
+[鉁揮 閫熷害鏈€灏忓€兼祴璇?(0s)
+
+
+=== 娴嬭瘯鎶ュ憡 ===
+娴嬭瘯濂椾欢: 灞炴€ц绠楃郴缁?- HP涓?淇
+鎬绘祴璇曟暟: 8
+閫氳繃: 8
+澶辫触: 0
+璺宠繃: 0
+鑰楁椂: 15.5864ms
+
+[鉁揮 瑙掕壊鍒涘缓鏃禡axHP涓?淇娴嬭瘯 (0s)
+[鉁揮 瑙掕壊鍒涘缓鏃禜P鍒濆鍖栨祴璇?(0s)
+[鉁揮 瑙掕壊HP涓?鏃跺垱寤轰慨澶嶆祴璇?(0s)
+[鉁揮 瑙掕壊姝讳骸鍚庝紤鎭仮澶岺P娴嬭瘯 (0s)
+[鉁揮 瑙掕壊鍒涘缓鏃禡axHP鑷姩璁＄畻娴嬭瘯 (0s)
+[鉁揮 浼戞伅绯荤粺MaxHP涓?淇娴嬭瘯 (0s)
+[鉁揮 鏋佺鎯呭喌锛欱aseHP涓?涓擲tamina涓?娴嬭瘯 (0s)
+[鉁揮 瑙掕壊鍒涘缓鍚嶮axHP鍜孒P涓€鑷存€ф祴璇?(0s)
+
+
+=== 娴嬭瘯鎶ュ憡 ===
+娴嬭瘯濂椾欢: 鏁板€艰绠楃郴缁?- 璧勬簮璁＄畻
+鎬绘祴璇曟暟: 10
+閫氳繃: 10
+澶辫触: 0
+璺宠繃: 0
+鑰楁椂: 9.0264ms
+
+[鉁揮 娉曞姏鎭㈠璁＄畻娴嬭瘯 (0s)
+[鉁揮 娉曞姏鎭㈠闆剁簿绁炴祴璇?(0s)
+[鉁揮 娉曞姏鎭㈠璐熸暟鍩虹鎭㈠娴嬭瘯 (0s)
+[鉁揮 娉曞姏鎭㈠nil瑙掕壊娴嬭瘯 (0s)
+[鉁揮 鎬掓皵鑾峰緱璁＄畻娴嬭瘯 (0s)
+[鉁揮 鎬掓皵鑾峰緱鏃犲姞鎴愭祴璇?(0s)
+[鉁揮 鎬掓皵鑾峰緱璐熸暟鍩虹鑾峰緱娴嬭瘯 (0s)
+[鉁揮 鎬掓皵鑾峰緱璐熸暟鍔犳垚娴嬭瘯 (0s)
+[鉁揮 鑳介噺鎭㈠璁＄畻娴嬭瘯 (0s)
+[鉁揮 鑳介噺鎭㈠璐熸暟鍩虹鎭㈠娴嬭瘯 (0s)
+
+
+=== 娴嬭瘯鎬荤粨 ===
+鎬婚€氳繃: 54
+鎬诲け璐? 2
+鎬昏烦杩? 0

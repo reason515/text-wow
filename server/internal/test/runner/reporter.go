@@ -24,11 +24,12 @@ func (r *Reporter) GenerateReport(result *TestSuiteResult) string {
 	report += fmt.Sprintf("耗时: %v\n\n", result.Duration)
 
 	for _, testResult := range result.Results {
-		statusIcon := "✓"
+		// 使用ASCII字符替代Unicode符号，避免序列化问题
+		statusIcon := "[PASS]"
 		if testResult.Status == "failed" {
-			statusIcon = "✗"
+			statusIcon = "[FAIL]"
 		} else if testResult.Status == "skipped" {
-			statusIcon = "⊘"
+			statusIcon = "[SKIP]"
 		}
 
 		report += fmt.Sprintf("[%s] %s (%v)\n", statusIcon, testResult.TestName, testResult.Duration)

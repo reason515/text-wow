@@ -2,7 +2,6 @@ package runner
 
 import (
 	"fmt"
-	"os"
 
 	"text-wow/internal/database"
 )
@@ -14,14 +13,14 @@ func (tr *TestRunner) createOrUpdateTestItem(item map[string]interface{}) error 
 		return fmt.Errorf("item ID is required")
 	}
 	
-	// 检查item是否已存在
+	// 检查item是否已存
 	var exists bool
 	err := database.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM items WHERE id = ?)", itemID).Scan(&exists)
 	if err != nil {
 		return fmt.Errorf("failed to check item existence: %w", err)
 	}
 	
-	// 获取字段值
+	// 获取字段
 	name, _ := item["name"].(string)
 	if name == "" {
 		name = "测试装备"
@@ -65,7 +64,7 @@ func (tr *TestRunner) createOrUpdateTestItem(item map[string]interface{}) error 
 		if err != nil {
 			return fmt.Errorf("failed to update item: %w", err)
 		}
-		fmt.Fprintf(os.Stderr, "[DEBUG] createOrUpdateTestItem: updated item %s with level_required=%d, class_required=%s\n", 
+		debugPrint("[DEBUG] createOrUpdateTestItem: updated item %s with level_required=%d, class_required=%s\n", 
 			itemID, levelRequired, classRequired)
 	} else {
 		// 创建新item
@@ -84,7 +83,7 @@ func (tr *TestRunner) createOrUpdateTestItem(item map[string]interface{}) error 
 		if err != nil {
 			return fmt.Errorf("failed to create item: %w", err)
 		}
-		fmt.Fprintf(os.Stderr, "[DEBUG] createOrUpdateTestItem: created item %s with level_required=%d, class_required=%s\n", 
+		debugPrint("[DEBUG] createOrUpdateTestItem: created item %s with level_required=%d, class_required=%s\n", 
 			itemID, levelRequired, classRequired)
 	}
 	

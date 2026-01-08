@@ -42,8 +42,8 @@ func main() {
 
 	for _, result := range results {
 		report := reporter.GenerateReport(result)
-		fmt.Println(report)
-		fmt.Println()
+		// 使用fmt.Fprintf到stdout而不是fmt.Println，避免序列化问题
+		fmt.Fprintf(os.Stdout, "%s\n\n", report)
 
 		totalPassed += result.PassedTests
 		totalFailed += result.FailedTests
@@ -51,10 +51,10 @@ func main() {
 	}
 
 	// 总结
-	fmt.Println("=== 测试总结 ===")
-	fmt.Printf("总通过: %d\n", totalPassed)
-	fmt.Printf("总失败: %d\n", totalFailed)
-	fmt.Printf("总跳过: %d\n", totalSkipped)
+	fmt.Fprintf(os.Stdout, "=== 测试总结 ===\n")
+	fmt.Fprintf(os.Stdout, "总通过: %d\n", totalPassed)
+	fmt.Fprintf(os.Stdout, "总失败: %d\n", totalFailed)
+	fmt.Fprintf(os.Stdout, "总跳过: %d\n", totalSkipped)
 
 	if totalFailed > 0 {
 		os.Exit(1)

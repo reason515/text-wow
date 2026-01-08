@@ -74,7 +74,7 @@ tests:
     category: "unit"
     priority: "high"
     setup:
-      - "创建一个攻击力=20的角色"
+      - "创建一个攻击力=20的角色，怒气=100/100"
       - "创建一个防御力=10的怪物"
       - "创建一个伤害倍率为150%的技能"
     steps:
@@ -92,7 +92,7 @@ tests:
     category: "integration"
     priority: "high"
     setup:
-      - "创建一个攻击力=20的角色"
+      - "创建一个攻击力=20的角色，怒气=100/100"
       - "创建3个防御力=10的怪物"
       - "创建一个AOE技能，伤害倍率100%"
     steps:
@@ -117,7 +117,7 @@ tests:
     category: "unit"
     priority: "high"
     setup:
-      - "创建一个角色，HP=50/100"
+      - "创建一个角色，HP=50/100，怒气=100/100"
       - "创建一个治疗技能，治疗量=30"
     steps:
       - action: "角色对自己使用治疗技能"
@@ -133,7 +133,7 @@ tests:
     category: "integration"
     priority: "high"
     setup:
-      - "创建一个角色"
+      - "创建一个角色，怒气=100/100"
       - "创建一个Buff技能，效果：攻击力+50%，持续3回合"
     steps:
       - action: "角色使用Buff技能"

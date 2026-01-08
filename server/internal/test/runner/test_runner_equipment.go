@@ -2,7 +2,6 @@ package runner
 
 import (
 	"fmt"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -12,7 +11,6 @@ import (
 )
 
 // generateEquipmentWithAttributes 生成带指定属性的装备
-// 例如："获得一件10级武器，攻击力+10"
 func (tr *TestRunner) generateEquipmentWithAttributes(instruction string) error {
 	// 先解析装备要求（等级、职业、属性），再确定level
 	levelRequired := 0
@@ -29,14 +27,14 @@ func (tr *TestRunner) generateEquipmentWithAttributes(instruction string) error 
 		if len(matches) > 1 {
 			if l, err := strconv.Atoi(matches[1]); err == nil {
 				levelRequired = l
-				fmt.Fprintf(os.Stderr, "[DEBUG] generateEquipmentWithAttributes: parsed level_required=%d\n", levelRequired)
+				debugPrint("[DEBUG] generateEquipmentWithAttributes: parsed level_required=%d\n", levelRequired)
 			}
 		}
 	}
 	
 	// 解析职业要求：如"只有战士才能装备"
 	if strings.Contains(instruction, "只有") && strings.Contains(instruction, "才能装备") {
-		// 使用更宽泛的正则表达式匹配中文职业名称
+		// 使用更宽泛的正则表达式匹配中文职业名
 		re := regexp.MustCompile(`只有([^才]+)才能装备`)
 		matches := re.FindStringSubmatch(instruction)
 		if len(matches) > 1 {
@@ -54,7 +52,7 @@ func (tr *TestRunner) generateEquipmentWithAttributes(instruction string) error 
 		}
 	}
 	
-	// 解析属性要求：如"需要力量15才能装备"
+	// 解析属性要求：如"需要力量5才能装备"
 	// 注意：必须包含"需要"和属性名称（力量/敏捷/智力）和"才能装备"，且不包含"级"（避免与等级要求混淆）
 	if strings.Contains(instruction, "需要") && (strings.Contains(instruction, "力量") || strings.Contains(instruction, "敏捷") || strings.Contains(instruction, "智力")) && strings.Contains(instruction, "才能装备") && !strings.Contains(instruction, "级") {
 		// 力量要求
@@ -111,7 +109,7 @@ func (tr *TestRunner) generateEquipmentWithAttributes(instruction string) error 
 		}
 	}
 	
-	// 解析装备类型和槽位
+	// 解析装备类型和槽
 	itemID := "worn_sword"
 	slot := "main_hand"
 	if strings.Contains(instruction, "武器") {
@@ -143,18 +141,18 @@ func (tr *TestRunner) generateEquipmentWithAttributes(instruction string) error 
 	}
 	
 	// 如果有特殊要求，创建或更新item配置
-	fmt.Fprintf(os.Stderr, "[DEBUG] generateEquipmentWithAttributes: checking requirements - levelRequired=%d, classRequired=%s, strengthRequired=%d, agilityRequired=%d, intellectRequired=%d\n", 
+	debugPrint("[DEBUG] generateEquipmentWithAttributes: checking requirements - levelRequired=%d, classRequired=%s, strengthRequired=%d, agilityRequired=%d, intellectRequired=%d\n", 
 		levelRequired, classRequired, strengthRequired, agilityRequired, intellectRequired)
 	if levelRequired > 0 || classRequired != "" || strengthRequired > 0 || agilityRequired > 0 || intellectRequired > 0 {
 		// 生成唯一的item ID（基于要求）
 		testItemID := fmt.Sprintf("test_item_%s_%d_%s_%d_%d_%d", slot, levelRequired, classRequired, strengthRequired, agilityRequired, intellectRequired)
-		fmt.Fprintf(os.Stderr, "[DEBUG] generateEquipmentWithAttributes: will create test item with ID=%s\n", testItemID)
+		debugPrint("[DEBUG] generateEquipmentWithAttributes: will create test item with ID=%s\n", testItemID)
 		
 		// 获取基础item配置
 		gameRepo := repository.NewGameRepository()
 		baseItem, err := gameRepo.GetItemByID(itemID)
 		if err != nil {
-			// 如果基础item不存在，创建一个默认配置
+			// 如果基础item不存在，创建一个默认配
 			baseItem = map[string]interface{}{
 				"id":            testItemID,
 				"name":          "测试装备",
@@ -168,7 +166,7 @@ func (tr *TestRunner) generateEquipmentWithAttributes(instruction string) error 
 				"intellect_required": intellectRequired,
 			}
 		} else {
-			// 复制基础配置并更新要求
+			// 复制基础配置并更新要
 			baseItem["id"] = testItemID
 			baseItem["level_required"] = levelRequired
 			if classRequired != "" {
@@ -180,20 +178,20 @@ func (tr *TestRunner) generateEquipmentWithAttributes(instruction string) error 
 		}
 		
 		// 在数据库中插入或更新item配置
-		fmt.Fprintf(os.Stderr, "[DEBUG] generateEquipmentWithAttributes: calling createOrUpdateTestItem for itemID=%s\n", testItemID)
+		debugPrint("[DEBUG] generateEquipmentWithAttributes: calling createOrUpdateTestItem for itemID=%s\n", testItemID)
 		err = tr.createOrUpdateTestItem(baseItem)
 		if err != nil {
 			return fmt.Errorf("failed to create test item: %w", err)
 		}
-		fmt.Fprintf(os.Stderr, "[DEBUG] generateEquipmentWithAttributes: createOrUpdateTestItem succeeded for itemID=%s\n", testItemID)
+		debugPrint("[DEBUG] generateEquipmentWithAttributes: createOrUpdateTestItem succeeded for itemID=%s\n", testItemID)
 		
 		// 使用测试item ID
 		itemID = testItemID
-		fmt.Fprintf(os.Stderr, "[DEBUG] generateEquipmentWithAttributes: updated itemID to %s with requirements (level=%d, class=%s, str=%d, agi=%d, int=%d)\n", 
+		debugPrint("[DEBUG] generateEquipmentWithAttributes: updated itemID to %s with requirements (level=%d, class=%s, str=%d, agi=%d, int=%d)\n", 
 			itemID, levelRequired, classRequired, strengthRequired, agilityRequired, intellectRequired)
 	}
 	
-	fmt.Fprintf(os.Stderr, "[DEBUG] generateEquipmentWithAttributes: using itemID=%s to generate equipment\n", itemID)
+	debugPrint("[DEBUG] generateEquipmentWithAttributes: using itemID=%s to generate equipment\n", itemID)
 	
 	// 确保用户和角色存在
 	ownerID := 1
@@ -220,7 +218,6 @@ func (tr *TestRunner) generateEquipmentWithAttributes(instruction string) error 
 	}
 	
 	// 解析并设置属性（如果指令中指定了）
-	// 例如："攻击力+10"、"防御力+15"、"力量+5"
 	if strings.Contains(instruction, "攻击力") || strings.Contains(instruction, "物理攻击") {
 		re := regexp.MustCompile(`攻击力\+(\d+)|物理攻击\+(\d+)`)
 		matches := re.FindStringSubmatch(instruction)
@@ -239,7 +236,7 @@ func (tr *TestRunner) generateEquipmentWithAttributes(instruction string) error 
 			}
 		}
 	}
-	if strings.Contains(instruction, "防御力") || strings.Contains(instruction, "物理防御") {
+	if strings.Contains(instruction, "防御") || strings.Contains(instruction, "物理防御") {
 		re := regexp.MustCompile(`防御力\+(\d+)|物理防御\+(\d+)`)
 		matches := re.FindStringSubmatch(instruction)
 		if len(matches) > 1 {
@@ -308,7 +305,7 @@ func (tr *TestRunner) executeEquipItem(instruction string) error {
 		}
 		equipment = eq
 	} else {
-		// 尝试从Equipments map中获取
+		// 尝试从Equipments map中获
 		for _, eq := range tr.context.Equipments {
 			equipment = eq
 			break
@@ -336,7 +333,7 @@ func (tr *TestRunner) executeEquipItem(instruction string) error {
 		return fmt.Errorf("failed to equip item: %w", err)
 	}
 	
-	// 重新加载角色以获取更新后的属性
+	// 重新加载角色以获取更新后的属
 	charRepo := repository.NewCharacterRepository()
 	updatedChar, err := charRepo.GetByID(char.ID)
 	if err != nil {
@@ -384,7 +381,7 @@ func (tr *TestRunner) executeUnequipItem(instruction string) error {
 		}
 		equipment = eq
 	} else {
-		// 尝试从Equipments map中获取
+		// 尝试从Equipments map中获
 		for _, eq := range tr.context.Equipments {
 			if eq.CharacterID != nil && *eq.CharacterID == char.ID {
 				equipment = eq
@@ -405,7 +402,7 @@ func (tr *TestRunner) executeUnequipItem(instruction string) error {
 		return fmt.Errorf("failed to unequip item: %w", err)
 	}
 	
-	// 重新加载角色以获取更新后的属性
+	// 重新加载角色以获取更新后的属
 	charRepo := repository.NewCharacterRepository()
 	updatedChar, err := charRepo.GetByID(char.ID)
 	if err != nil {
@@ -427,7 +424,7 @@ func (tr *TestRunner) executeUnequipItem(instruction string) error {
 
 // executeTryEquipItem 尝试穿戴装备（用于测试失败情况）
 func (tr *TestRunner) executeTryEquipItem(instruction string) error {
-	fmt.Fprintf(os.Stderr, "[DEBUG] executeTryEquipItem: called with instruction=%s\n", instruction)
+	debugPrint("[DEBUG] executeTryEquipItem: called with instruction=%s\n", instruction)
 	
 	char, ok := tr.context.Characters["character"]
 	if !ok || char == nil {
@@ -438,7 +435,7 @@ func (tr *TestRunner) executeTryEquipItem(instruction string) error {
 	var equipment *models.EquipmentInstance
 	if eq, ok := tr.context.Variables["equipment"].(*models.EquipmentInstance); ok {
 		equipment = eq
-		fmt.Fprintf(os.Stderr, "[DEBUG] executeTryEquipItem: found equipment from Variables, ID=%d\n", equipment.ID)
+		debugPrint("[DEBUG] executeTryEquipItem: found equipment from Variables, ID=%d\n", equipment.ID)
 	} else if eqID, ok := tr.context.Variables["equipment_id"].(int); ok {
 		equipmentRepo := repository.NewEquipmentRepository()
 		eq, err := equipmentRepo.GetByID(eqID)
@@ -446,12 +443,12 @@ func (tr *TestRunner) executeTryEquipItem(instruction string) error {
 			return fmt.Errorf("failed to get equipment: %w", err)
 		}
 		equipment = eq
-		fmt.Fprintf(os.Stderr, "[DEBUG] executeTryEquipItem: found equipment from equipment_id, ID=%d\n", equipment.ID)
+		debugPrint("[DEBUG] executeTryEquipItem: found equipment from equipment_id, ID=%d\n", equipment.ID)
 	} else {
-		// 尝试从Equipments map中获取
+		// 尝试从Equipments map中获
 		for _, eq := range tr.context.Equipments {
 			equipment = eq
-			fmt.Fprintf(os.Stderr, "[DEBUG] executeTryEquipItem: found equipment from Equipments map, ID=%d\n", equipment.ID)
+			debugPrint("[DEBUG] executeTryEquipItem: found equipment from Equipments map, ID=%d\n", equipment.ID)
 			break
 		}
 	}
@@ -461,7 +458,7 @@ func (tr *TestRunner) executeTryEquipItem(instruction string) error {
 	}
 	
 	// 尝试穿戴装备
-	fmt.Fprintf(os.Stderr, "[DEBUG] executeTryEquipItem: attempting to equip equipment ID=%d for character ID=%d\n", equipment.ID, char.ID)
+	debugPrint("[DEBUG] executeTryEquipItem: attempting to equip equipment ID=%d for character ID=%d\n", equipment.ID, char.ID)
 	err := tr.equipmentManager.EquipItem(char.ID, equipment.ID)
 	if err != nil {
 		// 装备失败，记录错误信息
@@ -469,13 +466,13 @@ func (tr *TestRunner) executeTryEquipItem(instruction string) error {
 		errorMsg := err.Error()
 		// 确保错误消息包含中文关键词（用于contains断言）
 		tr.context.Variables["error_message"] = errorMsg
-		fmt.Fprintf(os.Stderr, "[DEBUG] executeTryEquipItem: equip failed, error=%s, set equip_success=false, error_message=%s\n", errorMsg, errorMsg)
+		debugPrint("[DEBUG] executeTryEquipItem: equip failed, error=%s, set equip_success=false, error_message=%s\n", errorMsg, errorMsg)
 		return nil // 不返回错误，因为这是预期的失败
 	}
 	
 	// 装备成功
 	tr.context.Variables["equip_success"] = true
-	fmt.Fprintf(os.Stderr, "[DEBUG] executeTryEquipItem: equip succeeded, set equip_success=true\n")
+	debugPrint("[DEBUG] executeTryEquipItem: equip succeeded, set equip_success=true\n")
 	
 	// 重新加载角色
 	charRepo := repository.NewCharacterRepository()
@@ -510,7 +507,7 @@ func (tr *TestRunner) executeEquipAllItems(instruction string) error {
 		}
 	}
 	
-	// 重新加载角色以获取更新后的属性
+	// 重新加载角色以获取更新后的属
 	charRepo := repository.NewCharacterRepository()
 	updatedChar, err := charRepo.GetByID(char.ID)
 	if err != nil {
