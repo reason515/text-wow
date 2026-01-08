@@ -6278,14 +6278,14 @@ func (tr *TestRunner) syncTeamToContext() {
 			teamMagicAttack += char.MagicAttack
 
 			// 检查职业类型（简化判断：战士/圣骑士=坦克，牧师/萨满=治疗，法师/盗贼=DPS）
-			className := strings.ToLower(char.Class)
-			if className == "warrior" || className == "paladin" {
+			classID := strings.ToLower(char.ClassID)
+			if classID == "warrior" || classID == "paladin" {
 				hasTank = true
 			}
-			if className == "priest" || className == "shaman" {
+			if classID == "priest" || classID == "shaman" {
 				hasHealer = true
 			}
-			if className == "mage" || className == "rogue" {
+			if classID == "mage" || classID == "rogue" {
 				hasDPS = true
 			}
 
