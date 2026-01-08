@@ -177,11 +177,16 @@ func (tr *TestRunner) executeCreateZone(instruction string) error {
 
 // executeCalculateZoneMultiplier 计算区域倍率
 func (tr *TestRunner) executeCalculateZoneMultiplier(instruction string) error {
-	// 从上下文获取区域
+	// 从上下文获取区域（不再从Variables读取Zone对象，避免序列化错误）
 	var zone *models.Zone
-	if zoneVal, exists := tr.context.Variables["zone"]; exists {
-		if z, ok := zoneVal.(*models.Zone); ok {
-			zone = z
+	zoneID, exists := tr.context.Variables["zone_id"]
+	if exists {
+		zoneIDStr, ok := zoneID.(string)
+		if ok && zoneIDStr != "" {
+			gameRepo := repository.NewGameRepository()
+			if z, err := gameRepo.GetZoneByID(zoneIDStr); err == nil {
+				zone = z
+			}
 		}
 	}
 
@@ -294,11 +299,16 @@ func (tr *TestRunner) executeKillMonsterInZone(instruction string) error {
 		return fmt.Errorf("character not found")
 	}
 
-	// 获取当前区域
+	// 获取当前区域（不再从Variables读取Zone对象，避免序列化错误）
 	var zone *models.Zone
-	if zoneVal, exists := tr.context.Variables["zone"]; exists {
-		if z, ok := zoneVal.(*models.Zone); ok {
-			zone = z
+	zoneID, exists := tr.context.Variables["zone_id"]
+	if exists {
+		zoneIDStr, ok := zoneID.(string)
+		if ok && zoneIDStr != "" {
+			gameRepo := repository.NewGameRepository()
+			if z, err := gameRepo.GetZoneByID(zoneIDStr); err == nil {
+				zone = z
+			}
 		}
 	}
 

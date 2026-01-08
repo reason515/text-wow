@@ -3534,24 +3534,58 @@ func (tr *TestRunner) executeLearnSkill(instruction string) error {
 		return fmt.Errorf("character not found")
 	}
 
-	// 从上下文获取技能
-	skillVal, exists := tr.context.Variables["skill"]
+	// 从上下文获取技能ID（不再从Variables读取Skill对象，避免序列化错误）
+	skillID, exists := tr.context.Variables["skill_id"]
 	if !exists {
 		tr.assertion.SetContext("skill_learned", false)
 		tr.assertion.SetContext("error_message", "技能不存在，请先创建技能")
 		return fmt.Errorf("skill not found in context, please create a skill first")
 	}
 
-	skill, ok := skillVal.(*models.Skill)
-	if !ok || skill == nil {
+	skillIDStr, ok := skillID.(string)
+	if !ok {
 		tr.assertion.SetContext("skill_learned", false)
-		tr.assertion.SetContext("error_message", "技能对象无效")
-		return fmt.Errorf("skill is not a valid skill object")
+		tr.assertion.SetContext("error_message", "技能ID无效")
+		return fmt.Errorf("skill_id is not a valid string")
+	}
+
+	// 从数据库加载技能对象
+	skillRepo := repository.NewSkillRepository()
+	skill, err := skillRepo.GetSkillByID(skillIDStr)
+	if err != nil || skill == nil {
+		// 如果数据库中没有，从Variables中的基本字段重新构建Skill对象
+		skill = &models.Skill{
+			ID: skillIDStr,
+		}
+		if skillName, exists := tr.context.Variables["skill_name"]; exists {
+			if name, ok := skillName.(string); ok {
+				skill.Name = name
+			}
+		}
+		if skillType, exists := tr.context.Variables["skill_type"]; exists {
+			if st, ok := skillType.(string); ok {
+				skill.Type = st
+			}
+		}
+		if scalingRatio, exists := tr.context.Variables["skill_scaling_ratio"]; exists {
+			if ratio, ok := scalingRatio.(float64); ok {
+				skill.ScalingRatio = ratio
+			}
+		}
+		// 设置默认值
+		if skill.Type == "" {
+			skill.Type = "attack"
+		}
+		if skill.ScalingRatio == 0 {
+			skill.ScalingRatio = 1.0
+		}
+		if skill.ResourceCost == 0 {
+			skill.ResourceCost = 30
+		}
 	}
 
 	// 使用skillRepo让角色学习技能
-	skillRepo := repository.NewSkillRepository()
-	err := skillRepo.AddCharacterSkill(char.ID, skill.ID, 1)
+	err = skillRepo.AddCharacterSkill(char.ID, skill.ID, 1)
 	if err != nil {
 		tr.assertion.SetContext("skill_learned", false)
 		tr.assertion.SetContext("error_message", err.Error())
@@ -3619,32 +3653,50 @@ func (tr *TestRunner) executeUseSkill(instruction string) error {
 	// 在获取技能之前，确保上下文中的角色是最新的（包含恢复的PhysicalAttack）
 	tr.context.Characters["character"] = char
 
-	// 获取技能（从上下文或创建默认技能）
+	// 获取技能（从Variables中的基本字段重新构建，不再从Variables读取Skill对象，避免序列化错误）
 	var skill *models.Skill
-	if skillVal, exists := tr.context.Variables["skill"]; exists {
-		if s, ok := skillVal.(*models.Skill); ok {
-			skill = s
-			debugPrint("[DEBUG] executeUseSkill: loaded skill from Variables, initial ScalingRatio=%f\n", skill.ScalingRatio)
-			// 强制从上下文获取ScalingRatio（createSkill中存储的值更准确）
-			if ratioVal, exists := tr.context.Variables["skill_scaling_ratio"]; exists {
-				debugPrint("[DEBUG] executeUseSkill: found skill_scaling_ratio in Variables: %v (type: %T)\n", ratioVal, ratioVal)
-				if ratio, ok := ratioVal.(float64); ok {
-					if ratio > 0 {
-						skill.ScalingRatio = ratio
-						debugPrint("[DEBUG] executeUseSkill: restored ScalingRatio=%f from Variables\n", ratio)
-					} else {
-						debugPrint("[DEBUG] executeUseSkill: skill_scaling_ratio is 0 in Variables\n")
+	skillID, exists := tr.context.Variables["skill_id"]
+	if exists {
+		skillIDStr, ok := skillID.(string)
+		if ok && skillIDStr != "" {
+			// 尝试从数据库加载技能
+			skillRepo := repository.NewSkillRepository()
+			if dbSkill, err := skillRepo.GetSkillByID(skillIDStr); err == nil && dbSkill != nil {
+				skill = dbSkill
+				debugPrint("[DEBUG] executeUseSkill: loaded skill from database, ScalingRatio=%f\n", skill.ScalingRatio)
+			} else {
+				// 如果数据库中没有，从Variables中的基本字段重新构建Skill对象
+				skill = &models.Skill{
+					ID: skillIDStr,
+				}
+				if skillName, exists := tr.context.Variables["skill_name"]; exists {
+					if name, ok := skillName.(string); ok {
+						skill.Name = name
 					}
 				}
-			} else {
-				debugPrint("[DEBUG] executeUseSkill: skill_scaling_ratio NOT found in Variables\n")
-			}
-			debugPrint("[DEBUG] executeUseSkill: after restore, skill.ScalingRatio=%f\n", skill.ScalingRatio)
-			// 立即更新上下文，确保值不会丢失（只存储基本字段）
-			tr.context.Variables["skill_id"] = skill.ID
-			tr.context.Variables["skill_type"] = skill.Type
-			if skill.ScalingRatio > 0 {
-				tr.context.Variables["skill_scaling_ratio"] = skill.ScalingRatio
+				if skillType, exists := tr.context.Variables["skill_type"]; exists {
+					if st, ok := skillType.(string); ok && st != "" {
+						skill.Type = st
+					}
+				}
+				if scalingRatio, exists := tr.context.Variables["skill_scaling_ratio"]; exists {
+					if ratio, ok := scalingRatio.(float64); ok && ratio > 0 {
+						skill.ScalingRatio = ratio
+						debugPrint("[DEBUG] executeUseSkill: restored ScalingRatio=%f from Variables\n", ratio)
+					}
+				}
+				// 设置默认值
+				if skill.Type == "" {
+					skill.Type = "attack"
+				}
+				if skill.ScalingRatio == 0 {
+					skill.ScalingRatio = 1.0
+					tr.context.Variables["skill_scaling_ratio"] = 1.0
+				}
+				if skill.ResourceCost == 0 {
+					skill.ResourceCost = 30
+				}
+				debugPrint("[DEBUG] executeUseSkill: reconstructed skill from Variables, ScalingRatio=%f\n", skill.ScalingRatio)
 			}
 		}
 	}
@@ -3659,6 +3711,11 @@ func (tr *TestRunner) executeUseSkill(instruction string) error {
 			Cooldown:     0,
 			ScalingRatio: 1.0,
 		}
+		// 存储默认技能的基本字段到Variables
+		tr.context.Variables["skill_id"] = skill.ID
+		tr.context.Variables["skill_type"] = skill.Type
+		tr.context.Variables["skill_scaling_ratio"] = skill.ScalingRatio
+		debugPrint("[DEBUG] executeUseSkill: created default skill, ScalingRatio=%f\n", skill.ScalingRatio)
 	}
 
 	// 在消耗资源之前，再次确保使用最新的角色对象（从上下文重新获取，以防有更新）
@@ -4916,21 +4973,28 @@ func (tr *TestRunner) executeBattleRound(instruction string) error {
 			// 先减少冷却时间
 			skillManager.TickCooldowns(char.ID)
 
-			// 获取技能状态，检查是否可用
-			skillVal, exists := tr.context.Variables["skill"]
+			// 获取技能状态，检查是否可用（不再从Variables读取Skill对象，避免序列化错误）
+			skillID, exists := tr.context.Variables["skill_id"]
 			if exists {
-				if skill, ok := skillVal.(*models.Skill); ok {
-					skillState := skillManager.GetSkillState(char.ID, skill.ID)
+				skillIDStr, ok := skillID.(string)
+				if ok && skillIDStr != "" {
+					skillState := skillManager.GetSkillState(char.ID, skillIDStr)
 					if skillState != nil {
 						tr.assertion.SetContext(fmt.Sprintf("skill_usable_round_%d", roundNum), skillState.CooldownLeft == 0)
 						tr.assertion.SetContext(fmt.Sprintf("skill_cooldown_round_%d", roundNum), skillState.CooldownLeft)
 					} else {
-						// 如果技能状态不存在，根据冷却时间计算
+						// 如果技能状态不存在，从Variables获取冷却时间并计算
+						cooldown := 0
+						if cooldownVal, exists := tr.context.Variables["skill_cooldown"]; exists {
+							if cd, ok := cooldownVal.(int); ok {
+								cooldown = cd
+							}
+						}
 						// 假设第1回合使用了技能，冷却时间为3，那么：
 						// 第2回合：冷却剩余2，不可用
 						// 第3回合：冷却剩余1，不可用
 						// 第4回合：冷却剩余0，可用
-						cooldownLeft := skill.Cooldown - (roundNum - 1)
+						cooldownLeft := cooldown - (roundNum - 1)
 						if cooldownLeft < 0 {
 							cooldownLeft = 0
 						}
@@ -4940,43 +5004,49 @@ func (tr *TestRunner) executeBattleRound(instruction string) error {
 				}
 			}
 		} else {
-			// 如果角色没有技能，从上下文获取技能信息
-			skillVal, exists := tr.context.Variables["skill"]
-			if exists {
-				if skill, ok := skillVal.(*models.Skill); ok {
-					// 根据冷却时间计算
-					cooldownLeft := skill.Cooldown - (roundNum - 1)
-					if cooldownLeft < 0 {
-						cooldownLeft = 0
+			// 如果角色没有技能，从上下文获取技能信息（不再从Variables读取Skill对象）
+			if _, exists := tr.context.Variables["skill_id"]; exists {
+				// 从Variables获取冷却时间并计算
+				cooldown := 0
+				if cooldownVal, exists := tr.context.Variables["skill_cooldown"]; exists {
+					if cd, ok := cooldownVal.(int); ok {
+						cooldown = cd
 					}
-					tr.assertion.SetContext(fmt.Sprintf("skill_usable_round_%d", roundNum), cooldownLeft == 0)
-					tr.assertion.SetContext(fmt.Sprintf("skill_cooldown_round_%d", roundNum), cooldownLeft)
 				}
+				// 根据冷却时间计算
+				cooldownLeft := cooldown - (roundNum - 1)
+				if cooldownLeft < 0 {
+					cooldownLeft = 0
+				}
+				tr.assertion.SetContext(fmt.Sprintf("skill_usable_round_%d", roundNum), cooldownLeft == 0)
+				tr.assertion.SetContext(fmt.Sprintf("skill_cooldown_round_%d", roundNum), cooldownLeft)
 			}
 		}
 	}
 
-	// 处理怪物技能冷却时间
-	monsterSkillVal, exists := tr.context.Variables["monster_skill"]
-	if exists {
-		if monsterSkill, ok := monsterSkillVal.(*models.Skill); ok {
-			// 获取怪物技能冷却时间
-			monsterCooldown := monsterSkill.Cooldown
-			// 获取上次使用技能的回合数
-			lastUsedRound := 1
-			if lastRound, exists := tr.context.Variables["monster_skill_last_used_round"]; exists {
-				if lr, ok := lastRound.(int); ok {
-					lastUsedRound = lr
-				}
+	// 处理怪物技能冷却时间（不再从Variables读取Skill对象，避免序列化错误）
+	if monsterSkillID, exists := tr.context.Variables["monster_skill_id"]; exists && monsterSkillID != nil {
+		// 从Variables获取怪物技能冷却时间
+		monsterCooldown := 0
+		if cooldownVal, exists := tr.context.Variables["monster_skill_cooldown"]; exists {
+			if cd, ok := cooldownVal.(int); ok {
+				monsterCooldown = cd
 			}
-			// 计算冷却剩余时间
-			cooldownLeft := monsterCooldown - (roundNum - lastUsedRound)
-			if cooldownLeft < 0 {
-				cooldownLeft = 0
-			}
-			tr.assertion.SetContext(fmt.Sprintf("monster_skill_cooldown_round_%d", roundNum), cooldownLeft)
-			tr.context.Variables[fmt.Sprintf("monster_skill_cooldown_round_%d", roundNum)] = cooldownLeft
 		}
+		// 获取上次使用技能的回合数
+		lastUsedRound := 1
+		if lastRound, exists := tr.context.Variables["monster_skill_last_used_round"]; exists {
+			if lr, ok := lastRound.(int); ok {
+				lastUsedRound = lr
+			}
+		}
+		// 计算冷却剩余时间
+		cooldownLeft := monsterCooldown - (roundNum - lastUsedRound)
+		if cooldownLeft < 0 {
+			cooldownLeft = 0
+		}
+		tr.assertion.SetContext(fmt.Sprintf("monster_skill_cooldown_round_%d", roundNum), cooldownLeft)
+		tr.context.Variables[fmt.Sprintf("monster_skill_cooldown_round_%d", roundNum)] = cooldownLeft
 	}
 
 	return nil
@@ -5138,14 +5208,58 @@ func (tr *TestRunner) executeMonsterUseSkill(instruction string) error {
 		return fmt.Errorf("monster not found")
 	}
 
-	// 获取怪物技能
-	skillVal, exists := tr.context.Variables["monster_skill"]
+	// 获取怪物技能（不再从Variables读取Skill对象，避免序列化错误）
+	skillID, exists := tr.context.Variables["monster_skill_id"]
 	if !exists {
 		return fmt.Errorf("monster skill not found")
 	}
-	skill, ok := skillVal.(*models.Skill)
-	if !ok || skill == nil {
-		return fmt.Errorf("invalid monster skill")
+	skillIDStr, ok := skillID.(string)
+	if !ok || skillIDStr == "" {
+		return fmt.Errorf("invalid monster skill ID")
+	}
+	
+	// 从数据库加载技能或从Variables中的基本字段重新构建
+	var skill *models.Skill
+	skillRepo := repository.NewSkillRepository()
+	if dbSkill, err := skillRepo.GetSkillByID(skillIDStr); err == nil && dbSkill != nil {
+		skill = dbSkill
+	} else {
+		// 从Variables中的基本字段重新构建Skill对象
+		skill = &models.Skill{
+			ID: skillIDStr,
+		}
+		if skillName, exists := tr.context.Variables["monster_skill_name"]; exists {
+			if name, ok := skillName.(string); ok {
+				skill.Name = name
+			}
+		}
+		if skillType, exists := tr.context.Variables["monster_skill_type"]; exists {
+			if st, ok := skillType.(string); ok {
+				skill.Type = st
+			}
+		}
+		if scalingRatio, exists := tr.context.Variables["monster_skill_scaling_ratio"]; exists {
+			if ratio, ok := scalingRatio.(float64); ok {
+				skill.ScalingRatio = ratio
+			}
+		}
+		if resourceCost, exists := tr.context.Variables["monster_skill_resource_cost"]; exists {
+			if cost, ok := resourceCost.(int); ok {
+				skill.ResourceCost = cost
+			}
+		}
+		if cooldown, exists := tr.context.Variables["monster_skill_cooldown"]; exists {
+			if cd, ok := cooldown.(int); ok {
+				skill.Cooldown = cd
+			}
+		}
+		// 设置默认值
+		if skill.Type == "" {
+			skill.Type = "attack"
+		}
+		if skill.ScalingRatio == 0 {
+			skill.ScalingRatio = 1.0
+		}
 	}
 
 	// 确保ResourceCost从上下文变量中恢复（如果skill.ResourceCost为0）
@@ -6389,3 +6503,4 @@ func (tr *TestRunner) executeGainGold(instruction string) error {
 
 	return nil
 }
+

@@ -295,11 +295,9 @@ func (tr *TestRunner) executeEquipItem(instruction string) error {
 		return fmt.Errorf("character not found")
 	}
 	
-	// 获取要穿戴的装备
+	// 获取要穿戴的装备（不再从Variables读取EquipmentInstance对象，避免序列化错误）
 	var equipment *models.EquipmentInstance
-	if eq, ok := tr.context.Variables["equipment"].(*models.EquipmentInstance); ok {
-		equipment = eq
-	} else if eqID, ok := tr.context.Variables["equipment_id"].(int); ok {
+	if eqID, ok := tr.context.Variables["equipment_id"].(int); ok {
 		equipmentRepo := repository.NewEquipmentRepository()
 		eq, err := equipmentRepo.GetByID(eqID)
 		if err != nil {
@@ -398,11 +396,9 @@ func (tr *TestRunner) executeUnequipItem(instruction string) error {
 		return fmt.Errorf("character not found")
 	}
 	
-	// 获取要卸下的装备
+	// 获取要卸下的装备（不再从Variables读取EquipmentInstance对象，避免序列化错误）
 	var equipment *models.EquipmentInstance
-	if eq, ok := tr.context.Variables["equipment"].(*models.EquipmentInstance); ok {
-		equipment = eq
-	} else if eqID, ok := tr.context.Variables["equipment_id"].(int); ok {
+	if eqID, ok := tr.context.Variables["equipment_id"].(int); ok {
 		equipmentRepo := repository.NewEquipmentRepository()
 		eq, err := equipmentRepo.GetByID(eqID)
 		if err != nil {
@@ -467,12 +463,9 @@ func (tr *TestRunner) executeTryEquipItem(instruction string) error {
 		return fmt.Errorf("character not found")
 	}
 	
-	// 获取要穿戴的装备
+	// 获取要穿戴的装备（不再从Variables读取EquipmentInstance对象，避免序列化错误）
 	var equipment *models.EquipmentInstance
-	if eq, ok := tr.context.Variables["equipment"].(*models.EquipmentInstance); ok {
-		equipment = eq
-		debugPrint("[DEBUG] executeTryEquipItem: found equipment from Variables, ID=%d\n", equipment.ID)
-	} else if eqID, ok := tr.context.Variables["equipment_id"].(int); ok {
+	if eqID, ok := tr.context.Variables["equipment_id"].(int); ok {
 		equipmentRepo := repository.NewEquipmentRepository()
 		eq, err := equipmentRepo.GetByID(eqID)
 		if err != nil {
