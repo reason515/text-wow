@@ -483,6 +483,30 @@ func (tr *TestRunner) executeInstruction(instruction string) error {
 	} else if strings.Contains(instruction, "角色获得") && strings.Contains(instruction, "金币") {
 		// 处理"角色获得1000金币"
 		return tr.executeGainGold(instruction)
+	} else if strings.Contains(instruction, "初始化地图管理器") {
+		// 处理"初始化地图管理器"
+		return tr.executeInitializeMapManager()
+	} else if strings.Contains(instruction, "加载区域") {
+		// 处理"加载区域 elwynn"
+		return tr.executeLoadZone(instruction)
+	} else if strings.Contains(instruction, "切换到区域") || strings.Contains(instruction, "尝试切换到") {
+		// 处理"切换到区域 elwynn"、"尝试切换到需要等级10的区域"
+		return tr.executeSwitchZone(instruction)
+	} else if strings.Contains(instruction, "创建一个区域") {
+		// 处理"创建一个区域，经验倍率=1.5"、"创建一个区域，经验倍率=1.5，金币倍率=1.2"
+		return tr.executeCreateZone(instruction)
+	} else if strings.Contains(instruction, "计算该区域") && strings.Contains(instruction, "倍率") {
+		// 处理"计算该区域的经验倍率"、"计算该区域的金币倍率"
+		return tr.executeCalculateZoneMultiplier(instruction)
+	} else if strings.Contains(instruction, "检查区域") && strings.Contains(instruction, "解锁状态") {
+		// 处理"检查区域 elwynn 的解锁状态"
+		return tr.executeCheckZoneUnlockStatus(instruction)
+	} else if strings.Contains(instruction, "查询") && strings.Contains(instruction, "可用区域") {
+		// 处理"查询等级10、阵营alliance的可用区域"
+		return tr.executeQueryAvailableZones(instruction)
+	} else if strings.Contains(instruction, "角色在") && strings.Contains(instruction, "区域击杀") {
+		// 处理"角色在该区域击杀怪物（基础经验=10，基础金币=5）"
+		return tr.executeKillMonsterInZone(instruction)
 	}
 	return nil
 }
