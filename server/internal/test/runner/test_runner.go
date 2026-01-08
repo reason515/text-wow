@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -314,6 +315,9 @@ func (tr *TestRunner) executeInstruction(instruction string) error {
 	} else if strings.Contains(instruction, "创建一个") && strings.Contains(instruction, "队伍") {
 		// 创建多人队伍（如"创建一个3人队伍：战士(HP=100)、牧师(HP=100)、法师(HP=100)"）
 		return tr.createTeam(instruction)
+	} else if (strings.Contains(instruction, "创建") && strings.Contains(instruction, "个角色")) || (strings.Contains(instruction, "创建") && strings.Contains(instruction, "角色") && strings.Contains(instruction, "：")) {
+		// 处理"创建3个角色：角色1（敏捷=30），角色2（敏捷=50）"这样的指令
+		return tr.createMultipleCharacters(instruction)
 	} else if strings.Contains(instruction, "创建一个") && strings.Contains(instruction, "角色") {
 		return tr.createCharacter(instruction)
 	} else if (strings.Contains(instruction, "创建一个") || strings.Contains(instruction, "创建")) && strings.Contains(instruction, "怪物") {
@@ -1814,6 +1818,122 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 	return nil
 }
 
+// createMultipleCharacters 创建多个角色
+// 支持格式：如"创建3个角色：角色1（敏捷=30，速度=60），角色2（敏捷=50，速度=100），角色3（敏捷=40，速度=80）"
+func (tr *TestRunner) createMultipleCharacters(instruction string) error {
+	// 解析角色列表（通过冒号分隔）
+	var characterDescs []string
+	if strings.Contains(instruction, "：") {
+		parts := strings.Split(instruction, "：")
+		if len(parts) > 1 {
+			characterDescs = strings.Split(parts[1], "，")
+		}
+	} else if strings.Contains(instruction, ":") {
+		parts := strings.Split(instruction, ":")
+		if len(parts) > 1 {
+			characterDescs = strings.Split(parts[1], ",")
+		}
+	}
+
+	charRepo := repository.NewCharacterRepository()
+	user, err := tr.createTestUser()
+	if err != nil {
+		return fmt.Errorf("failed to create test user: %w", err)
+	}
+
+	// 先获取用户的所有角色，检查哪些slot已被占用
+	existingChars, err := charRepo.GetByUserID(user.ID)
+	if err != nil {
+		existingChars = []*models.Character{}
+	}
+	existingSlots := make(map[int]*models.Character)
+	for _, c := range existingChars {
+		existingSlots[c.TeamSlot] = c
+	}
+
+	for _, charDesc := range characterDescs {
+		charDesc = strings.TrimSpace(charDesc)
+		if charDesc == "" {
+			continue
+		}
+
+		// 解析角色索引（如"角色1"、"角色2"等）
+		charIndex := 1
+		if strings.Contains(charDesc, "角色") {
+			// 提取数字
+			re := regexp.MustCompile(`角色(\d+)`)
+			matches := re.FindStringSubmatch(charDesc)
+			if len(matches) > 1 {
+				if idx, err := strconv.Atoi(matches[1]); err == nil {
+					charIndex = idx
+				}
+			}
+		}
+
+		// 使用createCharacter的逻辑，但修改指令以创建单个角色
+		// 将"角色1（敏捷=30，速度=60）"转换为"创建一个角色，敏捷=30，速度=60"
+		singleCharInstruction := strings.Replace(charDesc, fmt.Sprintf("角色%d", charIndex), "一个角色", 1)
+		singleCharInstruction = strings.TrimSpace(strings.TrimPrefix(singleCharInstruction, "（"))
+		singleCharInstruction = strings.TrimSpace(strings.TrimSuffix(singleCharInstruction, "）"))
+		singleCharInstruction = strings.TrimSpace(strings.TrimSuffix(singleCharInstruction, ")"))
+		singleCharInstruction = "创建一个角色，" + singleCharInstruction
+
+		// 临时保存当前上下文，以便createCharacter使用
+		oldLastInstruction := tr.context.Variables["last_instruction"]
+		tr.context.Variables["last_instruction"] = singleCharInstruction
+
+		// 调用createCharacter创建单个角色
+		if err := tr.createCharacter(singleCharInstruction); err != nil {
+			tr.context.Variables["last_instruction"] = oldLastInstruction
+			return fmt.Errorf("failed to create character %d: %w", charIndex, err)
+		}
+
+		// 恢复last_instruction
+		tr.context.Variables["last_instruction"] = oldLastInstruction
+
+		// 获取刚创建的角色（应该存储在"character"键中）
+		char, ok := tr.context.Characters["character"]
+		if !ok || char == nil {
+			return fmt.Errorf("failed to get created character %d", charIndex)
+		}
+
+		// 检查该slot是否已存在角色
+		if existingChar, exists := existingSlots[charIndex]; exists {
+			// 更新已存在的角色
+			char.ID = existingChar.ID
+			char.TeamSlot = charIndex
+			char.UserID = user.ID
+			if err := charRepo.Update(char); err != nil {
+				return fmt.Errorf("failed to update character %d: %w", charIndex, err)
+			}
+		} else {
+			// 创建新角色
+			char.TeamSlot = charIndex
+			char.UserID = user.ID
+			createdChar, err := charRepo.Create(char)
+			if err != nil {
+				return fmt.Errorf("failed to create character %d: %w", charIndex, err)
+			}
+			char = createdChar
+		}
+
+		// 重新计算速度（确保使用最新的敏捷值）
+		speed := tr.calculator.CalculateSpeed(char)
+		tr.context.Variables[fmt.Sprintf("character_%d_speed", charIndex)] = speed
+
+		// 存储到上下文（使用character_1, character_2等作为key）
+		key := fmt.Sprintf("character_%d", charIndex)
+		tr.context.Characters[key] = char
+
+		// 第一个角色也保存为"character"（向后兼容）
+		if charIndex == 1 {
+			tr.context.Characters["character"] = char
+		}
+	}
+
+	return nil
+}
+
 // createMonster 创建怪物
 func (tr *TestRunner) createMonster(instruction string) error {
 	debugPrint("[DEBUG] createMonster: called with instruction: %s\n", instruction)
@@ -1949,10 +2069,13 @@ func (tr *TestRunner) createMonster(instruction string) error {
 		}
 
 		// 存储怪物（monster_1, monster_2, monster_3等）
+		// 注意：key用于context存储，monster.ID用于标识
 		key := fmt.Sprintf("monster_%d", i)
 		if count == 1 {
 			key = "monster" // 单个怪物使用monster作为key
 		}
+		// 确保monster.ID格式正确（monster_1, monster_2等，而不是test_monster_1）
+		monster.ID = fmt.Sprintf("monster_%d", i)
 		tr.context.Monsters[key] = monster
 		debugPrint("[DEBUG] createMonster: stored monster[%s] with PhysicalDefense=%d, HP=%d\n", key, monster.PhysicalDefense, monster.HP)
 	}
@@ -3893,9 +4016,15 @@ func (tr *TestRunner) buildTurnOrder() error {
 	// 收集所有怪物
 	for key, monster := range tr.context.Monsters {
 		if monster != nil {
+			// key可能是monster_1, monster_2等，直接使用作为ID
+			monsterID := key
+			// 如果key是"monster"，则使用"monster_1"格式
+			if key == "monster" {
+				monsterID = "monster_1"
+			}
 			monsterEntry := map[string]interface{}{
 				"type":   "monster",
-				"id":     fmt.Sprintf("monster_%s", key),
+				"id":     monsterID,
 				"speed":  monster.Speed,
 				"hp":     monster.HP,
 				"max_hp": monster.MaxHP,
@@ -3933,7 +4062,12 @@ func (tr *TestRunner) buildTurnOrder() error {
 			tr.assertion.SetContext(fmt.Sprintf("turn_order[%d].character.id", idx), charID)
 			tr.context.Variables[fmt.Sprintf("turn_order[%d].character.id", idx)] = charID
 		} else {
-			monsterID := fmt.Sprintf("monster_%s", p.key)
+			// p.key可能是monster_1, monster_2等，直接使用，不需要再加monster_前缀
+			monsterID := p.key
+			// 如果key是"monster"，则使用"monster_1"格式
+			if p.key == "monster" {
+				monsterID = "monster_1"
+			}
 			tr.assertion.SetContext(fmt.Sprintf("turn_order[%d].monster.id", idx), monsterID)
 			tr.context.Variables[fmt.Sprintf("turn_order[%d].monster.id", idx)] = monsterID
 		}
