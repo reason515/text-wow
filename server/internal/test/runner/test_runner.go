@@ -6243,6 +6243,154 @@ func (tr *TestRunner) syncTeamToContext() {
 			tr.assertion.SetContext(fmt.Sprintf("team.slot_%d.character_id", i), nil)
 		}
 	}
+
+	// 计算队伍总属性
+	baseTotalAttack := 0
+	baseTotalHP := 0
+	teamTotalAttack := 0
+	teamTotalHP := 0
+	teamPhysicalAttack := 0
+	teamMagicAttack := 0
+	hasTank := false
+	hasHealer := false
+	hasDPS := false
+	hasRageResource := false
+	hasManaResource := false
+	hasEnergyResource := false
+	hasAttackBuff := false
+	hasDefenseBuff := false
+	hasCritBuff := false
+
+	// 遍历所有角色计算属性
+	for _, char := range tr.context.Characters {
+		if char != nil {
+			// 基础总攻击力（物理+魔法，无加成）
+			baseTotalAttack += char.PhysicalAttack + char.MagicAttack
+			// 基础总生命值（无加成）
+			baseTotalHP += char.MaxHP
+			// 总攻击力（物理+魔法，可能有加成）
+			teamTotalAttack += char.PhysicalAttack + char.MagicAttack
+			// 总生命值（可能有加成）
+			teamTotalHP += char.MaxHP
+			// 物理攻击力
+			teamPhysicalAttack += char.PhysicalAttack
+			// 魔法攻击力
+			teamMagicAttack += char.MagicAttack
+
+			// 检查职业类型（简化判断：战士/圣骑士=坦克，牧师/萨满=治疗，法师/盗贼=DPS）
+			className := strings.ToLower(char.Class)
+			if className == "warrior" || className == "paladin" {
+				hasTank = true
+			}
+			if className == "priest" || className == "shaman" {
+				hasHealer = true
+			}
+			if className == "mage" || className == "rogue" {
+				hasDPS = true
+			}
+
+			// 检查资源类型
+			if char.ResourceType == "rage" {
+				hasRageResource = true
+			} else if char.ResourceType == "mana" {
+				hasManaResource = true
+			} else if char.ResourceType == "energy" {
+				hasEnergyResource = true
+			}
+
+			// 检查Buff（从Variables中读取）
+			if buffModifier, exists := tr.context.Variables["character_buff_attack_modifier"]; exists {
+				if modifier, ok := buffModifier.(float64); ok && modifier > 0 {
+					hasAttackBuff = true
+				}
+			}
+			if buffModifier, exists := tr.context.Variables["character_buff_defense_modifier"]; exists {
+				if modifier, ok := buffModifier.(float64); ok && modifier > 0 {
+					hasDefenseBuff = true
+				}
+			}
+			if buffModifier, exists := tr.context.Variables["character_buff_crit_modifier"]; exists {
+				if modifier, ok := buffModifier.(float64); ok && modifier > 0 {
+					hasCritBuff = true
+				}
+			}
+		}
+	}
+
+	// 应用队伍加成（如果有）
+	// 检查是否有队伍攻击力加成
+	if teamAttackBonus, exists := tr.context.Variables["team_attack_bonus"]; exists {
+		if bonus, ok := teamAttackBonus.(float64); ok && bonus > 0 {
+			teamTotalAttack = int(float64(teamTotalAttack) * (1.0 + bonus))
+		}
+	}
+	// 检查是否有队伍生命值加成
+	if teamHPBonus, exists := tr.context.Variables["team_hp_bonus"]; exists {
+		if bonus, ok := teamHPBonus.(float64); ok && bonus > 0 {
+			teamTotalHP = int(float64(teamTotalHP) * (1.0 + bonus))
+		}
+	}
+
+	// 设置基础值（无加成）
+	tr.assertion.SetContext("base_total_attack", baseTotalAttack)
+	tr.context.Variables["base_total_attack"] = baseTotalAttack
+	tr.assertion.SetContext("base_total_hp", baseTotalHP)
+	tr.context.Variables["base_total_hp"] = baseTotalHP
+
+	// 设置队伍总属性（可能有加成）
+	tr.assertion.SetContext("team_total_attack", teamTotalAttack)
+	tr.context.Variables["team_total_attack"] = teamTotalAttack
+	tr.assertion.SetContext("team_total_hp", teamTotalHP)
+	tr.context.Variables["team_total_hp"] = teamTotalHP
+	tr.assertion.SetContext("team.physical_attack", teamPhysicalAttack)
+	tr.context.Variables["team.physical_attack"] = teamPhysicalAttack
+	tr.assertion.SetContext("team.magic_attack", teamMagicAttack)
+	tr.context.Variables["team.magic_attack"] = teamMagicAttack
+
+	// 计算攻击占比
+	totalAttack := teamPhysicalAttack + teamMagicAttack
+	if totalAttack > 0 {
+		physicalRatio := float64(teamPhysicalAttack) / float64(totalAttack)
+		magicRatio := float64(teamMagicAttack) / float64(totalAttack)
+		tr.assertion.SetContext("team.physical_attack_ratio", physicalRatio)
+		tr.context.Variables["team.physical_attack_ratio"] = physicalRatio
+		tr.assertion.SetContext("team.magic_attack_ratio", magicRatio)
+		tr.context.Variables["team.magic_attack_ratio"] = magicRatio
+	} else {
+		tr.assertion.SetContext("team.physical_attack_ratio", 0.0)
+		tr.context.Variables["team.physical_attack_ratio"] = 0.0
+		tr.assertion.SetContext("team.magic_attack_ratio", 0.0)
+		tr.context.Variables["team.magic_attack_ratio"] = 0.0
+	}
+
+	// 设置队伍类型标志
+	tr.assertion.SetContext("team.has_tank", hasTank)
+	tr.context.Variables["team.has_tank"] = hasTank
+	tr.assertion.SetContext("team.has_healer", hasHealer)
+	tr.context.Variables["team.has_healer"] = hasHealer
+	tr.assertion.SetContext("team.has_dps", hasDPS)
+	tr.context.Variables["team.has_dps"] = hasDPS
+
+	// 设置资源类型标志
+	tr.assertion.SetContext("team.has_rage_resource", hasRageResource)
+	tr.context.Variables["team.has_rage_resource"] = hasRageResource
+	tr.assertion.SetContext("team.has_mana_resource", hasManaResource)
+	tr.context.Variables["team.has_mana_resource"] = hasManaResource
+	tr.assertion.SetContext("team.has_energy_resource", hasEnergyResource)
+	tr.context.Variables["team.has_energy_resource"] = hasEnergyResource
+
+	// 设置Buff标志
+	tr.assertion.SetContext("team.has_attack_buff", hasAttackBuff)
+	tr.context.Variables["team.has_attack_buff"] = hasAttackBuff
+	tr.assertion.SetContext("team.has_defense_buff", hasDefenseBuff)
+	tr.context.Variables["team.has_defense_buff"] = hasDefenseBuff
+	tr.assertion.SetContext("team.has_crit_buff", hasCritBuff)
+	tr.context.Variables["team.has_crit_buff"] = hasCritBuff
+
+	// 设置是否可以战斗（至少有一个存活角色）
+	canBattle := teamAliveCount > 0
+	tr.assertion.SetContext("team.can_battle", canBattle)
+	tr.context.Variables["team.can_battle"] = canBattle
 }
 
 // executeCreateEmptyTeam 创建一个空队伍
