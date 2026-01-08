@@ -707,48 +707,70 @@ func (tr *TestRunner) updateAssertionContext() {
 		}
 	}
 
-	// 同步所有monster_X.hp_damage值（从Variables中读取）
+	// 同步所有monster_X.hp_damage值（从Variables中读取，只同步可序列化的值）
 	for i := 1; i <= 10; i++ {
 		damageKey := fmt.Sprintf("monster_%d.hp_damage", i)
 		if hpDamage, exists := tr.context.Variables[damageKey]; exists {
-			tr.assertion.SetContext(damageKey, hpDamage)
+			if isSerializable(hpDamage) {
+				tr.assertion.SetContext(damageKey, hpDamage)
+			}
 		}
 	}
 
-	// 同步技能伤害值
+	// 同步技能伤害值（只同步可序列化的值）
 	if skillDamage, exists := tr.context.Variables["skill_damage_dealt"]; exists {
-		tr.assertion.SetContext("skill_damage_dealt", skillDamage)
+		if isSerializable(skillDamage) {
+			tr.assertion.SetContext("skill_damage_dealt", skillDamage)
+		}
 	}
 
-	// 同步治疗相关值
+	// 同步治疗相关值（只同步可序列化的值）
 	if overhealing, exists := tr.context.Variables["overhealing"]; exists {
-		tr.assertion.SetContext("overhealing", overhealing)
+		if isSerializable(overhealing) {
+			tr.assertion.SetContext("overhealing", overhealing)
+		}
 	}
 	if skillHealing, exists := tr.context.Variables["skill_healing_done"]; exists {
-		tr.assertion.SetContext("skill_healing_done", skillHealing)
+		if isSerializable(skillHealing) {
+			tr.assertion.SetContext("skill_healing_done", skillHealing)
+		}
 	}
 
-	// 同步怪物技能相关值
+	// 同步怪物技能相关值（只同步可序列化的值）
 	if monsterSkillDamage, exists := tr.context.Variables["monster_skill_damage_dealt"]; exists {
-		tr.assertion.SetContext("monster_skill_damage_dealt", monsterSkillDamage)
+		if isSerializable(monsterSkillDamage) {
+			tr.assertion.SetContext("monster_skill_damage_dealt", monsterSkillDamage)
+		}
 	}
 	if monsterHealing, exists := tr.context.Variables["monster_healing_dealt"]; exists {
-		tr.assertion.SetContext("monster_healing_dealt", monsterHealing)
+		if isSerializable(monsterHealing) {
+			tr.assertion.SetContext("monster_healing_dealt", monsterHealing)
+		}
 	}
 	if monsterResource, exists := tr.context.Variables["monster.resource"]; exists {
-		tr.assertion.SetContext("monster.resource", monsterResource)
+		if isSerializable(monsterResource) {
+			tr.assertion.SetContext("monster.resource", monsterResource)
+		}
 	}
 	if monsterSkillResourceCost, exists := tr.context.Variables["monster_skill_resource_cost"]; exists {
-		tr.assertion.SetContext("monster_skill_resource_cost", monsterSkillResourceCost)
+		if isSerializable(monsterSkillResourceCost) {
+			tr.assertion.SetContext("monster_skill_resource_cost", monsterSkillResourceCost)
+		}
 	}
 	if monsterSkillIsCrit, exists := tr.context.Variables["monster_skill_is_crit"]; exists {
-		tr.assertion.SetContext("monster_skill_is_crit", monsterSkillIsCrit)
+		if isSerializable(monsterSkillIsCrit) {
+			tr.assertion.SetContext("monster_skill_is_crit", monsterSkillIsCrit)
+		}
 	}
 	if monsterSkillCritDamage, exists := tr.context.Variables["monster_skill_crit_damage"]; exists {
-		tr.assertion.SetContext("monster_skill_crit_damage", monsterSkillCritDamage)
+		if isSerializable(monsterSkillCritDamage) {
+			tr.assertion.SetContext("monster_skill_crit_damage", monsterSkillCritDamage)
+		}
 	}
 	if monsterDebuffDuration, exists := tr.context.Variables["character_debuff_duration"]; exists {
-		tr.assertion.SetContext("character_debuff_duration", monsterDebuffDuration)
+		if isSerializable(monsterDebuffDuration) {
+			tr.assertion.SetContext("character_debuff_duration", monsterDebuffDuration)
+		}
 	}
 
 	// 同步装备信息（从 Equipments map 或 Variables 中的 equipment_id 获取）
@@ -796,33 +818,53 @@ func (tr *TestRunner) updateAssertionContext() {
 		tr.assertion.SetContext("equipped_main_hand_count", mainHandCount)
 	}
 
-	// 同步战斗状态相关变量
+	// 同步战斗状态相关变量（只同步可序列化的值）
 	if battleState, exists := tr.context.Variables["battle_state"]; exists {
-		tr.assertion.SetContext("battle_state", battleState)
+		if isSerializable(battleState) {
+			tr.assertion.SetContext("battle_state", battleState)
+		}
 	}
 	if isResting, exists := tr.context.Variables["is_resting"]; exists {
-		tr.assertion.SetContext("is_resting", isResting)
+		if isSerializable(isResting) {
+			tr.assertion.SetContext("is_resting", isResting)
+		}
 	}
 	if restUntil, exists := tr.context.Variables["rest_until"]; exists {
-		tr.assertion.SetContext("rest_until", restUntil)
+		if isSerializable(restUntil) {
+			tr.assertion.SetContext("rest_until", restUntil)
+		}
 	}
 	if restSpeed, exists := tr.context.Variables["rest_speed"]; exists {
-		tr.assertion.SetContext("rest_speed", restSpeed)
+		if isSerializable(restSpeed) {
+			tr.assertion.SetContext("rest_speed", restSpeed)
+		}
 	}
 	if turnOrder, exists := tr.context.Variables["turn_order"]; exists {
-		tr.assertion.SetContext("turn_order", turnOrder)
+		if isSerializable(turnOrder) {
+			tr.assertion.SetContext("turn_order", turnOrder)
+		} else {
+			debugPrint("[DEBUG] updateAssertionContext: turn_order is not serializable, skipping\n")
+		}
 	}
 	if turnOrderLength, exists := tr.context.Variables["turn_order_length"]; exists {
-		tr.assertion.SetContext("turn_order_length", turnOrderLength)
+		if isSerializable(turnOrderLength) {
+			tr.assertion.SetContext("turn_order_length", turnOrderLength)
+		}
 	}
 	if enemyCount, exists := tr.context.Variables["enemy_count"]; exists {
-		tr.assertion.SetContext("enemy_count", enemyCount)
+		if isSerializable(enemyCount) {
+			tr.assertion.SetContext("enemy_count", enemyCount)
+		}
 	}
 	if enemyAliveCount, exists := tr.context.Variables["enemy_alive_count"]; exists {
-		tr.assertion.SetContext("enemy_alive_count", enemyAliveCount)
+		if isSerializable(enemyAliveCount) {
+			tr.assertion.SetContext("enemy_alive_count", enemyAliveCount)
+		}
 	}
 	if currentRound, exists := tr.context.Variables["current_round"]; exists {
-		tr.assertion.SetContext("current_round", currentRound)
+		if isSerializable(currentRound) {
+			tr.assertion.SetContext("current_round", currentRound)
+		}
 	}
 
 	// 同步队伍信息
@@ -4567,9 +4609,13 @@ func (tr *TestRunner) buildTurnOrder() error {
 		}
 	}
 
-	// 设置完整的turn_order数组
-	tr.assertion.SetContext("turn_order", turnOrder)
-	tr.context.Variables["turn_order"] = turnOrder
+	// 设置完整的turn_order数组（确保可序列化）
+	if isSerializable(turnOrder) {
+		tr.assertion.SetContext("turn_order", turnOrder)
+		tr.context.Variables["turn_order"] = turnOrder
+	} else {
+		debugPrint("[DEBUG] buildTurnOrder: turn_order is not serializable, skipping\n")
+	}
 	tr.assertion.SetContext("turn_order_length", len(turnOrder))
 	tr.context.Variables["turn_order_length"] = len(turnOrder)
 
