@@ -1000,6 +1000,15 @@ func isSerializable(v interface{}) bool {
 	
 	// 使用反射检查类型，更严格
 	val := reflect.ValueOf(v)
+	
+	// 如果是指针，解引用
+	if val.Kind() == reflect.Ptr {
+		if val.IsNil() {
+			return true // nil指针是可序列化的
+		}
+		val = val.Elem()
+	}
+	
 	kind := val.Kind()
 	
 	// 基本类型
@@ -1009,6 +1018,10 @@ func isSerializable(v interface{}) bool {
 		 reflect.Float32, reflect.Float64, reflect.String:
 		return true
 	case reflect.Slice, reflect.Array:
+		// 空切片/数组是可序列化的
+		if val.Len() == 0 {
+			return true
+		}
 		// 检查切片/数组中的每个元素是否可序列化
 		for i := 0; i < val.Len(); i++ {
 			elem := val.Index(i).Interface()
@@ -1018,6 +1031,10 @@ func isSerializable(v interface{}) bool {
 		}
 		return true
 	case reflect.Map:
+		// 空map是可序列化的
+		if val.Len() == 0 {
+			return true
+		}
 		// 只允许 map[string]interface{} 类型
 		if val.Type().Key().Kind() != reflect.String {
 			return false
@@ -1030,8 +1047,18 @@ func isSerializable(v interface{}) bool {
 			}
 		}
 		return true
+	case reflect.Interface:
+		// 接口类型，检查实际值
+		if val.IsNil() {
+			return true
+		}
+		return isSerializable(val.Interface())
 	default:
-		// 其他类型（包括指针、结构体、函数、通道等）不可序列化
+		// 其他类型（包括结构体、函数、通道等）不可序列化
+		// 特别检查：如果是结构体，拒绝
+		if kind == reflect.Struct {
+			return false
+		}
 		return false
 	}
 }
