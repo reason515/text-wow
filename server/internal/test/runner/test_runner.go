@@ -4465,6 +4465,19 @@ func (tr *TestRunner) handleAttackSkill(char *models.Character, skill *models.Sk
 			tr.assertion.SetContext("skill_damage_dealt", actualDamage)
 			tr.context.Variables["skill_damage_dealt"] = actualDamage
 
+			// 设置暴击和闪避状态（从damageResult获取）
+			if damageResult != nil {
+				tr.assertion.SetContext("skill_is_crit", damageResult.IsCrit)
+				tr.context.Variables["skill_is_crit"] = damageResult.IsCrit
+				if damageResult.IsCrit {
+					// 计算暴击伤害（实际伤害就是暴击伤害）
+					tr.assertion.SetContext("skill_crit_damage", actualDamage)
+					tr.context.Variables["skill_crit_damage"] = actualDamage
+				}
+				tr.assertion.SetContext("skill_is_dodged", damageResult.IsDodged)
+				tr.context.Variables["skill_is_dodged"] = damageResult.IsDodged
+			}
+
 			// 更新怪物到上下文
 			tr.context.Monsters[targetKey] = targetMonster
 		} else {
