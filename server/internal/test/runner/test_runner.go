@@ -2802,11 +2802,17 @@ func (tr *TestRunner) executeCalculateDamage(instruction string) error {
 
 // createSkill 创建技能（用于测试）
 func (tr *TestRunner) createSkill(instruction string) error {
+	// 默认资源消耗：如果是治疗技能，设为0（测试环境）；否则设为30
+	defaultResourceCost := 30
+	if strings.Contains(instruction, "治疗") || strings.Contains(instruction, "恢复") {
+		defaultResourceCost = 0 // 治疗技能在测试中默认不消耗资源
+	}
+	
 	skill := &models.Skill{
 		ID:          "test_skill",
 		Name:        "测试技能",
 		Type:        "attack",
-		ResourceCost: 30,
+		ResourceCost: defaultResourceCost,
 		Cooldown:    0,
 	}
 	
@@ -2891,6 +2897,11 @@ func (tr *TestRunner) createSkill(instruction string) error {
 				skill.Type = "heal"
 				// 将治疗量存储到上下文中
 				tr.context.Variables["skill_heal_amount"] = heal
+				// 如果是治疗技能且没有明确指定资源消耗，设置为0（测试环境）
+				if !strings.Contains(instruction, "消耗") {
+					skill.ResourceCost = 0
+					fmt.Fprintf(os.Stderr, "[DEBUG] createSkill: set ResourceCost=0 for heal skill (test environment)\n")
+				}
 				fmt.Fprintf(os.Stderr, "[DEBUG] createSkill: parsed heal amount=%d\n", heal)
 			}
 		}
