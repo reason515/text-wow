@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -91,6 +92,7 @@ type TestStep struct {
 	Action     string   `yaml:"action"`
 	Expected   string   `yaml:"expected"`
 	Timeout    int      `yaml:"timeout"`
+	MaxRounds  int      `yaml:"max_rounds"` // 最大回合数（用于"继续战斗直到"等指令）
 	Assertions []string `yaml:"assertions"`
 }
 
@@ -263,15 +265,22 @@ func (tr *TestRunner) RunTestCase(testCase TestCase) TestResult {
 // executeSetup 执行前置条件
 func (tr *TestRunner) executeSetup(setup []string) error {
 	for _, instruction := range setup {
+		debugPrint("[DEBUG] executeSetup: processing instruction: %s\n", instruction)
 		if err := tr.executeInstruction(instruction); err != nil {
+			debugPrint("[DEBUG] executeSetup: instruction failed: %s, error: %v\n", instruction, err)
 			return fmt.Errorf("setup instruction failed: %w", err)
 		}
+		debugPrint("[DEBUG] executeSetup: instruction completed: %s, characters=%d\n", instruction, len(tr.context.Characters))
 	}
 	return nil
 }
 
 // executeStep 执行测试步骤
 func (tr *TestRunner) executeStep(step TestStep) error {
+	// 将max_rounds存储到上下文中，供"继续战斗直到"等指令使用
+	if step.MaxRounds > 0 {
+		tr.context.Variables["step_max_rounds"] = step.MaxRounds
+	}
 	if err := tr.executeInstruction(step.Action); err != nil {
 		return fmt.Errorf("step action failed: %s, error: %w", step.Action, err)
 	}
@@ -315,11 +324,22 @@ func (tr *TestRunner) executeInstruction(instruction string) error {
 	} else if strings.Contains(instruction, "创建一个") && strings.Contains(instruction, "队伍") {
 		// 创建多人队伍（如"创建一个3人队伍：战士(HP=100)、牧师(HP=100)、法师(HP=100)"）
 		return tr.createTeam(instruction)
-	} else if (strings.Contains(instruction, "创建") && strings.Contains(instruction, "个角色")) || (strings.Contains(instruction, "创建") && strings.Contains(instruction, "角色") && strings.Contains(instruction, "：")) {
-		// 处理"创建3个角色：角色1（敏捷=30），角色2（敏捷=50）"这样的指令
-		return tr.createMultipleCharacters(instruction)
 	} else if strings.Contains(instruction, "创建一个") && strings.Contains(instruction, "角色") {
+		// 必须在"创建N个角色"之前检查，因为"创建一个角色"也包含"创建"和"个角色"
+		debugPrint("[DEBUG] executeInstruction: matched '创建一个角色' pattern for: %s\n", instruction)
 		return tr.createCharacter(instruction)
+	} else if (strings.Contains(instruction, "创建") && strings.Contains(instruction, "个角色") && !strings.Contains(instruction, "创建一个")) || (strings.Contains(instruction, "创建") && strings.Contains(instruction, "角色") && strings.Contains(instruction, "：")) {
+		// 处理"创建3个角色：角色1（敏捷=30），角色2（敏捷=50）"这样的指令
+		// 注意：必须排除"创建一个角色"，因为上面已经处理了
+		debugPrint("[DEBUG] executeInstruction: matched '创建N个角色' pattern for: %s\n", instruction)
+		return tr.createMultipleCharacters(instruction)
+	} else if strings.Contains(instruction, "创建") && strings.Contains(instruction, "角色") {
+		// 处理"创建角色"（没有"一个"或"N个"）的情况
+		debugPrint("[DEBUG] executeInstruction: matched '创建角色' pattern for: %s\n", instruction)
+		return tr.createCharacter(instruction)
+	} else if (strings.Contains(instruction, "创建") && strings.Contains(instruction, "个怪物")) || (strings.Contains(instruction, "创建") && strings.Contains(instruction, "怪物") && strings.Contains(instruction, "：")) {
+		// 处理"创建3个怪物：怪物1（速度=40），怪物2（速度=80）"这样的指令
+		return tr.createMultipleMonsters(instruction)
 	} else if (strings.Contains(instruction, "创建一个") || strings.Contains(instruction, "创建")) && strings.Contains(instruction, "怪物") {
 		return tr.createMonster(instruction)
 	} else if strings.Contains(instruction, "击败") && strings.Contains(instruction, "怪物") {
@@ -396,6 +416,30 @@ func (tr *TestRunner) executeInstruction(instruction string) error {
 		return tr.executeAddMonsterSkill(instruction)
 	} else if strings.Contains(instruction, "初始化战斗系统") {
 		// 初始化战斗系统（空操作，战斗系统在开始战斗时自动初始化）
+		return nil
+	} else if strings.Contains(instruction, "继续战斗直到") {
+		// 处理"继续战斗直到怪物死亡"、"继续战斗直到所有怪物死亡"
+		return tr.executeContinueBattleUntil(instruction)
+	} else if strings.Contains(instruction, "所有怪物攻击") || strings.Contains(instruction, "所有敌人攻击") {
+		// 处理"所有怪物攻击角色"、"所有怪物攻击队伍"
+		return tr.executeAllMonstersAttack(instruction)
+	} else if strings.Contains(instruction, "剩余") && strings.Contains(instruction, "个怪物攻击") {
+		// 处理"剩余2个怪物攻击角色"
+		return tr.executeRemainingMonstersAttack(instruction)
+	} else if strings.Contains(instruction, "角色攻击第") && strings.Contains(instruction, "个怪物") {
+		// 处理"角色攻击第一个怪物"、"角色攻击第二个怪物"
+		return tr.executeAttackSpecificMonster(instruction)
+	} else if strings.Contains(instruction, "怪物反击") {
+		// 处理"怪物反击"（等同于"怪物攻击角色"）
+		return tr.executeMonsterAttack()
+	} else if strings.Contains(instruction, "等待休息恢复") {
+		// 处理"等待休息恢复"
+		return tr.executeWaitRestRecovery()
+	} else if strings.Contains(instruction, "进入休息状态") {
+		// 处理"进入休息状态，休息速度倍率=X"
+		return tr.executeEnterRestState(instruction)
+	} else if strings.Contains(instruction, "记录战斗后") {
+		// 处理"记录战斗后HP和Resource"（空操作，用于测试文档说明）
 		return nil
 	}
 	return nil
@@ -623,6 +667,12 @@ func (tr *TestRunner) updateAssertionContext() {
 	}
 	if isResting, exists := tr.context.Variables["is_resting"]; exists {
 		tr.assertion.SetContext("is_resting", isResting)
+	}
+	if restUntil, exists := tr.context.Variables["rest_until"]; exists {
+		tr.assertion.SetContext("rest_until", restUntil)
+	}
+	if restSpeed, exists := tr.context.Variables["rest_speed"]; exists {
+		tr.assertion.SetContext("rest_speed", restSpeed)
 	}
 	if turnOrder, exists := tr.context.Variables["turn_order"]; exists {
 		tr.assertion.SetContext("turn_order", turnOrder)
@@ -1814,6 +1864,8 @@ func (tr *TestRunner) createCharacter(instruction string) error {
 	tr.context.Variables["max_hp"] = char.MaxHP
 
 	debugPrint("[DEBUG] createCharacter: stored all calculated attributes to Variables\n")
+	debugPrint("[DEBUG] createCharacter: final context - characters=%d, stored character with key='character'\n", len(tr.context.Characters))
+	debugPrint("[DEBUG] createCharacter: final context - characters=%d, stored character with key='character'\n", len(tr.context.Characters))
 
 	return nil
 }
@@ -1897,12 +1949,25 @@ func (tr *TestRunner) createMultipleCharacters(instruction string) error {
 			return fmt.Errorf("failed to get created character %d", charIndex)
 		}
 
+		// 保存敏捷值（可能在数据库操作后丢失）
+		savedAgility := char.Agility
+		savedStrength := char.Strength
+		savedIntellect := char.Intellect
+		savedStamina := char.Stamina
+		savedSpirit := char.Spirit
+
 		// 检查该slot是否已存在角色
 		if existingChar, exists := existingSlots[charIndex]; exists {
 			// 更新已存在的角色
 			char.ID = existingChar.ID
 			char.TeamSlot = charIndex
 			char.UserID = user.ID
+			// 恢复保存的属性值
+			char.Agility = savedAgility
+			char.Strength = savedStrength
+			char.Intellect = savedIntellect
+			char.Stamina = savedStamina
+			char.Spirit = savedSpirit
 			if err := charRepo.Update(char); err != nil {
 				return fmt.Errorf("failed to update character %d: %w", charIndex, err)
 			}
@@ -1910,12 +1975,33 @@ func (tr *TestRunner) createMultipleCharacters(instruction string) error {
 			// 创建新角色
 			char.TeamSlot = charIndex
 			char.UserID = user.ID
+			// 确保属性值正确
+			char.Agility = savedAgility
+			char.Strength = savedStrength
+			char.Intellect = savedIntellect
+			char.Stamina = savedStamina
+			char.Spirit = savedSpirit
 			createdChar, err := charRepo.Create(char)
 			if err != nil {
 				return fmt.Errorf("failed to create character %d: %w", charIndex, err)
 			}
 			char = createdChar
+			// 数据库操作后，可能需要重新设置属性值
+			char.Agility = savedAgility
+			char.Strength = savedStrength
+			char.Intellect = savedIntellect
+			char.Stamina = savedStamina
+			char.Spirit = savedSpirit
+			// 更新数据库以确保属性值正确
+			charRepo.Update(char)
 		}
+
+		// 确保属性值正确（数据库操作后可能被重置）
+		char.Agility = savedAgility
+		char.Strength = savedStrength
+		char.Intellect = savedIntellect
+		char.Stamina = savedStamina
+		char.Spirit = savedSpirit
 
 		// 重新计算速度（确保使用最新的敏捷值）
 		speed := tr.calculator.CalculateSpeed(char)
@@ -2008,6 +2094,19 @@ func (tr *TestRunner) createMonster(instruction string) error {
 			}
 		}
 
+		// 解析速度（如"速度=80"）
+		if strings.Contains(instruction, "速度=") {
+			parts := strings.Split(instruction, "速度=")
+			if len(parts) > 1 {
+				speedStr := strings.TrimSpace(strings.Split(parts[1], "，")[0])
+				speedStr = strings.TrimSpace(strings.Split(speedStr, "的")[0])
+				speedStr = strings.TrimSpace(strings.Split(speedStr, "（")[0])
+				if speed, err := strconv.Atoi(speedStr); err == nil {
+					monster.Speed = speed
+				}
+			}
+		}
+
 		// 解析攻击力（如"攻击力=20"）
 		if strings.Contains(instruction, "攻击力=") {
 			parts := strings.Split(instruction, "攻击力=")
@@ -2080,6 +2179,81 @@ func (tr *TestRunner) createMonster(instruction string) error {
 		debugPrint("[DEBUG] createMonster: stored monster[%s] with PhysicalDefense=%d, HP=%d\n", key, monster.PhysicalDefense, monster.HP)
 	}
 	debugPrint("[DEBUG] createMonster: total monsters in context: %d\n", len(tr.context.Monsters))
+
+	return nil
+}
+
+// createMultipleMonsters 创建多个怪物
+// 支持格式：如"创建3个怪物：怪物1（速度=40），怪物2（速度=80），怪物3（速度=60）"
+func (tr *TestRunner) createMultipleMonsters(instruction string) error {
+	// 解析怪物列表（通过冒号分隔）
+	var monsterDescs []string
+	if strings.Contains(instruction, "：") {
+		parts := strings.Split(instruction, "：")
+		if len(parts) > 1 {
+			monsterDescs = strings.Split(parts[1], "，")
+		}
+	} else if strings.Contains(instruction, ":") {
+		parts := strings.Split(instruction, ":")
+		if len(parts) > 1 {
+			monsterDescs = strings.Split(parts[1], ",")
+		}
+	}
+
+	for _, monsterDesc := range monsterDescs {
+		monsterDesc = strings.TrimSpace(monsterDesc)
+		if monsterDesc == "" {
+			continue
+		}
+
+		// 解析怪物索引（如"怪物1"、"怪物2"等）
+		monsterIndex := 1
+		if strings.Contains(monsterDesc, "怪物") {
+			// 提取数字
+			re := regexp.MustCompile(`怪物(\d+)`)
+			matches := re.FindStringSubmatch(monsterDesc)
+			if len(matches) > 1 {
+				if idx, err := strconv.Atoi(matches[1]); err == nil {
+					monsterIndex = idx
+				}
+			}
+		}
+
+		// 解析速度
+		speed := 0
+		if strings.Contains(monsterDesc, "速度=") {
+			parts := strings.Split(monsterDesc, "速度=")
+			if len(parts) > 1 {
+				speedStr := strings.TrimSpace(strings.Split(parts[1], "，")[0])
+				speedStr = strings.TrimSpace(strings.Split(speedStr, ")")[0])
+				speedStr = strings.TrimSpace(strings.Split(speedStr, "）")[0])
+				if s, err := strconv.Atoi(speedStr); err == nil {
+					speed = s
+				}
+			}
+		}
+
+		// 创建怪物
+		monster := &models.Monster{
+			ID:              fmt.Sprintf("monster_%d", monsterIndex),
+			Name:            fmt.Sprintf("测试怪物%d", monsterIndex),
+			Type:            "normal",
+			Level:           1,
+			HP:              100,
+			MaxHP:           100,
+			PhysicalAttack:  10,
+			MagicAttack:     5,
+			PhysicalDefense: 5,
+			MagicDefense:    3,
+			Speed:           speed,
+			DodgeRate:       0.05,
+		}
+
+		// 存储怪物（使用monster_1, monster_2等作为key）
+		key := fmt.Sprintf("monster_%d", monsterIndex)
+		tr.context.Monsters[key] = monster
+		debugPrint("[DEBUG] createMultipleMonsters: created monster[%s] with Speed=%d\n", key, speed)
+	}
 
 	return nil
 }
@@ -3992,13 +4166,34 @@ func (tr *TestRunner) buildTurnOrder() error {
 
 	participants := make([]participant, 0)
 
+	debugPrint("[DEBUG] buildTurnOrder: Characters count=%d, Monsters count=%d\n", len(tr.context.Characters), len(tr.context.Monsters))
+
 	// 收集所有角色（包括character和character_1, character_2等）
 	for key, char := range tr.context.Characters {
+		debugPrint("[DEBUG] buildTurnOrder: processing character key=%s, char=%v\n", key, char != nil)
 		if char != nil {
 			speed := tr.calculator.CalculateSpeed(char)
+			// 从key中提取角色ID
+			charID := key
+			if key == "character" {
+				// 如果是"character"，检查是否有character_1，如果没有则使用character_1
+				if _, exists := tr.context.Characters["character_1"]; !exists {
+					// 如果没有character_1，使用character_1作为ID
+					charID = "character_1"
+				} else {
+					// 如果有character_1，跳过这个"character"（避免重复）
+					continue
+				}
+			} else if strings.HasPrefix(key, "character_") {
+				// 直接使用key作为ID（character_1, character_2等）
+				charID = key
+			} else {
+				// 否则使用数据库ID
+				charID = fmt.Sprintf("character_%d", char.ID)
+			}
 			charEntry := map[string]interface{}{
 				"type":   "character",
-				"id":     fmt.Sprintf("character_%d", char.ID),
+				"id":     charID,
 				"speed":  speed,
 				"hp":     char.HP,
 				"max_hp": char.MaxHP,
@@ -4015,6 +4210,7 @@ func (tr *TestRunner) buildTurnOrder() error {
 
 	// 收集所有怪物
 	for key, monster := range tr.context.Monsters {
+		debugPrint("[DEBUG] buildTurnOrder: processing monster key=%s, monster=%v\n", key, monster != nil)
 		if monster != nil {
 			// key可能是monster_1, monster_2等，直接使用作为ID
 			monsterID := key
@@ -4058,7 +4254,8 @@ func (tr *TestRunner) buildTurnOrder() error {
 		tr.context.Variables[fmt.Sprintf("turn_order[%d].speed", idx)] = p.speed
 
 		if p.isChar {
-			charID := fmt.Sprintf("character_%d", p.charID)
+			// 使用entry中的id（已经从key提取）
+			charID := p.entry["id"].(string)
 			tr.assertion.SetContext(fmt.Sprintf("turn_order[%d].character.id", idx), charID)
 			tr.context.Variables[fmt.Sprintf("turn_order[%d].character.id", idx)] = charID
 		} else {
@@ -4078,6 +4275,8 @@ func (tr *TestRunner) buildTurnOrder() error {
 	tr.context.Variables["turn_order"] = turnOrder
 	tr.assertion.SetContext("turn_order_length", len(turnOrder))
 	tr.context.Variables["turn_order_length"] = len(turnOrder)
+
+	debugPrint("[DEBUG] buildTurnOrder: created turn_order with %d participants\n", len(turnOrder))
 
 	return nil
 }
@@ -4990,4 +5189,436 @@ func (tr *TestRunner) executeMonsterUseSkill(instruction string) error {
 	tr.context.Characters["character"] = char
 
 	return nil
+}
+
+// executeContinueBattleUntil 继续战斗直到条件满足（如"继续战斗直到怪物死亡"）
+func (tr *TestRunner) executeContinueBattleUntil(instruction string) error {
+	// 获取最大回合数（从step的max_rounds或默认值）
+	maxRounds := 50 // 默认最大回合数
+	if maxRoundsVal, exists := tr.context.Variables["step_max_rounds"]; exists {
+		if mr, ok := maxRoundsVal.(int); ok && mr > 0 {
+			maxRounds = mr
+		}
+	}
+
+	// 判断条件：怪物死亡或所有怪物死亡
+	allMonstersDead := strings.Contains(instruction, "所有怪物死亡") || strings.Contains(instruction, "所有敌人死亡")
+	singleMonsterDead := strings.Contains(instruction, "怪物死亡") && !allMonstersDead
+
+	round := 0
+	for round < maxRounds {
+		round++
+		tr.context.Variables["current_round"] = round
+		tr.assertion.SetContext("current_round", round)
+
+		// 检查角色是否存活
+		char, ok := tr.context.Characters["character"]
+		if !ok || char == nil || char.HP <= 0 {
+			// 角色死亡，战斗失败
+			tr.assertion.SetContext("battle_state", "defeat")
+			tr.context.Variables["battle_state"] = "defeat"
+			break
+		}
+
+		// 执行一个回合：角色攻击，然后怪物攻击
+		// 角色攻击第一个存活的怪物
+		if err := tr.executeAttackMonster(); err != nil {
+			// 如果没有怪物，战斗结束
+			break
+		}
+
+		// 更新上下文
+		tr.updateAssertionContext()
+
+		// 检查是否满足条件
+		aliveCount := 0
+		for _, monster := range tr.context.Monsters {
+			if monster != nil && monster.HP > 0 {
+				aliveCount++
+			}
+		}
+
+		tr.assertion.SetContext("enemy_alive_count", aliveCount)
+		tr.context.Variables["enemy_alive_count"] = aliveCount
+
+		if allMonstersDead {
+			// 所有怪物死亡
+			if aliveCount == 0 {
+				// 战斗胜利
+				tr.assertion.SetContext("battle_state", "victory")
+				tr.context.Variables["battle_state"] = "victory"
+				// 检查是否应该进入休息状态
+				if err := tr.checkAndEnterRest(); err != nil {
+					debugPrint("Warning: failed to enter rest state: %v\n", err)
+				}
+				// 给予经验和金币奖励（简化处理）
+				if char != nil {
+					// 计算经验奖励（基于怪物数量）
+					expGain := len(tr.context.Monsters) * 10 // 简化：每个怪物10经验
+					char.Exp += expGain
+					tr.assertion.SetContext("character.exp", char.Exp)
+					tr.context.Variables["character.exp"] = char.Exp
+					// 设置team_total_exp（单角色时等于character.exp）
+					tr.assertion.SetContext("team_total_exp", char.Exp)
+					tr.context.Variables["team_total_exp"] = char.Exp
+				}
+				// 设置team_alive_count（单角色时等于1）
+				tr.assertion.SetContext("team_alive_count", 1)
+				tr.context.Variables["team_alive_count"] = 1
+				// 设置enemy_death_count
+				tr.assertion.SetContext("enemy_death_count", len(tr.context.Monsters))
+				tr.context.Variables["enemy_death_count"] = len(tr.context.Monsters)
+				break
+			}
+		} else if singleMonsterDead {
+			// 单个怪物死亡（检查第一个怪物）
+			firstMonster := tr.getFirstAliveMonster()
+			if firstMonster == nil || firstMonster.HP <= 0 {
+				// 第一个怪物死亡
+				tr.assertion.SetContext("battle_state", "victory")
+				tr.context.Variables["battle_state"] = "victory"
+				if err := tr.checkAndEnterRest(); err != nil {
+					debugPrint("Warning: failed to enter rest state: %v\n", err)
+				}
+				if char != nil {
+					expGain := 10
+					char.Exp += expGain
+					tr.assertion.SetContext("character.exp", char.Exp)
+					tr.context.Variables["character.exp"] = char.Exp
+					// 设置team_total_exp
+					tr.assertion.SetContext("team_total_exp", char.Exp)
+					tr.context.Variables["team_total_exp"] = char.Exp
+				}
+				// 设置team_alive_count
+				tr.assertion.SetContext("team_alive_count", 1)
+				tr.context.Variables["team_alive_count"] = 1
+				// 设置enemy_death_count
+				tr.assertion.SetContext("enemy_death_count", 1)
+				tr.context.Variables["enemy_death_count"] = 1
+				break
+			}
+		}
+
+		// 怪物反击（所有存活的怪物攻击角色）
+		if err := tr.executeAllMonstersAttack("所有怪物攻击角色"); err != nil {
+			// 如果出错，继续下一回合
+		}
+
+		// 更新上下文
+		tr.updateAssertionContext()
+
+		// 再次检查角色是否存活
+		if char != nil && char.HP <= 0 {
+			tr.assertion.SetContext("battle_state", "defeat")
+			tr.context.Variables["battle_state"] = "defeat"
+			break
+		}
+	}
+
+	// 更新最终状态
+	tr.updateAssertionContext()
+	return nil
+}
+
+// executeAllMonstersAttack 所有怪物攻击角色或队伍
+func (tr *TestRunner) executeAllMonstersAttack(instruction string) error {
+	char, ok := tr.context.Characters["character"]
+	if !ok || char == nil {
+		return fmt.Errorf("character not found")
+	}
+
+	// 获取所有存活的怪物
+	aliveMonsters := []*models.Monster{}
+	for _, monster := range tr.context.Monsters {
+		if monster != nil && monster.HP > 0 {
+			aliveMonsters = append(aliveMonsters, monster)
+		}
+	}
+
+	if len(aliveMonsters) == 0 {
+		return fmt.Errorf("no alive monsters")
+	}
+
+	// 所有怪物攻击角色
+	totalDamage := 0
+	for _, monster := range aliveMonsters {
+		damage := int(math.Round(float64(monster.PhysicalAttack))) - char.PhysicalDefense
+		if damage < 1 {
+			damage = 1
+		}
+		totalDamage += damage
+		char.HP -= damage
+		if char.HP < 0 {
+			char.HP = 0
+		}
+	}
+
+	// 设置总伤害到上下文
+	tr.assertion.SetContext("total_monster_damage", totalDamage)
+	tr.context.Variables["total_monster_damage"] = totalDamage
+
+	// 如果角色死亡，战士怒气归0
+	if char.HP == 0 && char.ResourceType == "rage" {
+		char.Resource = 0
+		charRepo := repository.NewCharacterRepository()
+		charRepo.UpdateAfterBattle(char.ID, char.HP, char.Resource, char.Exp, char.Level,
+			char.ExpToNext, char.MaxHP, char.MaxResource, char.PhysicalAttack, char.MagicAttack, char.PhysicalDefense, char.MagicDefense,
+			char.Strength, char.Agility, char.Intellect, char.Stamina, char.Spirit, char.UnspentPoints, char.TotalKills)
+	} else if char.HP > 0 && char.ResourceType == "rage" {
+		// 受到伤害时获得怒气（每个怪物攻击获得5点）
+		char.Resource += len(aliveMonsters) * 5
+		if char.Resource > char.MaxResource {
+			char.Resource = char.MaxResource
+		}
+	}
+
+	// 更新上下文
+	tr.context.Characters["character"] = char
+	return nil
+}
+
+// executeRemainingMonstersAttack 剩余X个怪物攻击角色
+func (tr *TestRunner) executeRemainingMonstersAttack(instruction string) error {
+	// 解析剩余怪物数量（如"剩余2个怪物攻击角色"）
+	expectedCount := 0
+	if strings.Contains(instruction, "剩余") {
+		parts := strings.Split(instruction, "剩余")
+		if len(parts) > 1 {
+			countStr := strings.TrimSpace(strings.Split(parts[1], "个")[0])
+			if count, err := strconv.Atoi(countStr); err == nil {
+				expectedCount = count
+			}
+		}
+	}
+
+	// 获取所有存活的怪物
+	aliveMonsters := []*models.Monster{}
+	for _, monster := range tr.context.Monsters {
+		if monster != nil && monster.HP > 0 {
+			aliveMonsters = append(aliveMonsters, monster)
+		}
+	}
+
+	// 验证存活怪物数量
+	if len(aliveMonsters) != expectedCount {
+		debugPrint("Warning: expected %d alive monsters, but found %d\n", expectedCount, len(aliveMonsters))
+	}
+
+	// 执行攻击
+	return tr.executeAllMonstersAttack(instruction)
+}
+
+// executeAttackSpecificMonster 攻击指定的怪物（如"角色攻击第一个怪物"）
+func (tr *TestRunner) executeAttackSpecificMonster(instruction string) error {
+	char, ok := tr.context.Characters["character"]
+	if !ok || char == nil {
+		return fmt.Errorf("character not found")
+	}
+
+	// 解析怪物序号（如"第一个"、"第二个"）
+	monsterIndex := 0
+	if strings.Contains(instruction, "第一个") {
+		monsterIndex = 0
+	} else if strings.Contains(instruction, "第二个") {
+		monsterIndex = 1
+	} else if strings.Contains(instruction, "第三个") {
+		monsterIndex = 2
+	} else if strings.Contains(instruction, "第") {
+		// 解析数字（如"第3个"）
+		parts := strings.Split(instruction, "第")
+		if len(parts) > 1 {
+			numStr := strings.TrimSpace(strings.Split(parts[1], "个")[0])
+			if num, err := strconv.Atoi(numStr); err == nil {
+				monsterIndex = num - 1 // 转换为0-based索引
+			}
+		}
+	}
+
+	// 获取所有存活的怪物，按key排序
+	monsterKeys := []string{}
+	for key := range tr.context.Monsters {
+		if tr.context.Monsters[key] != nil && tr.context.Monsters[key].HP > 0 {
+			monsterKeys = append(monsterKeys, key)
+		}
+	}
+
+	// 排序（确保顺序一致）
+	sort.Strings(monsterKeys)
+
+	if monsterIndex >= len(monsterKeys) {
+		return fmt.Errorf("monster index %d out of range (only %d alive monsters)", monsterIndex+1, len(monsterKeys))
+	}
+
+	// 获取目标怪物
+	targetKey := monsterKeys[monsterIndex]
+	targetMonster := tr.context.Monsters[targetKey]
+
+	if targetMonster == nil {
+		return fmt.Errorf("target monster not found")
+	}
+
+	// 计算伤害
+	baseAttack := float64(char.PhysicalAttack)
+	if debuffModifier, exists := tr.context.Variables["monster_debuff_attack_modifier"]; exists {
+		if modifier, ok := debuffModifier.(float64); ok && modifier < 0 {
+			baseAttack = baseAttack * (1.0 + modifier)
+		}
+	}
+	damage := int(math.Round(baseAttack)) - targetMonster.PhysicalDefense
+	if damage < 1 {
+		damage = 1
+	}
+
+	// 应用伤害
+	targetMonster.HP -= damage
+	if targetMonster.HP < 0 {
+		targetMonster.HP = 0
+	}
+
+	// 设置伤害值到上下文
+	tr.assertion.SetContext("damage_dealt", damage)
+	tr.context.Variables["damage_dealt"] = damage
+
+	// 战士攻击时获得怒气
+	if char.ResourceType == "rage" {
+		char.Resource += 10
+		if char.Resource > char.MaxResource {
+			char.Resource = char.MaxResource
+		}
+	}
+
+	// 更新上下文
+	tr.context.Characters["character"] = char
+	tr.context.Monsters[targetKey] = targetMonster
+
+	// 如果怪物HP为0，检查是否所有怪物都死亡
+	if targetMonster.HP == 0 {
+		aliveCount := 0
+		for _, m := range tr.context.Monsters {
+			if m != nil && m.HP > 0 {
+				aliveCount++
+			}
+		}
+		if aliveCount == 0 {
+			// 所有怪物死亡，战斗胜利
+			tr.assertion.SetContext("battle_state", "victory")
+			tr.context.Variables["battle_state"] = "victory"
+			if char.ResourceType == "rage" {
+				char.Resource = 0
+				tr.context.Characters["character"] = char
+			}
+			if err := tr.checkAndEnterRest(); err != nil {
+				debugPrint("Warning: failed to enter rest state: %v\n", err)
+			}
+		}
+	}
+
+	return nil
+}
+
+// executeWaitRestRecovery 等待休息恢复
+func (tr *TestRunner) executeWaitRestRecovery() error {
+	// 检查是否处于休息状态
+	isResting, exists := tr.context.Variables["is_resting"]
+	if !exists || isResting == nil || !isResting.(bool) {
+		// 如果不在休息状态，先进入休息状态
+		if err := tr.checkAndEnterRest(); err != nil {
+			return fmt.Errorf("failed to enter rest state: %w", err)
+		}
+	}
+
+	// 模拟休息恢复（简化处理：直接恢复到满值）
+	char, ok := tr.context.Characters["character"]
+	if !ok || char == nil {
+		return fmt.Errorf("character not found")
+	}
+
+	// 恢复HP和Resource（简化：恢复到最大值）
+	char.HP = char.MaxHP
+	char.Resource = char.MaxResource
+
+	// 更新上下文
+	tr.context.Characters["character"] = char
+	tr.assertion.SetContext("character.hp", char.HP)
+	tr.assertion.SetContext("character.resource", char.Resource)
+	tr.assertion.SetContext("character.max_hp", char.MaxHP)
+	tr.assertion.SetContext("character.max_resource", char.MaxResource)
+
+	return nil
+}
+
+// executeEnterRestState 进入休息状态
+func (tr *TestRunner) executeEnterRestState(instruction string) error {
+	// 解析休息速度倍率（如"进入休息状态，休息速度倍率=2.0"）
+	restSpeed := 1.0
+	if strings.Contains(instruction, "休息速度倍率") {
+		parts := strings.Split(instruction, "休息速度倍率")
+		if len(parts) > 1 {
+			// 提取数字（如"=2.0"或"2.0"）
+			speedStr := strings.TrimSpace(parts[1])
+			speedStr = strings.TrimPrefix(speedStr, "=")
+			if speed, err := strconv.ParseFloat(speedStr, 64); err == nil {
+				restSpeed = speed
+			}
+		}
+	}
+
+	// 设置休息状态
+	tr.assertion.SetContext("is_resting", true)
+	tr.context.Variables["is_resting"] = true
+	tr.assertion.SetContext("rest_speed", restSpeed)
+	tr.context.Variables["rest_speed"] = restSpeed
+	tr.assertion.SetContext("battle_state", "resting")
+	tr.context.Variables["battle_state"] = "resting"
+
+	// 设置休息结束时间（简化处理：设置为当前时间+1小时）
+	restUntil := time.Now().Add(1 * time.Hour)
+	tr.assertion.SetContext("rest_until", restUntil)
+	tr.context.Variables["rest_until"] = restUntil
+
+	return nil
+}
+
+// checkAndEnterRest 检查并进入休息状态（当所有敌人死亡时）
+func (tr *TestRunner) checkAndEnterRest() error {
+	// 检查是否所有敌人死亡
+	aliveCount := 0
+	for _, monster := range tr.context.Monsters {
+		if monster != nil && monster.HP > 0 {
+			aliveCount++
+		}
+	}
+
+	if aliveCount == 0 {
+		// 所有敌人死亡，进入休息状态
+		tr.assertion.SetContext("is_resting", true)
+		tr.context.Variables["is_resting"] = true
+		tr.assertion.SetContext("battle_state", "resting")
+		tr.context.Variables["battle_state"] = "resting"
+
+		// 设置休息结束时间
+		restUntil := time.Now().Add(1 * time.Hour)
+		tr.assertion.SetContext("rest_until", restUntil)
+		tr.context.Variables["rest_until"] = restUntil
+	}
+
+	return nil
+}
+
+// getFirstAliveMonster 获取第一个存活的怪物
+func (tr *TestRunner) getFirstAliveMonster() *models.Monster {
+	// 按key排序，获取第一个存活的怪物
+	monsterKeys := []string{}
+	for key := range tr.context.Monsters {
+		if tr.context.Monsters[key] != nil && tr.context.Monsters[key].HP > 0 {
+			monsterKeys = append(monsterKeys, key)
+		}
+	}
+
+	if len(monsterKeys) == 0 {
+		return nil
+	}
+
+	sort.Strings(monsterKeys)
+	return tr.context.Monsters[monsterKeys[0]]
 }
