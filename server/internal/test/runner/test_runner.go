@@ -507,6 +507,24 @@ func (tr *TestRunner) executeInstruction(instruction string) error {
 	} else if strings.Contains(instruction, "角色在") && strings.Contains(instruction, "区域击杀") {
 		// 处理"角色在该区域击杀怪物（基础经验=10，基础金币=5）"
 		return tr.executeKillMonsterInZone(instruction)
+	} else if strings.Contains(instruction, "配置策略") {
+		// 处理"配置策略：如果HP<60%，使用治疗技能"
+		return tr.executeConfigureStrategy(instruction)
+	} else if strings.Contains(instruction, "执行策略判断") || strings.Contains(instruction, "执行策略选择") {
+		// 处理"执行策略判断"、"执行策略选择"
+		return tr.executeStrategyDecision(instruction)
+	} else if strings.Contains(instruction, "配置技能优先级") {
+		// 处理"配置技能优先级：治疗（优先级10）> 攻击（优先级5）> 防御（优先级1）"
+		return tr.executeConfigureSkillPriority(instruction)
+	} else if strings.Contains(instruction, "角色在") && strings.Contains(instruction, "区域击杀") && strings.Contains(instruction, "个怪物") {
+		// 处理"角色在 elwynn 区域击杀1个怪物"
+		return tr.executeKillMonsterInZoneForExploration(instruction)
+	} else if strings.Contains(instruction, "用户获得") && strings.Contains(instruction, "点探索度") {
+		// 处理"用户获得10点探索度"
+		return tr.executeGainExploration(instruction)
+	} else if strings.Contains(instruction, "设置区域解锁要求") {
+		// 处理"设置区域解锁要求：需要10点探索度"
+		return tr.executeSetZoneUnlockRequirement(instruction)
 	}
 	return nil
 }

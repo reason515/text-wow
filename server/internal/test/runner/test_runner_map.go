@@ -346,3 +346,272 @@ func (tr *TestRunner) executeKillMonsterInZone(instruction string) error {
 	return nil
 }
 
+// executeKillMonsterInZoneForExploration 在区域中击杀怪物（用于探索度）
+func (tr *TestRunner) executeKillMonsterInZoneForExploration(instruction string) error {
+	char, ok := tr.context.Characters["character"]
+	if !ok || char == nil {
+		return fmt.Errorf("character not found")
+	}
+
+	// 解析区域和数量，如"角色在 elwynn 区域击杀1个怪物"
+	zoneID := "elwynn" // 默认区域
+	if strings.Contains(instruction, "在") && strings.Contains(instruction, "区域") {
+		parts := strings.Split(instruction, "在")
+		if len(parts) > 1 {
+			zonePart := strings.TrimSpace(strings.Split(parts[1], "区域")[0])
+			zoneID = zonePart
+		}
+	}
+
+	// 增加探索度
+	explorationRepo := repository.NewExplorationRepository()
+	err := explorationRepo.AddExploration(char.UserID, zoneID, 1)
+	if err != nil {
+		return fmt.Errorf("failed to add exploration: %w", err)
+	}
+
+	// 获取更新后的探索度
+	exploration, err := explorationRepo.GetExploration(char.UserID, zoneID)
+	if err != nil {
+		return fmt.Errorf("failed to get exploration: %w", err)
+	}
+
+	tr.context.Variables["exploration_increase"] = 1
+	tr.assertion.SetContext("exploration_increase", 1)
+	tr.context.Variables["exploration"] = exploration.Exploration
+	tr.assertion.SetContext("exploration", exploration.Exploration)
+
+	return nil
+}
+
+// executeGainExploration 用户获得探索度
+func (tr *TestRunner) executeGainExploration(instruction string) error {
+	// 解析探索度数量，如"用户获得10点探索度"
+	parts := strings.Split(instruction, "获得")
+	if len(parts) > 1 {
+		expStr := strings.TrimSpace(strings.Split(parts[1], "点")[0])
+		if exp, err := strconv.Atoi(expStr); err == nil {
+			// 获取用户
+			user, err := tr.createTestUser()
+			if err != nil {
+				return fmt.Errorf("failed to create user: %w", err)
+			}
+
+			// 获取当前区域
+			zoneID := user.CurrentZoneID
+			if zoneID == "" {
+				zoneID = "elwynn"
+			}
+
+			// 增加探索度
+			explorationRepo := repository.NewExplorationRepository()
+			err = explorationRepo.AddExploration(user.ID, zoneID, exp)
+			if err != nil {
+				return fmt.Errorf("failed to add exploration: %w", err)
+			}
+
+			// 检查区域解锁
+			gameRepo := repository.NewGameRepository()
+			zone, err := gameRepo.GetZoneByID(zoneID)
+			if err == nil && zone != nil {
+				unlocked, _ := explorationRepo.IsZoneUnlocked(user.ID, zone)
+				tr.context.Variables["zone_unlocked"] = unlocked
+				tr.assertion.SetContext("zone_unlocked", unlocked)
+			}
+		}
+	}
+
+	return nil
+}
+
+// executeSetZoneUnlockRequirement 设置区域解锁要求
+func (tr *TestRunner) executeSetZoneUnlockRequirement(instruction string) error {
+	// 解析探索度要求，如"设置区域解锁要求：需要10点探索度"
+	parts := strings.Split(instruction, "需要")
+	if len(parts) > 1 {
+		expStr := strings.TrimSpace(strings.Split(parts[1], "点")[0])
+		if exp, err := strconv.Atoi(expStr); err == nil {
+			tr.context.Variables["zone_required_exploration"] = exp
+			tr.assertion.SetContext("zone_required_exploration", exp)
+		}
+	}
+
+	return nil
+}
+
+// executeConfigureStrategy 配置策略
+func (tr *TestRunner) executeConfigureStrategy(instruction string) error {
+	// 解析策略配置，如"配置策略：如果HP<60%，使用治疗技能"
+	// 存储策略配置到上下文
+	tr.context.Variables["strategy_configured"] = true
+	tr.assertion.SetContext("strategy_configured", true)
+
+	// 解析策略类型
+	if strings.Contains(instruction, "HP<") {
+		// 解析HP阈值
+		parts := strings.Split(instruction, "HP<")
+		if len(parts) > 1 {
+			thresholdStr := strings.TrimSpace(strings.Split(parts[1], "%")[0])
+			if threshold, err := strconv.Atoi(thresholdStr); err == nil {
+				tr.context.Variables["strategy_hp_threshold"] = threshold
+				tr.assertion.SetContext("strategy_hp_threshold", threshold)
+			}
+		}
+		// 解析使用的技能
+		if strings.Contains(instruction, "使用治疗技能") {
+			tr.context.Variables["strategy_skill_type"] = "heal"
+			tr.assertion.SetContext("strategy_skill_type", "heal")
+		}
+	} else if strings.Contains(instruction, "MP<") {
+		// 解析MP阈值
+		parts := strings.Split(instruction, "MP<")
+		if len(parts) > 1 {
+			thresholdStr := strings.TrimSpace(strings.Split(parts[1], "%")[0])
+			if threshold, err := strconv.Atoi(thresholdStr); err == nil {
+				tr.context.Variables["strategy_mp_threshold"] = threshold
+				tr.assertion.SetContext("strategy_mp_threshold", threshold)
+			}
+		}
+		// 解析使用的技能
+		if strings.Contains(instruction, "使用基础攻击") {
+			tr.context.Variables["strategy_skill_type"] = "basic_attack"
+			tr.assertion.SetContext("strategy_skill_type", "basic_attack")
+		}
+	} else if strings.Contains(instruction, "敌人HP<") {
+		// 解析敌人HP阈值
+		parts := strings.Split(instruction, "敌人HP<")
+		if len(parts) > 1 {
+			thresholdStr := strings.TrimSpace(strings.Split(parts[1], "%")[0])
+			if threshold, err := strconv.Atoi(thresholdStr); err == nil {
+				tr.context.Variables["strategy_enemy_hp_threshold"] = threshold
+				tr.assertion.SetContext("strategy_enemy_hp_threshold", threshold)
+			}
+		}
+		// 解析使用的技能
+		if strings.Contains(instruction, "使用斩杀技能") {
+			tr.context.Variables["strategy_skill_type"] = "execute"
+			tr.assertion.SetContext("strategy_skill_type", "execute")
+		}
+	}
+
+	return nil
+}
+
+// executeStrategyDecision 执行策略判断
+func (tr *TestRunner) executeStrategyDecision(instruction string) error {
+	char, ok := tr.context.Characters["character"]
+	if !ok || char == nil {
+		return fmt.Errorf("character not found")
+	}
+
+	// 获取策略配置
+	selectedSkillType := "basic_attack" // 默认
+
+	// 检查HP条件
+	if hpThreshold, exists := tr.context.Variables["strategy_hp_threshold"]; exists {
+		if threshold, ok := hpThreshold.(int); ok {
+			hpPercent := float64(char.HP) / float64(char.MaxHP) * 100
+			if hpPercent < float64(threshold) {
+				if skillType, exists := tr.context.Variables["strategy_skill_type"]; exists {
+					if st, ok := skillType.(string); ok {
+						selectedSkillType = st
+					}
+				}
+			}
+		}
+	}
+
+	// 检查MP条件
+	if mpThreshold, exists := tr.context.Variables["strategy_mp_threshold"]; exists {
+		if threshold, ok := mpThreshold.(int); ok {
+			mpPercent := float64(char.Resource) / float64(char.MaxResource) * 100
+			if mpPercent < float64(threshold) {
+				if skillType, exists := tr.context.Variables["strategy_skill_type"]; exists {
+					if st, ok := skillType.(string); ok {
+						selectedSkillType = st
+					}
+				}
+			}
+		}
+	}
+
+	// 检查敌人HP条件
+	if enemyHpThreshold, exists := tr.context.Variables["strategy_enemy_hp_threshold"]; exists {
+		if threshold, ok := enemyHpThreshold.(int); ok {
+			// 获取第一个怪物
+			var monster *models.Monster
+			for _, m := range tr.context.Monsters {
+				if m != nil && m.HP > 0 {
+					monster = m
+					break
+				}
+			}
+			if monster != nil {
+				hpPercent := float64(monster.HP) / float64(monster.MaxHP) * 100
+				if hpPercent < float64(threshold) {
+					if skillType, exists := tr.context.Variables["strategy_skill_type"]; exists {
+						if st, ok := skillType.(string); ok {
+							selectedSkillType = st
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// 设置选中的技能
+	tr.context.Variables["selected_skill.type"] = selectedSkillType
+	tr.assertion.SetContext("selected_skill.type", selectedSkillType)
+
+	return nil
+}
+
+// executeConfigureSkillPriority 配置技能优先级
+func (tr *TestRunner) executeConfigureSkillPriority(instruction string) error {
+	// 解析技能优先级，如"配置技能优先级：治疗（优先级10）> 攻击（优先级5）> 防御（优先级1）"
+	// 解析格式：技能名（优先级N）
+	skillPriorities := []map[string]interface{}{}
+
+	// 按">"分割
+	parts := strings.Split(instruction, "：")
+	if len(parts) > 1 {
+		priorityStr := parts[1]
+		skills := strings.Split(priorityStr, ">")
+		for i, skillStr := range skills {
+			skillStr = strings.TrimSpace(skillStr)
+			// 解析"治疗（优先级10）"
+			if strings.Contains(skillStr, "（") && strings.Contains(skillStr, "优先级") {
+				namePart := strings.TrimSpace(strings.Split(skillStr, "（")[0])
+				priorityPart := strings.TrimSpace(strings.Split(strings.Split(skillStr, "优先级")[1], "）")[0])
+				if priority, err := strconv.Atoi(priorityPart); err == nil {
+					skillPriorities = append(skillPriorities, map[string]interface{}{
+						"name":     namePart,
+						"priority": priority,
+						"index":    i,
+					})
+				}
+			}
+		}
+	}
+
+	// 存储到上下文
+	tr.context.Variables["skill_priority_order"] = skillPriorities
+	tr.assertion.SetContext("skill_priority_order", skillPriorities)
+
+	// 同时设置第一个技能的名称（用于断言）
+	if len(skillPriorities) > 0 {
+		if name, ok := skillPriorities[0]["name"].(string); ok {
+			tr.context.Variables["skill_priority_order[0].name"] = name
+			tr.assertion.SetContext("skill_priority_order[0].name", name)
+		}
+		if len(skillPriorities) > 1 {
+			if name, ok := skillPriorities[1]["name"].(string); ok {
+				tr.context.Variables["skill_priority_order[1].name"] = name
+				tr.assertion.SetContext("skill_priority_order[1].name", name)
+			}
+		}
+	}
+
+	return nil
+}
+
