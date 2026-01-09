@@ -354,4 +354,3 @@ func boolToInt(b bool) int {
 func intToBool(i int) bool {
 	return i != 0
 }
-

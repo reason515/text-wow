@@ -350,4 +350,3 @@ func (mm *MonsterManager) ReloadAllMonsterConfigs() error {
 
 	return mm.LoadAllMonsterConfigs()
 }
-

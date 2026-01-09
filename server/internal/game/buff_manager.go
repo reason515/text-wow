@@ -467,4 +467,3 @@ func (bm *BuffManager) ProcessEnemyDOTEffects(enemyID string, currentRound int) 
 
 	return damage
 }
-
