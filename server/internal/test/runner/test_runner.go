@@ -383,9 +383,14 @@ func (tr *TestRunner) safeSetContext(key string, value interface{}) {
 	switch v := value.(type) {
 	case string, int, int64, float64, bool:
 		tr.context.Variables[key] = v
+		// 同步到断言执行器的上下文
+		tr.assertion.SetContext(key, v)
 	default:
 		// 对于复杂类型，转换为字符串
-		tr.context.Variables[key] = fmt.Sprintf("%v", v)
+		strValue := fmt.Sprintf("%v", v)
+		tr.context.Variables[key] = strValue
+		// 同步到断言执行器的上下文
+		tr.assertion.SetContext(key, strValue)
 	}
 }
 

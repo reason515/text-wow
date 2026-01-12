@@ -439,39 +439,43 @@ func (tr *TestRunner) executeCreateTeamWithMembers(instruction string) error {
 
 func (tr *TestRunner) executeAddCharacterToTeamSlot(instruction string) error {
 
-	// 解析指令，如"将角色添加到槽位"
-
-
-	parts := strings.Split(instruction, "将角色添加到槽位")
-
-	if len(parts) < 2 {
-
+	// 解析指令，支持两种格式：
+	// 1. "将角色X添加到槽位Y" - 指定角色ID
+	// 2. "将角色添加到槽位Y" - 使用默认角色
+	
+	var charID, slot int
+	var err error
+	
+	// 尝试匹配 "将角色X添加到槽位Y" 格式
+	if strings.Contains(instruction, "将角色") && strings.Contains(instruction, "添加到槽位") {
+		// 提取角色ID部分
+		afterRole := strings.TrimPrefix(instruction, "将角色")
+		beforeSlot := strings.Split(afterRole, "添加到槽位")
+		
+		if len(beforeSlot) >= 2 {
+			charIDStr := strings.TrimSpace(beforeSlot[0])
+			slotStr := strings.TrimSpace(beforeSlot[1])
+			
+			// 如果角色ID为空，使用默认值1
+			if charIDStr == "" {
+				charID = 1
+			} else {
+				charID, err = strconv.Atoi(charIDStr)
+				if err != nil {
+					charID = 1 // 解析失败时使用默认值
+				}
+			}
+			
+			// 解析槽位
+			slot, err = strconv.Atoi(slotStr)
+			if err != nil {
+				return fmt.Errorf("failed to parse slot from '%s': %w", slotStr, err)
+			}
+		} else {
+			return fmt.Errorf("invalid instruction format: %s", instruction)
+		}
+	} else {
 		return fmt.Errorf("invalid instruction: %s", instruction)
-
-	}
-
-	
-
-	charIDPart := strings.TrimSpace(strings.Split(parts[1], "添加到槽位")[0])
-
-	charID, err := strconv.Atoi(charIDPart)
-
-	if err != nil {
-
-		return fmt.Errorf("failed to parse character ID: %w", err)
-
-	}
-
-	
-
-	slotPart := strings.TrimSpace(strings.Split(parts[1], "槽位")[1])
-
-	slot, err := strconv.Atoi(slotPart)
-
-	if err != nil {
-
-		return fmt.Errorf("failed to parse slot: %w", err)
-
 	}
 
 	
