@@ -1,0 +1,47 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+修复 character.go 文件中所有剩余的编码问题
+"""
+
+def fix_all_remaining():
+    file_path = 'server/internal/test/runner/character.go'
+    
+    with open(file_path, 'rb') as f:
+        content = f.read()
+    
+    # 修复所有 "以便后续恢" + 替换字符 + tab 的模式
+    # 替换为 "以便后续恢复\n" + tab
+    old_pattern = b'\xe4\xbe\xbf\xe4\xba\x8e\xe5\x90\x8e\xe7\xbb\xad\xe6\x81\xa2\xef\xbf\xbd\t'
+    new_pattern = b'\xe4\xbe\xbf\xe4\xba\x8e\xe5\x90\x8e\xe7\xbb\xad\xe6\x81\xa2\xe5\xa4\x8d\n\t'
+    content = content.replace(old_pattern, new_pattern)
+    
+    # 修复所有 "以便后续恢" + 替换字符 + 多个tab 的模式
+    old_pattern2 = b'\xe4\xbe\xbf\xe4\xba\x8e\xe5\x90\x8e\xe7\xbb\xad\xe6\x81\xa2\xef\xbf\xbd\t\t'
+    new_pattern2 = b'\xe4\xbe\xbf\xe4\xba\x8e\xe5\x90\x8e\xe7\xbb\xad\xe6\x81\xa2\xe5\xa4\x8d\n\t\t'
+    content = content.replace(old_pattern2, new_pattern2)
+    
+    old_pattern3 = b'\xe4\xbe\xbf\xe4\xba\x8e\xe5\x90\x8e\xe7\xbb\xad\xe6\x81\xa2\xef\xbf\xbd\t\t\t'
+    new_pattern3 = b'\xe4\xbe\xbf\xe4\xba\x8e\xe5\x90\x8e\xe7\xbb\xad\xe6\x81\xa2\xe5\xa4\x8d\n\t\t\t'
+    content = content.replace(old_pattern3, new_pattern3)
+    
+    old_pattern4 = b'\xe4\xbe\xbf\xe4\xba\x8e\xe5\x90\x8e\xe7\xbb\xad\xe6\x81\xa2\xef\xbf\xbd\t\t\t\t'
+    new_pattern4 = b'\xe4\xbe\xbf\xe4\xba\x8e\xe5\x90\x8e\xe7\xbb\xad\xe6\x81\xa2\xe5\xa4\x8d\n\t\t\t\t'
+    content = content.replace(old_pattern4, new_pattern4)
+    
+    old_pattern5 = b'\xe4\xbe\xbf\xe4\xba\x8e\xe5\x90\x8e\xe7\xbb\xad\xe6\x81\xa2\xef\xbf\xbd\t\t\t\t\t'
+    new_pattern5 = b'\xe4\xbe\xbf\xe4\xba\x8e\xe5\x90\x8e\xe7\xbb\xad\xe6\x81\xa2\xe5\xa4\x8d\n\t\t\t\t\t'
+    content = content.replace(old_pattern5, new_pattern5)
+    
+    old_pattern6 = b'\xe4\xbe\xbf\xe4\xba\x8e\xe5\x90\x8e\xe7\xbb\xad\xe6\x81\xa2\xef\xbf\xbd\t\t\t\t\t\t'
+    new_pattern6 = b'\xe4\xbe\xbf\xe4\xba\x8e\xe5\x90\x8e\xe7\xbb\xad\xe6\x81\xa2\xe5\xa4\x8d\n\t\t\t\t\t\t'
+    content = content.replace(old_pattern6, new_pattern6)
+    
+    # 写入文件
+    with open(file_path, 'wb') as f:
+        f.write(content)
+    
+    print("修复完成！")
+
+if __name__ == '__main__':
+    fix_all_remaining()

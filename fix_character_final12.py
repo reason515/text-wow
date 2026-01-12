@@ -1,0 +1,30 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+修复 character.go 文件中最后的编码问题
+"""
+
+def fix_final12():
+    file_path = 'server/internal/test/runner/character.go'
+    
+    with open(file_path, 'rb') as f:
+        content = f.read()
+    
+    # 修复第1004行：注释和代码混在一起
+    old1 = b'\xe5\xa6\x82\xe6\x9e\x9c\xe5\xae\x83\xe8\xa2\xab\xe6\x95\xb0\xe6\x8d\xae\xe5\xba\x93\xe6\x9b\xb4\xe6\x96\xb0\xe8\xa6\x86\xe7\x9b\x96\xe4\xba\x86\xef\xbf\xbd\t\t\tif savedPhysicalAttack'
+    new1 = b'\xe5\xa6\x82\xe6\x9e\x9c\xe5\xae\x83\xe8\xa2\xab\xe6\x95\xb0\xe6\x8d\xae\xe5\xba\x93\xe6\x9b\xb4\xe6\x96\xb0\xe8\xa6\x86\xe7\x9b\x96\xe4\xba\x86\n\t\t\tif savedPhysicalAttack'
+    content = content.replace(old1, new1)
+    
+    # 修复第1012行：注释和代码混在一起
+    old2 = b'\xe5\xa6\x82\xe6\x9e\x9cPhysicalAttack\xef\xbf\xbd\xef\xbc\x8c\xe9\x87\x8d\xe6\x96\xb0\xe8\xae\xa1\xef\xbf\xbd\t\t\t\tchar.PhysicalAttack'
+    new2 = b'\xe5\xa6\x82\xe6\x9e\x9cPhysicalAttack\xe4\xb8\xba0\xef\xbc\x8c\xe9\x87\x8d\xe6\x96\xb0\xe8\xae\xa1\xe7\xae\x97\n\t\t\t\tchar.PhysicalAttack'
+    content = content.replace(old2, new2)
+    
+    # 写入文件
+    with open(file_path, 'wb') as f:
+        f.write(content)
+    
+    print("修复完成！")
+
+if __name__ == '__main__':
+    fix_final12()

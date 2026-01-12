@@ -1,0 +1,34 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+修复 character.go 文件中更多的编码问题
+"""
+
+def fix_more():
+    file_path = 'server/internal/test/runner/character.go'
+    
+    with open(file_path, 'rb') as f:
+        content = f.read()
+    
+    # 修复第700行：注释和代码混在一起
+    # 查找：防御力（ + 替换字符 + 防御 + 替换字符 + 10" + 替换字符 + tab + if
+    old1 = b'\xe9\x98\xb2\xe5\xbe\xa1\xe5\x8a\x9b\xef\xbc\x88\xef\xbf\xbd\xe9\x98\xb2\xe5\xbe\xa1\xef\xbf\xbd10"\xef\xbf\xbd\tif'
+    # 替换为：防御力（如"防御=10"）\n\tif
+    new1 = b'\xe9\x98\xb2\xe5\xbe\xa1\xe5\x8a\x9b\xef\xbc\x88\xe5\xa6\x82"\xe9\x98\xb2\xe5\xbe\xa1=10"\xef\xbc\x89\n\tif'
+    content = content.replace(old1, new1)
+    
+    # 修复第756行：注释和代码混在一起
+    # 查找：金币=100" + 替换字符 + tab + // 注意 + ... + 模型 + 替换字符 + tab + if
+    old2 = b'\xe9\x87\x91\xe5\xb8\x81=100"\xef\xbf\xbd\t// \xe6\xb3\xa8\xe6\x84\x8f\xef\xbc\x9aGold\xe5\x9c\xa8User\xe6\xa8\xa1\xe5\x9e\x8b\xe4\xb8\xad\xef\xbc\x8c\xe4\xb8\x8d\xe5\x9c\xa8Character\xe6\xa8\xa1\xe5\x9e\x8b\xef\xbf\xbd\tif'
+    # 替换为：金币=100"）\n\t// 注意：Gold在User模型中，不在Character模型中\n\tif
+    new2 = b'\xe9\x87\x91\xe5\xb8\x81=100"\xef\xbc\x89\n\t// \xe6\xb3\xa8\xe6\x84\x8f\xef\xbc\x9aGold\xe5\x9c\xa8User\xe6\xa8\xa1\xe5\x9e\x8b\xe4\xb8\xad\xef\xbc\x8c\xe4\xb8\x8d\xe5\x9c\xa8Character\xe6\xa8\xa1\xe5\x9e\x8b\xe4\xb8\xad\n\tif'
+    content = content.replace(old2, new2)
+    
+    # 写入文件
+    with open(file_path, 'wb') as f:
+        f.write(content)
+    
+    print("修复完成！")
+
+if __name__ == '__main__':
+    fix_more()
