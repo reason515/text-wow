@@ -449,6 +449,25 @@ func (tr *TestRunner) executeBattleRound(instruction string) error {
 		tr.safeSetContext(fmt.Sprintf("monster_skill_cooldown_round_%d", roundNum), cooldownLeft)
 		tr.context.Variables[fmt.Sprintf("monster_skill_cooldown_round_%d", roundNum)] = cooldownLeft
 	}
+
+	// 记录当前回合的角色HP
+	if char != nil {
+		tr.safeSetContext(fmt.Sprintf("character.hp_round_%d", roundNum), char.HP)
+		tr.context.Variables[fmt.Sprintf("character.hp_round_%d", roundNum)] = char.HP
+	}
+
+	// 记录当前回合的怪物HP
+	monsterIdx := 1
+	for _, monster := range tr.context.Monsters {
+		if monster != nil {
+			tr.safeSetContext(fmt.Sprintf("monster.hp_round_%d", roundNum), monster.HP)
+			tr.context.Variables[fmt.Sprintf("monster.hp_round_%d", roundNum)] = monster.HP
+			tr.safeSetContext(fmt.Sprintf("monster_%d.hp_round_%d", monsterIdx, roundNum), monster.HP)
+			tr.context.Variables[fmt.Sprintf("monster_%d.hp_round_%d", monsterIdx, roundNum)] = monster.HP
+			monsterIdx++
+		}
+	}
+
 	return nil
 }
 

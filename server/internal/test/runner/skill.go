@@ -388,16 +388,20 @@ func (tr *TestRunner) executeAddBuff(instruction string) error {
 		tr.context.Variables["buff_attack_modifier"] = buffValue
 	}
 	tr.context.Variables["buff_duration"] = duration
+	tr.context.Variables["character_buff_duration"] = duration // 用于executeBattleRound减少
 	tr.context.Variables["buff_type"] = buffType
 	tr.context.Variables["character.buff_count"] = 1
 	tr.safeSetContext("character.buff_count", 1)
+	// 初始化buff_duration_round_1为初始持续时间
+	tr.context.Variables["buff_duration_round_1"] = duration
+	tr.safeSetContext("buff_duration_round_1", duration)
 
 	debugPrint("[DEBUG] executeAddBuff: type=%s, value=%f, duration=%d\n", buffType, buffValue, duration)
 	return nil
 }
 
 // executeAddShield 给角色添加护盾
-// 格式: "给角色添加30点护盾"
+// 格式: "给角色添加30点护盾" 或 "给角色添加50点护盾（持续3回合）"
 func (tr *TestRunner) executeAddShield(instruction string) error {
 	char, ok := tr.context.Characters["character"]
 	if !ok || char == nil {
@@ -416,10 +420,27 @@ func (tr *TestRunner) executeAddShield(instruction string) error {
 		}
 	}
 
+	// 解析护盾持续时间（默认3回合）
+	shieldDuration := 3
+	if strings.Contains(instruction, "持续") {
+		parts := strings.Split(instruction, "持续")
+		if len(parts) > 1 {
+			durationStr := strings.TrimSpace(strings.Split(parts[1], "回合")[0])
+			if d, err := strconv.Atoi(durationStr); err == nil {
+				shieldDuration = d
+			}
+		}
+	}
+
 	// 设置护盾值到上下文
 	tr.context.Variables["character.shield"] = shieldValue
 	tr.safeSetContext("character.shield", shieldValue)
+	tr.context.Variables["character.shield_duration"] = shieldDuration
+	tr.safeSetContext("character.shield_duration", shieldDuration)
+	// 初始化shield_duration_round_1
+	tr.context.Variables["character.shield_duration_round_1"] = shieldDuration
+	tr.safeSetContext("character.shield_duration_round_1", shieldDuration)
 
-	debugPrint("[DEBUG] executeAddShield: value=%d\n", shieldValue)
+	debugPrint("[DEBUG] executeAddShield: value=%d, duration=%d\n", shieldValue, shieldDuration)
 	return nil
 }
