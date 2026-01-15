@@ -218,13 +218,18 @@ func (tr *TestRunner) executeAttackMonster() error {
 		}
 		// 检查是否所有怪物都死亡
 		allDead := true
+		hasMonsters := false
 		for _, m := range tr.context.Monsters {
-			if m != nil && m.HP > 0 {
-				allDead = false
-				break
+			if m != nil {
+				hasMonsters = true
+				if m.HP > 0 {
+					allDead = false
+					break
+				}
 			}
 		}
-		if allDead {
+		// 只有当存在怪物且所有怪物都死亡时，才算胜利
+		if hasMonsters && allDead {
 			tr.setBattleResult(true, char)
 		}
 	}
