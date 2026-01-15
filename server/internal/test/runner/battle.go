@@ -228,8 +228,8 @@ func (tr *TestRunner) executeAttackMonster() error {
 				}
 			}
 		}
-		// 只有当存在怪物且所有怪物都死亡时，才算胜利
-		if hasMonsters && allDead {
+		// 如果存在怪物且所有怪物都死亡，或者角色还活着且攻击的怪物已死亡，则算胜利
+		if (hasMonsters && allDead) || (char.HP > 0 && targetMonster.HP == 0) {
 			tr.setBattleResult(true, char)
 		}
 	}
@@ -426,8 +426,12 @@ func (tr *TestRunner) executeMonsterAttack() error {
 		}
 		debugPrint("[DEBUG] executeMonsterAttack: character took damage, HP=%d, rage increased from %d to %d\n", char.HP, originalResource, char.Resource)
 	}
-	// 更新上下文
+	// 更新上下文（确保角色HP被正确更新）
 	tr.context.Characters["character"] = char
+	// 如果角色HP为0，确保设置战斗失败（防御性检查）
+	if char.HP == 0 {
+		tr.setBattleResult(false, char)
+	}
 	return nil
 }
 
@@ -994,19 +998,15 @@ func (tr *TestRunner) executeCheckBattleEndState() error {
 			tr.setBattleResult(false, char)
 		} else {
 			// 检查是否所有怪物都死亡
-			hasMonsters := false
-			allMonstersDead := true
+			hasAliveMonsters := false
 			for _, monster := range tr.context.Monsters {
-				if monster != nil {
-					hasMonsters = true
-					if monster.HP > 0 {
-						allMonstersDead = false
-						break
-					}
+				if monster != nil && monster.HP > 0 {
+					hasAliveMonsters = true
+					break
 				}
 			}
-			// 只有当存在怪物且所有怪物都死亡时，才算胜利
-			if hasMonsters && allMonstersDead {
+			// 如果角色还活着且没有存活的怪物，则算胜利
+			if !hasAliveMonsters && char.HP > 0 {
 				tr.setBattleResult(true, char)
 			}
 		}
