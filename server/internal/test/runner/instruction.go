@@ -318,6 +318,10 @@ func (tr *TestRunner) tryExecuteBattleInstruction(instruction string) (bool, err
 	if strings.Contains(instruction, "使用") && strings.Contains(instruction, "伤害技能") {
 		return true, tr.executeElementalDamageSkill(instruction)
 	}
+	// 处理队伍攻击（需要在"角色攻击怪物"之前匹配）
+	if strings.Contains(instruction, "队伍攻击") && strings.Contains(instruction, "怪物") {
+		return true, tr.executeTeamAttackMonster()
+	}
 	if strings.Contains(instruction, "角色攻击怪物") || strings.Contains(instruction, "攻击怪物") {
 		return true, tr.executeAttackMonster()
 	}

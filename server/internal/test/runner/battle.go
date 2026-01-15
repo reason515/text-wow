@@ -231,6 +231,118 @@ func (tr *TestRunner) executeAttackMonster() error {
 	return nil
 }
 
+// executeTeamAttackMonster 队伍攻击怪物
+func (tr *TestRunner) executeTeamAttackMonster() error {
+	// 找到第一个存活的怪物
+	var targetMonster *models.Monster
+	var targetKey string
+	for key, monster := range tr.context.Monsters {
+		if monster != nil && monster.HP > 0 {
+			targetMonster = monster
+			targetKey = key
+			break
+		}
+	}
+	if targetMonster == nil {
+		return fmt.Errorf("monster not found")
+	}
+
+	// 让所有存活的角色攻击怪物
+	totalDamage := 0
+	attacked := false
+	for key, char := range tr.context.Characters {
+		if char != nil && char.HP > 0 {
+			// 计算伤害
+			baseAttack := float64(char.PhysicalAttack)
+			// 检查是否有Debuff减成
+			if debuffModifier, exists := tr.context.Variables["monster_debuff_attack_modifier"]; exists {
+				if modifier, ok := debuffModifier.(float64); ok && modifier < 0 {
+					baseAttack = baseAttack * (1.0 + modifier)
+				}
+			}
+			damage := int(math.Round(baseAttack)) - targetMonster.PhysicalDefense
+			if damage < 1 {
+				damage = 1
+			}
+			
+			// 应用伤害
+			targetMonster.HP -= damage
+			if targetMonster.HP < 0 {
+				targetMonster.HP = 0
+			}
+			totalDamage += damage
+			attacked = true
+
+			// 战士攻击时获得怒气
+			if char.ResourceType == "rage" {
+				char.Resource += 10
+				if char.Resource > char.MaxResource {
+					char.Resource = char.MaxResource
+				}
+			}
+			
+			// 更新角色到上下文
+			tr.context.Characters[key] = char
+		}
+	}
+
+	if !attacked {
+		return fmt.Errorf("no alive characters in team")
+	}
+
+	// 更新怪物到上下文
+	if targetKey != "" {
+		tr.context.Monsters[targetKey] = targetMonster
+	}
+
+	// 添加战斗日志
+	if battleLogs, exists := tr.context.Variables["battle_logs"]; exists {
+		if logs, ok := battleLogs.([]string); ok {
+			logs = append(logs, fmt.Sprintf("队伍攻击怪物，造成%d点伤害", totalDamage))
+			tr.context.Variables["battle_logs"] = logs
+		}
+	} else {
+		tr.context.Variables["battle_logs"] = []string{fmt.Sprintf("队伍攻击怪物，造成%d点伤害", totalDamage)}
+	}
+	tr.safeSetContext("damage_dealt", totalDamage)
+	tr.context.Variables["damage_dealt"] = totalDamage
+
+	// 如果怪物HP为0，战斗结束
+	if targetMonster.HP == 0 {
+		// 重置所有战士的怒气
+		for key, char := range tr.context.Characters {
+			if char != nil && char.ResourceType == "rage" {
+				char.Resource = 0
+				tr.context.Characters[key] = char
+			}
+		}
+		
+		// 检查是否所有怪物都死亡
+		allDead := true
+		for _, m := range tr.context.Monsters {
+			if m != nil && m.HP > 0 {
+				allDead = false
+				break
+			}
+		}
+		if allDead {
+			// 使用第一个存活的角色作为代表设置战斗结果
+			var firstChar *models.Character
+			for _, c := range tr.context.Characters {
+				if c != nil && c.HP > 0 {
+					firstChar = c
+					break
+				}
+			}
+			if firstChar != nil {
+				tr.setBattleResult(true, firstChar)
+			}
+		}
+	}
+
+	return nil
+}
+
 func (tr *TestRunner) executeMonsterAttack() error {
 	char, ok := tr.context.Characters["character"]
 	if !ok || char == nil {
@@ -607,35 +719,68 @@ func (tr *TestRunner) setBattleResult(isVictory bool, char *models.Character) {
 
 		// 如果胜利，给予经验和金币奖励
 		if isVictory {
-
 			// 计算经验奖励（基于怪物数量）
 			expGain := len(tr.context.Monsters) * 10 // 每个怪物10经验
-			char.Exp += expGain
-			tr.safeSetContext("character.exp", char.Exp)
-			tr.context.Variables["character.exp"] = char.Exp
-			tr.safeSetContext("character.exp_gained", expGain)
-			tr.context.Variables["character.exp_gained"] = expGain
-
-			// 计算金币奖励（简化：每个怪物10-30金币）
-			goldGain := len(tr.context.Monsters) * 20 // 每个怪物20金币
-			userRepo := repository.NewUserRepository()
-			if user, err := userRepo.GetByID(char.UserID); err == nil && user != nil {
-				newGold := user.Gold + goldGain
-				userRepo.UpdateGold(char.UserID, newGold)
-				tr.safeSetContext("character.gold", newGold)
-				tr.context.Variables["character.gold"] = newGold
-				tr.safeSetContext("character.gold_gained", goldGain)
-				tr.context.Variables["character.gold_gained"] = goldGain
-			}
-			// 计算team_total_exp（所有角色的总经验）
-			teamTotalExp := char.Exp
+			
+			// 给所有存活的角色添加经验
+			teamTotalExp := 0
 			for key, c := range tr.context.Characters {
-				if c != nil && key != "character" {
+				if c != nil && c.HP > 0 {
+					c.Exp += expGain
+					teamTotalExp += c.Exp
+					
+					// 更新角色到上下文
+					tr.context.Characters[key] = c
+					
+					// 根据角色键设置经验变量
+					if key == "character" {
+						tr.safeSetContext("character.exp", c.Exp)
+						tr.context.Variables["character.exp"] = c.Exp
+						tr.safeSetContext("character.exp_gained", expGain)
+						tr.context.Variables["character.exp_gained"] = expGain
+					} else {
+						// 对于其他角色，也设置经验变量
+						tr.safeSetContext(fmt.Sprintf("%s.exp", key), c.Exp)
+						tr.context.Variables[fmt.Sprintf("%s.exp", key)] = c.Exp
+					}
+					
+					// 根据职业ID设置经验变量（如warrior.exp, priest.exp）
+					if c.ClassID == "warrior" {
+						tr.safeSetContext("warrior.exp", c.Exp)
+						tr.context.Variables["warrior.exp"] = c.Exp
+					} else if c.ClassID == "priest" {
+						tr.safeSetContext("priest.exp", c.Exp)
+						tr.context.Variables["priest.exp"] = c.Exp
+					} else if c.ClassID == "mage" {
+						tr.safeSetContext("mage.exp", c.Exp)
+						tr.context.Variables["mage.exp"] = c.Exp
+					} else if c.ClassID == "rogue" {
+						tr.safeSetContext("rogue.exp", c.Exp)
+						tr.context.Variables["rogue.exp"] = c.Exp
+					}
+				} else if c != nil {
+					// 死亡的角色不获得经验，但计入总经验
 					teamTotalExp += c.Exp
 				}
 			}
+			
+			// 设置team_total_exp
 			tr.safeSetContext("team_total_exp", teamTotalExp)
 			tr.context.Variables["team_total_exp"] = teamTotalExp
+
+			// 计算金币奖励（简化：每个怪物20金币，只给主角色）
+			if char != nil {
+				goldGain := len(tr.context.Monsters) * 20 // 每个怪物20金币
+				userRepo := repository.NewUserRepository()
+				if user, err := userRepo.GetByID(char.UserID); err == nil && user != nil {
+					newGold := user.Gold + goldGain
+					userRepo.UpdateGold(char.UserID, newGold)
+					tr.safeSetContext("character.gold", newGold)
+					tr.context.Variables["character.gold"] = newGold
+					tr.safeSetContext("character.gold_gained", goldGain)
+					tr.context.Variables["character.gold_gained"] = goldGain
+				}
+			}
 		} else {
 
 			// 失败时，exp_gained和gold_gained为0
@@ -844,14 +989,19 @@ func (tr *TestRunner) executeCheckBattleEndState() error {
 			tr.setBattleResult(false, char)
 		} else {
 			// 检查是否所有怪物都死亡
+			hasMonsters := false
 			allMonstersDead := true
 			for _, monster := range tr.context.Monsters {
-				if monster != nil && monster.HP > 0 {
-					allMonstersDead = false
-					break
+				if monster != nil {
+					hasMonsters = true
+					if monster.HP > 0 {
+						allMonstersDead = false
+						break
+					}
 				}
 			}
-			if allMonstersDead {
+			// 只有当存在怪物且所有怪物都死亡时，才算胜利
+			if hasMonsters && allMonstersDead {
 				tr.setBattleResult(true, char)
 			}
 		}
