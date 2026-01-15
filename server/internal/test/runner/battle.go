@@ -887,23 +887,28 @@ func (tr *TestRunner) executeEnterRestState() error {
 
 // executeContinueBattleUntil 继续战斗直到指定条件
 func (tr *TestRunner) executeContinueBattleUntil(instruction string) error {
-	// 解析条件（如"继续战斗直到角色死亡"或"继续战斗直到怪物死亡"）
+	maxRounds := 20 // 防止无限循环
+
 	if strings.Contains(instruction, "角色死亡") {
 		// 继续战斗直到角色死亡
-		char, ok := tr.context.Characters["character"]
-		if !ok || char == nil {
-			return fmt.Errorf("character not found")
-		}
-		// 这里可以实现战斗循环逻辑
-		for char.HP > 0 {
-			// 执行一个回合
-			// 简化实现：直接返回
-			break
+		for round := 0; round < maxRounds; round++ {
+			char, ok := tr.context.Characters["character"]
+			if !ok || char == nil {
+				return fmt.Errorf("character not found")
+			}
+			if char.HP <= 0 {
+				tr.setBattleResult(false, char)
+				break
+			}
+			// 怪物攻击角色
+			if err := tr.executeMonsterAttack(); err != nil {
+				debugPrint("[DEBUG] executeContinueBattleUntil: monster attack error: %v\n", err)
+			}
 		}
 	} else if strings.Contains(instruction, "怪物死亡") {
-		// 继续战斗直到怪物死亡
-		// 这里可以实现战斗循环逻辑
-		for {
+		// 继续战斗直到所有怪物死亡
+		for round := 0; round < maxRounds; round++ {
+			// 检查是否所有怪物已死亡
 			allDead := true
 			for _, monster := range tr.context.Monsters {
 				if monster != nil && monster.HP > 0 {
@@ -912,11 +917,14 @@ func (tr *TestRunner) executeContinueBattleUntil(instruction string) error {
 				}
 			}
 			if allDead {
+				char, _ := tr.context.Characters["character"]
+				tr.setBattleResult(true, char)
 				break
 			}
-			// 执行一个回合
-			// 简化实现：直接返回
-			break
+			// 角色攻击怪物
+			if err := tr.executeAttackMonster(); err != nil {
+				debugPrint("[DEBUG] executeContinueBattleUntil: attack error: %v\n", err)
+			}
 		}
 	}
 	return nil

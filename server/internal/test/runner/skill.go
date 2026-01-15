@@ -341,3 +341,85 @@ func (tr *TestRunner) executeUseSkill(instruction string) error {
 
 	return nil
 }
+
+// executeAddBuff 给角色添加Buff
+// 格式: "给角色添加攻击力+30%的Buff（持续3回合）"
+func (tr *TestRunner) executeAddBuff(instruction string) error {
+	char, ok := tr.context.Characters["character"]
+	if !ok || char == nil {
+		return fmt.Errorf("character not found")
+	}
+
+	// 解析Buff类型和数值
+	var buffType string
+	var buffValue float64
+	var duration int = 3 // 默认3回合
+
+	// 解析攻击力加成
+	if strings.Contains(instruction, "攻击力") {
+		buffType = "attack"
+		// 解析百分比数值（如"+30%"）
+		if idx := strings.Index(instruction, "+"); idx >= 0 {
+			rest := instruction[idx+1:]
+			if percentIdx := strings.Index(rest, "%"); percentIdx >= 0 {
+				valueStr := rest[:percentIdx]
+				if v, err := strconv.ParseFloat(valueStr, 64); err == nil {
+					buffValue = v / 100.0 // 转换为小数
+				}
+			}
+		}
+	}
+
+	// 解析持续时间
+	if strings.Contains(instruction, "持续") {
+		parts := strings.Split(instruction, "持续")
+		if len(parts) > 1 {
+			durationStr := strings.TrimSpace(strings.Split(parts[1], "回合")[0])
+			if d, err := strconv.Atoi(durationStr); err == nil {
+				duration = d
+			}
+		}
+	}
+
+	// 设置Buff相关变量到上下文
+	if buffType == "attack" {
+		tr.context.Variables["character.buff_attack_modifier"] = buffValue
+		tr.safeSetContext("character.buff_attack_modifier", buffValue)
+		tr.context.Variables["buff_attack_modifier"] = buffValue
+	}
+	tr.context.Variables["buff_duration"] = duration
+	tr.context.Variables["buff_type"] = buffType
+	tr.context.Variables["character.buff_count"] = 1
+	tr.safeSetContext("character.buff_count", 1)
+
+	debugPrint("[DEBUG] executeAddBuff: type=%s, value=%f, duration=%d\n", buffType, buffValue, duration)
+	return nil
+}
+
+// executeAddShield 给角色添加护盾
+// 格式: "给角色添加30点护盾"
+func (tr *TestRunner) executeAddShield(instruction string) error {
+	char, ok := tr.context.Characters["character"]
+	if !ok || char == nil {
+		return fmt.Errorf("character not found")
+	}
+
+	// 解析护盾值
+	shieldValue := 0
+	if strings.Contains(instruction, "点护盾") {
+		parts := strings.Split(instruction, "添加")
+		if len(parts) > 1 {
+			shieldStr := strings.TrimSpace(strings.Split(parts[1], "点")[0])
+			if v, err := strconv.Atoi(shieldStr); err == nil {
+				shieldValue = v
+			}
+		}
+	}
+
+	// 设置护盾值到上下文
+	tr.context.Variables["character.shield"] = shieldValue
+	tr.safeSetContext("character.shield", shieldValue)
+
+	debugPrint("[DEBUG] executeAddShield: value=%d\n", shieldValue)
+	return nil
+}

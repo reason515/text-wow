@@ -164,6 +164,23 @@ func (tr *TestRunner) tryExecuteCharacterInstruction(instruction string) (bool, 
 		debugPrint("[DEBUG] executeInstruction: matched '创建角色' pattern for: %s\n", instruction)
 		return true, tr.createCharacter(instruction)
 	}
+	// 处理Buff相关指令
+	if strings.Contains(instruction, "给角色添加") && strings.Contains(instruction, "Buff") {
+		return true, tr.executeAddBuff(instruction)
+	}
+	// 处理护盾相关指令
+	if strings.Contains(instruction, "给角色添加") && strings.Contains(instruction, "护盾") {
+		return true, tr.executeAddShield(instruction)
+	}
+	// 处理"创建一个角色和一个怪物"
+	if strings.Contains(instruction, "角色") && strings.Contains(instruction, "怪物") && strings.Contains(instruction, "和") {
+		// 先创建角色
+		if err := tr.createCharacter(instruction); err != nil {
+			return true, err
+		}
+		// 再创建怪物
+		return true, tr.createMonster(instruction)
+	}
 	return false, nil
 }
 
