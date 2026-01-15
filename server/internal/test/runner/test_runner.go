@@ -371,10 +371,11 @@ func (tr *TestRunner) RunAllTests(testDir string) ([]*TestSuiteResult, error) {
 
 }
 
-// debugPrint 调试打印函数
+// debugPrint 调试打印函数，只在TEST_DEBUG=1时输出
 func debugPrint(format string, args ...interface{}) {
-	// 可以在这里添加日志级别控制
-	fmt.Printf(format, args...)
+	if os.Getenv("TEST_DEBUG") == "1" || os.Getenv("TEST_DEBUG") == "true" {
+		fmt.Printf(format, args...)
+	}
 }
 
 // safeSetContext 安全地设置断言上下文，只设置可序列化的值

@@ -309,6 +309,8 @@ func (tr *TestRunner) executeUseSkill(instruction string) error {
 	// 检查资源是否足够
 	if char.Resource < skill.ResourceCost {
 		tr.safeSetContext("skill_used", false)
+		tr.safeSetContext("skill_use_failed", true)
+		tr.context.Variables["skill_use_failed"] = true
 		tr.safeSetContext("error_message", fmt.Sprintf("资源不足: 需要%d，当前%d", skill.ResourceCost, char.Resource))
 		return nil
 	}

@@ -3,6 +3,7 @@ package game
 import (
 	"fmt"
 	"math/rand"
+	"os"
 	"sync"
 
 	"text-wow/internal/database"
@@ -551,9 +552,11 @@ func (em *EquipmentManager) validateEquipmentRequirements(char *models.Character
 		return fmt.Errorf("failed to get item: %w", err)
 	}
 
-	// 调试：打印item配置
-	fmt.Printf("[DEBUG] validateEquipmentRequirements: itemID=%s, charLevel=%d, charClass=%s, item level_required=%v, item class_required=%v\n", 
-		equipment.ItemID, char.Level, char.ClassID, item["level_required"], item["class_required"])
+	// 调试：打印item配置（仅在TEST_DEBUG=1时输出）
+	if os.Getenv("TEST_DEBUG") == "1" {
+		fmt.Printf("[DEBUG] validateEquipmentRequirements: itemID=%s, charLevel=%d, charClass=%s, item level_required=%v, item class_required=%v\n", 
+			equipment.ItemID, char.Level, char.ClassID, item["level_required"], item["class_required"])
+	}
 
 	// 检查等级要求
 	levelRequired, ok := item["level_required"].(int)

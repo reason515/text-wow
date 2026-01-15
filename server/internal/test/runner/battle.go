@@ -210,11 +210,22 @@ func (tr *TestRunner) executeAttackMonster() error {
 	if targetKey != "" {
 		tr.context.Monsters[targetKey] = targetMonster
 	}
-	// 如果怪物HP�，战斗结束，战士怒气�
+	// 如果怪物HP为0，战斗结束，战士怒气归0
 	if targetMonster.HP == 0 {
 		if char.ResourceType == "rage" {
 			char.Resource = 0
 			tr.context.Characters["character"] = char
+		}
+		// 检查是否所有怪物都死亡
+		allDead := true
+		for _, m := range tr.context.Monsters {
+			if m != nil && m.HP > 0 {
+				allDead = false
+				break
+			}
+		}
+		if allDead {
+			tr.setBattleResult(true, char)
 		}
 	}
 	return nil
@@ -283,9 +294,10 @@ func (tr *TestRunner) executeMonsterAttack() error {
 				char.ExpToNext, char.MaxHP, char.MaxResource, char.PhysicalAttack, char.MagicAttack, char.PhysicalDefense, char.MagicDefense,
 				char.Strength, char.Agility, char.Intellect, char.Stamina, char.Spirit, char.UnspentPoints, char.TotalKills)
 		}
-		// 如果角色死亡，不再获得怒气，直接返回
+		// 如果角色死亡，不再获得怒气，设置战斗失败
 		tr.context.Characters["character"] = char
 		debugPrint("[DEBUG] executeMonsterAttack: character died, HP=0, rage reset to 0 (was %d)\n", originalResource)
+		tr.setBattleResult(false, char)
 		return nil
 	}
 	// 只有在角色未死亡时，才获得怒气
@@ -656,7 +668,19 @@ func (tr *TestRunner) checkAndEnterRest() error {
 func (tr *TestRunner) executeStartBattle() error {
 	char, ok := tr.context.Characters["character"]
 	if !ok || char == nil {
-		return fmt.Errorf("character not found")
+		// 尝试查找其他角色（如character_1, warrior等）
+		for key, c := range tr.context.Characters {
+			if c != nil {
+				char = c
+				// 同时设置到"character"键以便后续使用
+				tr.context.Characters["character"] = c
+				debugPrint("[DEBUG] executeStartBattle: using character from key '%s'\n", key)
+				break
+			}
+		}
+		if char == nil {
+			return fmt.Errorf("character not found")
+		}
 	}
 
 	// 获取BattleManager并开始战斗

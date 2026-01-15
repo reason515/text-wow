@@ -29,7 +29,8 @@ func (tr *TestRunner) createTeam(instruction string) error {
 
 
 
-	// 解析队伍成员（通过冒号或逗号分隔�?	// 格式：战�HP=100)、牧�HP=100)、法�HP=100)
+	// 解析队伍成员（通过冒号或逗号分隔）
+	// 格式：战士(HP=100)、牧师(HP=100)、法师(HP=100)
 
 	var members []string
 
@@ -43,8 +44,22 @@ func (tr *TestRunner) createTeam(instruction string) error {
 
 		}
 
-	} else if strings.Contains(instruction, ":") {
+	} else if strings.Contains(instruction, "：") {
+		// 中文冒号
+		parts := strings.Split(instruction, "：")
 
+		if len(parts) > 1 {
+			// 支持中文顿号"、"分隔
+			memberStr := parts[1]
+			if strings.Contains(memberStr, "、") {
+				members = strings.Split(memberStr, "、")
+			} else {
+				members = strings.Split(memberStr, ",")
+			}
+		}
+
+	} else if strings.Contains(instruction, ":") {
+		// 英文冒号
 		parts := strings.Split(instruction, ":")
 
 		if len(parts) > 1 {
