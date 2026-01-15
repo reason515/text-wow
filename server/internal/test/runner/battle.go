@@ -831,10 +831,30 @@ func (tr *TestRunner) executeCheckBattleState(instruction string) error {
 
 // executeCheckBattleEndState 检查战斗结束状态
 func (tr *TestRunner) executeCheckBattleEndState() error {
-	// 确保战士的怒气为0
 	char, ok := tr.context.Characters["character"]
 	if !ok || char == nil {
 		return fmt.Errorf("character not found")
+	}
+
+	// 检查战斗结果是否已经设置
+	if _, exists := tr.context.Variables["battle_result.is_victory"]; !exists {
+		// 如果还没有设置战斗结果，检查当前状态并设置
+		// 检查角色是否死亡
+		if char.HP <= 0 {
+			tr.setBattleResult(false, char)
+		} else {
+			// 检查是否所有怪物都死亡
+			allMonstersDead := true
+			for _, monster := range tr.context.Monsters {
+				if monster != nil && monster.HP > 0 {
+					allMonstersDead = false
+					break
+				}
+			}
+			if allMonstersDead {
+				tr.setBattleResult(true, char)
+			}
+		}
 	}
 
 	// 如果角色是战士，确保怒气为0

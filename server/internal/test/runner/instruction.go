@@ -173,7 +173,7 @@ func (tr *TestRunner) tryExecuteCharacterInstruction(instruction string) (bool, 
 		return true, tr.executeAddShield(instruction)
 	}
 	// 处理状态效果相关指令
-	if strings.Contains(instruction, "给角色添加") && (strings.Contains(instruction, "击晕") || strings.Contains(instruction, "沉默") || strings.Contains(instruction, "恐惧") || strings.Contains(instruction, "状态效果")) {
+	if (strings.Contains(instruction, "给角色添加") || strings.Contains(instruction, "对角色施加")) && (strings.Contains(instruction, "击晕") || strings.Contains(instruction, "眩晕") || strings.Contains(instruction, "沉默") || strings.Contains(instruction, "恐惧") || strings.Contains(instruction, "状态效果")) {
 		return true, tr.executeAddStatusEffect(instruction)
 	}
 	// 处理"创建一个角色和一个怪物"
@@ -311,7 +311,7 @@ func (tr *TestRunner) tryExecuteBattleInstruction(instruction string) (bool, err
 	if strings.Contains(instruction, "检查战斗初始状态") || strings.Contains(instruction, "检查战斗状态") {
 		return true, tr.executeCheckBattleState(instruction)
 	}
-	if strings.Contains(instruction, "检查战斗结束状态") {
+	if strings.Contains(instruction, "检查战斗结束状态") || strings.Contains(instruction, "检查战斗结果") {
 		return true, tr.executeCheckBattleEndState()
 	}
 	// 处理元素伤害技能（需要在"攻击怪物"之前匹配）

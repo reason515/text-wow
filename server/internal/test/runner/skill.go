@@ -457,7 +457,7 @@ func (tr *TestRunner) executeAddStatusEffect(instruction string) error {
 	var statusType string
 	var duration int = 2 // 默认2回合
 
-	if strings.Contains(instruction, "击晕") {
+	if strings.Contains(instruction, "击晕") || strings.Contains(instruction, "眩晕") {
 		statusType = "stunned"
 		tr.context.Variables["character.is_stunned"] = true
 		tr.safeSetContext("character.is_stunned", true)
