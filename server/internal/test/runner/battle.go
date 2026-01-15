@@ -371,6 +371,36 @@ func (tr *TestRunner) executeBattleRound(instruction string) error {
 					tr.context.Variables[fmt.Sprintf("character.shield_duration_round_%d", roundNum)] = newDuration
 				}
 			}
+			// 减少状态效果持续时间（每回合减少1）
+			statusTypes := []string{"stunned", "silenced", "feared"}
+			for _, statusType := range statusTypes {
+				durationKey := fmt.Sprintf("character.%s_duration", statusType)
+				if statusDuration, exists := tr.context.Variables[durationKey]; exists {
+					if duration, ok := statusDuration.(int); ok && duration > 0 {
+						newDuration := duration - 1
+						if newDuration < 0 {
+							newDuration = 0
+						}
+						tr.context.Variables[durationKey] = newDuration
+						tr.safeSetContext(durationKey, newDuration)
+						tr.safeSetContext(fmt.Sprintf("character.%s_duration_round_%d", statusType, roundNum), newDuration)
+						tr.context.Variables[fmt.Sprintf("character.%s_duration_round_%d", statusType, roundNum)] = newDuration
+						// 如果持续时间为0，清除状态
+						if newDuration == 0 {
+							if statusType == "stunned" {
+								tr.context.Variables["character.is_stunned"] = false
+								tr.safeSetContext("character.is_stunned", false)
+							} else if statusType == "silenced" {
+								tr.context.Variables["character.is_silenced"] = false
+								tr.safeSetContext("character.is_silenced", false)
+							} else if statusType == "feared" {
+								tr.context.Variables["character.is_feared"] = false
+								tr.safeSetContext("character.is_feared", false)
+							}
+						}
+					}
+				}
+			}
 			// 获取技能状态，检查是否可用（不再从Variables读取Skill对象，避免序列化错误）
 			skillID, exists := tr.context.Variables["skill_id"]
 			if exists {
@@ -597,8 +627,15 @@ func (tr *TestRunner) setBattleResult(isVictory bool, char *models.Character) {
 				tr.safeSetContext("character.gold_gained", goldGain)
 				tr.context.Variables["character.gold_gained"] = goldGain
 			}
-			// 设置team_total_exp（单角色时等于character.exp）
-			tr.context.Variables["team_total_exp"] = char.Exp
+			// 计算team_total_exp（所有角色的总经验）
+			teamTotalExp := char.Exp
+			for key, c := range tr.context.Characters {
+				if c != nil && key != "character" {
+					teamTotalExp += c.Exp
+				}
+			}
+			tr.safeSetContext("team_total_exp", teamTotalExp)
+			tr.context.Variables["team_total_exp"] = teamTotalExp
 		} else {
 
 			// 失败时，exp_gained和gold_gained为0
@@ -1000,6 +1037,97 @@ func (tr *TestRunner) executeAttackSpecificMonster(instruction string) error {
 	// 设置伤害值到上下文
 	tr.safeSetContext("damage_dealt", damage)
 	tr.context.Variables["damage_dealt"] = damage
+
+	return nil
+}
+
+// executeElementalDamageSkill 执行元素伤害技能
+// 格式: "角色对怪物使用火焰伤害技能"、"角色对怪物使用冰霜伤害技能"等
+func (tr *TestRunner) executeElementalDamageSkill(instruction string) error {
+	char, ok := tr.context.Characters["character"]
+	if !ok || char == nil {
+		return fmt.Errorf("character not found")
+	}
+
+	// 找到第一个存活的怪物
+	var targetMonster *models.Monster
+	var targetKey string
+	for key, monster := range tr.context.Monsters {
+		if monster != nil && monster.HP > 0 {
+			targetMonster = monster
+			targetKey = key
+			break
+		}
+	}
+	if targetMonster == nil {
+		return fmt.Errorf("monster not found")
+	}
+
+	// 解析伤害类型
+	var damageType string
+	if strings.Contains(instruction, "火焰") {
+		damageType = "fire"
+	} else if strings.Contains(instruction, "冰霜") {
+		damageType = "frost"
+	} else if strings.Contains(instruction, "暗影") {
+		damageType = "shadow"
+	} else if strings.Contains(instruction, "神圣") {
+		damageType = "holy"
+	} else if strings.Contains(instruction, "自然") {
+		damageType = "nature"
+	} else {
+		return fmt.Errorf("unknown damage type in instruction: %s", instruction)
+	}
+
+	// 计算元素伤害（使用法术攻击力和魔法防御）
+	baseAttack := float64(char.MagicAttack)
+	damage := int(math.Round(baseAttack)) - targetMonster.MagicDefense
+	if damage < 1 {
+		damage = 1
+	}
+
+	// 应用伤害
+	targetMonster.HP -= damage
+	if targetMonster.HP < 0 {
+		targetMonster.HP = 0
+	}
+
+	// 更新怪物到上下文
+	tr.context.Monsters[targetKey] = targetMonster
+
+	// 设置伤害类型和伤害值
+	tr.safeSetContext("damage_type", damageType)
+	tr.context.Variables["damage_type"] = damageType
+	tr.safeSetContext(fmt.Sprintf("%s_damage_type", damageType), damageType)
+	tr.context.Variables[fmt.Sprintf("%s_damage_type", damageType)] = damageType
+	tr.safeSetContext(fmt.Sprintf("%s_damage_dealt", damageType), damage)
+	tr.context.Variables[fmt.Sprintf("%s_damage_dealt", damageType)] = damage
+	tr.safeSetContext("damage_dealt", damage)
+	tr.context.Variables["damage_dealt"] = damage
+
+	// 添加战斗日志
+	if battleLogs, exists := tr.context.Variables["battle_logs"]; exists {
+		if logs, ok := battleLogs.([]string); ok {
+			logs = append(logs, fmt.Sprintf("角色使用%s伤害技能，造成%d点伤害", damageType, damage))
+			tr.context.Variables["battle_logs"] = logs
+		}
+	} else {
+		tr.context.Variables["battle_logs"] = []string{fmt.Sprintf("角色使用%s伤害技能，造成%d点伤害", damageType, damage)}
+	}
+
+	// 检查怪物是否死亡
+	if targetMonster.HP == 0 {
+		allDead := true
+		for _, m := range tr.context.Monsters {
+			if m != nil && m.HP > 0 {
+				allDead = false
+				break
+			}
+		}
+		if allDead {
+			tr.setBattleResult(true, char)
+		}
+	}
 
 	return nil
 }

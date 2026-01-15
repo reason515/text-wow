@@ -444,3 +444,66 @@ func (tr *TestRunner) executeAddShield(instruction string) error {
 	debugPrint("[DEBUG] executeAddShield: value=%d, duration=%d\n", shieldValue, shieldDuration)
 	return nil
 }
+
+// executeAddStatusEffect 给角色添加状态效果
+// 格式: "给角色添加击晕状态（持续2回合）"、"给角色添加沉默状态"等
+func (tr *TestRunner) executeAddStatusEffect(instruction string) error {
+	char, ok := tr.context.Characters["character"]
+	if !ok || char == nil {
+		return fmt.Errorf("character not found")
+	}
+
+	// 解析状态类型
+	var statusType string
+	var duration int = 2 // 默认2回合
+
+	if strings.Contains(instruction, "击晕") {
+		statusType = "stunned"
+		tr.context.Variables["character.is_stunned"] = true
+		tr.safeSetContext("character.is_stunned", true)
+	} else if strings.Contains(instruction, "沉默") {
+		statusType = "silenced"
+		tr.context.Variables["character.is_silenced"] = true
+		tr.safeSetContext("character.is_silenced", true)
+	} else if strings.Contains(instruction, "恐惧") {
+		statusType = "feared"
+		tr.context.Variables["character.is_feared"] = true
+		tr.safeSetContext("character.is_feared", true)
+	} else {
+		return fmt.Errorf("unknown status effect type in instruction: %s", instruction)
+	}
+
+	// 解析持续时间
+	if strings.Contains(instruction, "持续") {
+		parts := strings.Split(instruction, "持续")
+		if len(parts) > 1 {
+			durationStr := strings.TrimSpace(strings.Split(parts[1], "回合")[0])
+			if d, err := strconv.Atoi(durationStr); err == nil {
+				duration = d
+			}
+		}
+	}
+
+	// 设置状态效果相关变量
+	tr.context.Variables[fmt.Sprintf("character.%s_duration", statusType)] = duration
+	tr.safeSetContext(fmt.Sprintf("character.%s_duration", statusType), duration)
+	tr.context.Variables[fmt.Sprintf("character.%s_duration_round_1", statusType)] = duration
+	tr.safeSetContext(fmt.Sprintf("character.%s_duration_round_1", statusType), duration)
+
+	// 更新状态效果计数
+	statusCount := 1
+	if count, exists := tr.context.Variables["character.status_effect_count"]; exists {
+		if c, ok := count.(int); ok {
+			statusCount = c + 1
+		}
+	}
+	tr.context.Variables["character.status_effect_count"] = statusCount
+	tr.safeSetContext("character.status_effect_count", statusCount)
+
+	// 设置状态效果应用标志
+	tr.context.Variables["status_effect_applied"] = true
+	tr.safeSetContext("status_effect_applied", true)
+
+	debugPrint("[DEBUG] executeAddStatusEffect: type=%s, duration=%d\n", statusType, duration)
+	return nil
+}

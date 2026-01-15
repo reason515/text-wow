@@ -172,6 +172,10 @@ func (tr *TestRunner) tryExecuteCharacterInstruction(instruction string) (bool, 
 	if strings.Contains(instruction, "给角色添加") && strings.Contains(instruction, "护盾") {
 		return true, tr.executeAddShield(instruction)
 	}
+	// 处理状态效果相关指令
+	if strings.Contains(instruction, "给角色添加") && (strings.Contains(instruction, "击晕") || strings.Contains(instruction, "沉默") || strings.Contains(instruction, "恐惧") || strings.Contains(instruction, "状态效果")) {
+		return true, tr.executeAddStatusEffect(instruction)
+	}
 	// 处理"创建一个角色和一个怪物"
 	if strings.Contains(instruction, "角色") && strings.Contains(instruction, "怪物") && strings.Contains(instruction, "和") {
 		// 先创建角色
@@ -269,6 +273,10 @@ func (tr *TestRunner) tryExecuteCalculationInstruction(instruction string) (bool
 
 // tryExecuteSkillInstruction 尝试处理技能相关指令
 func (tr *TestRunner) tryExecuteSkillInstruction(instruction string) (bool, error) {
+	// 先检查是否是元素伤害技能（需要在普通技能之前匹配）
+	if strings.Contains(instruction, "使用") && strings.Contains(instruction, "伤害技能") {
+		return false, nil // 返回false让战斗指令处理
+	}
 	if strings.Contains(instruction, "学习技能") || strings.Contains(instruction, "角色学习技能") {
 		return true, tr.executeLearnSkill(instruction)
 	}
@@ -305,6 +313,10 @@ func (tr *TestRunner) tryExecuteBattleInstruction(instruction string) (bool, err
 	}
 	if strings.Contains(instruction, "检查战斗结束状态") {
 		return true, tr.executeCheckBattleEndState()
+	}
+	// 处理元素伤害技能（需要在"攻击怪物"之前匹配）
+	if strings.Contains(instruction, "使用") && strings.Contains(instruction, "伤害技能") {
+		return true, tr.executeElementalDamageSkill(instruction)
 	}
 	if strings.Contains(instruction, "角色攻击怪物") || strings.Contains(instruction, "攻击怪物") {
 		return true, tr.executeAttackMonster()
